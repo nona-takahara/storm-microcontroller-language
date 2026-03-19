@@ -1,0 +1,271 @@
+{
+  "schemaVersion": "7",
+  "nodes": [
+    {
+      "id": "composite_in",
+      "displayName": "Project Input Composite",
+      "category": "project",
+      "stormworks": {
+        "type": "5",
+        "mode": "1"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "composite",
+            "signal": "composite",
+            "label": "Composite"
+          }
+        ]
+      }
+    },
+    {
+      "id": "composite_out",
+      "displayName": "Project Output Composite",
+      "category": "project",
+      "stormworks": {
+        "type": "5"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "composite",
+            "signal": "composite",
+            "label": "Composite"
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "video_in",
+      "displayName": "Project Input Video",
+      "category": "project",
+      "stormworks": {
+        "type": "6",
+        "mode": "1"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "video",
+            "signal": "video",
+            "label": "Video"
+          }
+        ]
+      }
+    },
+    {
+      "id": "video_out",
+      "displayName": "Project Output Video",
+      "category": "project",
+      "stormworks": {
+        "type": "6"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "video",
+            "signal": "video",
+            "label": "Video"
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "number_in",
+      "displayName": "Project Input Number",
+      "category": "project",
+      "stormworks": {
+        "type": "1",
+        "mode": "1"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "number",
+            "signal": "number",
+            "label": "Number"
+          }
+        ]
+      }
+    },
+    {
+      "id": "number_out",
+      "displayName": "Project Output Number",
+      "category": "project",
+      "stormworks": {
+        "type": "1"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "number",
+            "signal": "number",
+            "label": "Number"
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "boolean_in",
+      "displayName": "Project Input Boolean",
+      "category": "project",
+      "stormworks": {
+        "type": "0",
+        "mode": "1"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "boolean",
+            "signal": "boolean",
+            "label": "Boolean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boolean_out",
+      "displayName": "Project Output Boolean",
+      "category": "project",
+      "stormworks": {
+        "type": "0"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "boolean",
+            "signal": "boolean",
+            "label": "Boolean"
+          }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "CONST",
+      "displayName": "Constant Number",
+      "category": "value",
+      "stormworks": {
+        "type": "15"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "value",
+            "signal": "number",
+            "label": "Value",
+            "stormworks": {
+              "nodeIndex": 1
+            }
+          }
+        ]
+      },
+      "properties": [
+        {
+          "key": "value",
+          "valueType": "number",
+          "required": true,
+          "dsl": {
+            "emit": false
+          },
+          "source": {
+            "xmlPath": "object.n.@value"
+          }
+        },
+        {
+          "key": "text",
+          "valueType": "string",
+          "required": false,
+          "dsl": {
+            "key": "value",
+            "valueType": "number"
+          },
+          "source": {
+            "xmlPath": "object.n.@text"
+          },
+          "writeTargets": [
+            {
+              "xmlPath": "object.n.@text",
+              "valueType": "string"
+            },
+            {
+              "xmlPath": "object.n.@value",
+              "valueType": "number"
+            }
+          ]
+        }
+      ],
+      "defaults": {
+        "value": 0,
+        "text": "0"
+      }
+    },
+    {
+      "id": "LUA",
+      "displayName": "Lua Script",
+      "category": "script",
+      "stormworks": {
+        "type": "56"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "composite",
+            "signal": "composite",
+            "label": "Composite",
+            "stormworks": {
+              "xmlKey": "in1"
+            }
+          },
+          {
+            "key": "video",
+            "signal": "video",
+            "label": "Video",
+            "stormworks": {
+              "xmlKey": "in2"
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "key": "composite",
+            "signal": "composite",
+            "label": "Composite"
+          },
+          {
+            "key": "video",
+            "signal": "video",
+            "label": "Video",
+            "stormworks": {
+              "nodeIndex": 1
+            }
+          }
+        ]
+      },
+      "properties": [
+        {
+          "key": "script",
+          "valueType": "string",
+          "required": true,
+          "source": {
+            "xmlPath": "object.@script"
+          }
+        }
+      ],
+      "defaults": {
+        "script": ""
+      }
+    }
+  ]
+}

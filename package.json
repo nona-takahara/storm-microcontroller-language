@@ -1,0 +1,31 @@
+{
+  "name": "storm-microcontroller-language",
+  "version": "0.1.0",
+  "description": "Stormworks microcontroller conversion tool skeleton",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "storm-mcl": "./dist/cli/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node ./scripts/copy-definitions.mjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "cli": "node --import tsx ./src/cli/main.ts"
+  },
+  "keywords": [
+    "stormworks",
+    "typescript",
+    "cli"
+  ],
+  "author": "Nona Takahara",
+  "license": "MIT",
+  "packageManager": "pnpm@10.28.2",
+  "dependencies": {
+    "fast-xml-parser": "^4.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.2"
+  }
+}
