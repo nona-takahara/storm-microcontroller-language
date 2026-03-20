@@ -1,3 +1,4 @@
+// Shared intermediate representation used to decouple XML parsing from DSL/project serialization and export.
 export type IrScalarValue = boolean | number | string | null;
 
 export type IrSignalKind = "number" | "boolean" | "composite" | "video" | "execute" | "unknown";
@@ -63,6 +64,7 @@ export interface IrProgram {
   metadata: IrProgramMetadata;
 }
 
+// Create an empty IR program with normalized metadata defaults.
 export function createEmptyIrProgram(metadata?: Partial<IrProgramMetadata>): IrProgram {
   return {
     nodes: [],

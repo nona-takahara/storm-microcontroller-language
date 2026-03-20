@@ -1,3 +1,4 @@
+// Definitions schema parser that validates the external node-definition JSON used by import/export.
 import type { IrScalarValue, IrSignalKind } from "../ir.js";
 
 export const NODE_DEFINITIONS_SCHEMA_VERSION = "9";
@@ -86,6 +87,7 @@ export interface NodePropertyWriteTarget {
   valueType?: DefinitionValueType;
 }
 
+// Error type that keeps precise schema paths for invalid definitions documents.
 export class NodeDefinitionsSchemaError extends Error {
   constructor(
     message: string,
@@ -96,6 +98,7 @@ export class NodeDefinitionsSchemaError extends Error {
   }
 }
 
+// Parse and validate the complete external definitions document.
 export function parseNodeDefinitionsDocument(input: unknown): NodeDefinitionsDocument {
   const root = expectRecord(input, "$");
   const schemaVersion = expectString(root.schemaVersion, "$.schemaVersion");
@@ -113,6 +116,7 @@ export function parseNodeDefinitionsDocument(input: unknown): NodeDefinitionsDoc
   };
 }
 
+// Parse one project-node definition entry.
 function parseProjectNodeDefinition(input: unknown, path: string): ProjectNodeDefinition {
   const base = parseDefinitionBase(input, path);
   const record = expectRecord(input, path);
@@ -123,6 +127,7 @@ function parseProjectNodeDefinition(input: unknown, path: string): ProjectNodeDe
   };
 }
 
+// Parse one logic-component definition entry.
 function parseComponentDefinition(input: unknown, path: string): ComponentDefinition {
   const base = parseDefinitionBase(input, path);
   const record = expectRecord(input, path);
@@ -133,6 +138,7 @@ function parseComponentDefinition(input: unknown, path: string): ComponentDefini
   };
 }
 
+// Parse the shared definition fields used by both project nodes and logic components.
 function parseDefinitionBase(input: unknown, path: string): DefinitionBase {
   const record = expectRecord(input, path);
   const propertiesValue = record.properties;
@@ -154,6 +160,7 @@ function parseDefinitionBase(input: unknown, path: string): DefinitionBase {
   };
 }
 
+// Parse the Stormworks binding block for one project-node definition.
 function parseProjectNodeBinding(input: unknown, path: string): ProjectNodeBinding {
   const record = expectRecord(input, path);
 
@@ -165,6 +172,7 @@ function parseProjectNodeBinding(input: unknown, path: string): ProjectNodeBindi
   };
 }
 
+// Parse the Stormworks binding block for one logic-component definition.
 function parseComponentBinding(input: unknown, path: string): ComponentBinding {
   const record = expectRecord(input, path);
 
@@ -177,6 +185,7 @@ function parseComponentBinding(input: unknown, path: string): ComponentBinding {
   };
 }
 
+// Parse the dynamic-input description used by components such as composite writers.
 function parseComponentDynamicInputsBinding(
   input: unknown,
   path: string,
@@ -192,6 +201,7 @@ function parseComponentDynamicInputsBinding(
   };
 }
 
+// Parse the input/output port lists shared by all definitions.
 function parseNodePortCollection(input: unknown, path: string): NodePortCollection {
   const record = expectRecord(input, path);
 
@@ -205,6 +215,7 @@ function parseNodePortCollection(input: unknown, path: string): NodePortCollecti
   };
 }
 
+// Parse one port definition, including optional Stormworks-side aliases.
 function parseNodePortDefinition(input: unknown, path: string): NodePortDefinition {
   const record = expectRecord(input, path);
 
@@ -219,6 +230,7 @@ function parseNodePortDefinition(input: unknown, path: string): NodePortDefiniti
   };
 }
 
+// Parse one property definition, including DSL aliases and XML write targets.
 function parseNodePropertyDefinition(input: unknown, path: string): NodePropertyDefinition {
   const record = expectRecord(input, path);
 
@@ -238,6 +250,7 @@ function parseNodePropertyDefinition(input: unknown, path: string): NodeProperty
   };
 }
 
+// Parse the XML source path for one property definition.
 function parseNodePropertySource(input: unknown, path: string): NodePropertySource {
   const record = expectRecord(input, path);
 
@@ -246,6 +259,7 @@ function parseNodePropertySource(input: unknown, path: string): NodePropertySour
   };
 }
 
+// Parse the Stormworks-side port binding used to map DSL ports back to XML names or node_index values.
 function parseNodePortStormworksBinding(input: unknown, path: string): NodePortStormworksBinding {
   const record = expectRecord(input, path);
 
@@ -256,6 +270,7 @@ function parseNodePortStormworksBinding(input: unknown, path: string): NodePortS
   };
 }
 
+// Parse the DSL-side property binding used to rename or hide properties in sw-net.
 function parseNodePropertyDslBinding(input: unknown, path: string): NodePropertyDslBinding {
   const record = expectRecord(input, path);
 
@@ -267,6 +282,7 @@ function parseNodePropertyDslBinding(input: unknown, path: string): NodeProperty
   };
 }
 
+// Parse one XML write target used when lowering DSL properties back into XML attributes or elements.
 function parseNodePropertyWriteTarget(input: unknown, path: string): NodePropertyWriteTarget {
   const record = expectRecord(input, path);
 
@@ -277,6 +293,7 @@ function parseNodePropertyWriteTarget(input: unknown, path: string): NodePropert
   };
 }
 
+// Parse a scalar default-value record.
 function parseScalarRecord(input: unknown, path: string): Record<string, IrScalarValue> {
   const record = expectRecord(input, path);
   const parsed: Record<string, IrScalarValue> = {};
@@ -288,6 +305,7 @@ function parseScalarRecord(input: unknown, path: string): Record<string, IrScala
   return parsed;
 }
 
+// Parse one scalar value allowed in defaults and property payloads.
 function parseScalarValue(input: unknown, path: string): IrScalarValue {
   if (typeof input === "string" || typeof input === "number" || typeof input === "boolean" || input === null) {
     return input;
@@ -296,6 +314,7 @@ function parseScalarValue(input: unknown, path: string): IrScalarValue {
   throw new NodeDefinitionsSchemaError("Expected a scalar value", path);
 }
 
+// Validate one property value-type tag from the schema document.
 function parseDefinitionValueType(input: unknown, path: string): DefinitionValueType {
   const value = expectString(input, path);
 
@@ -306,6 +325,7 @@ function parseDefinitionValueType(input: unknown, path: string): DefinitionValue
   throw new NodeDefinitionsSchemaError("Expected one of boolean | number | string", path);
 }
 
+// Validate one signal-kind tag from the schema document.
 function parseSignalKind(input: unknown, path: string): IrSignalKind {
   const value = expectString(input, path);
 
@@ -326,6 +346,7 @@ function parseSignalKind(input: unknown, path: string): IrSignalKind {
   );
 }
 
+// Require a plain object at the current schema path.
 function expectRecord(input: unknown, path: string): Record<string, unknown> {
   if (typeof input === "object" && input !== null && !Array.isArray(input)) {
     return input as Record<string, unknown>;
@@ -334,6 +355,7 @@ function expectRecord(input: unknown, path: string): Record<string, unknown> {
   throw new NodeDefinitionsSchemaError("Expected an object", path);
 }
 
+// Require an array at the current schema path.
 function expectArray(input: unknown, path: string): unknown[] {
   if (Array.isArray(input)) {
     return input;
@@ -342,6 +364,7 @@ function expectArray(input: unknown, path: string): unknown[] {
   throw new NodeDefinitionsSchemaError("Expected an array", path);
 }
 
+// Require a string at the current schema path.
 function expectString(input: unknown, path: string): string {
   if (typeof input === "string") {
     return input;
@@ -350,6 +373,7 @@ function expectString(input: unknown, path: string): string {
   throw new NodeDefinitionsSchemaError("Expected a string", path);
 }
 
+// Require a boolean at the current schema path.
 function expectBoolean(input: unknown, path: string): boolean {
   if (typeof input === "boolean") {
     return input;
@@ -358,6 +382,7 @@ function expectBoolean(input: unknown, path: string): boolean {
   throw new NodeDefinitionsSchemaError("Expected a boolean", path);
 }
 
+// Require an integer at the current schema path.
 function expectInteger(input: unknown, path: string): number {
   if (typeof input === "number" && Number.isInteger(input)) {
     return input;

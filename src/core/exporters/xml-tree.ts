@@ -1,3 +1,4 @@
+// XML tree exporter that lowers project.json, sw-net, and sw-mcl into the object structure later written as XML.
 import {
   extractCompatibleStormworksType,
   findCompatibleComponentDefinition,
@@ -97,6 +98,7 @@ interface XmlIdAllocator {
 
 const DEFAULT_GROUP_DATA_TYPE = "-1104064832";
 
+// Reconstruct the structured XML object tree from project.json, sw-net, and sw-mcl.
 export function buildStormworksXmlTree(
   input: BuildStormworksXmlTreeInput,
   options: BuildStormworksXmlTreeOptions,
@@ -107,6 +109,8 @@ export function buildStormworksXmlTree(
   const entryModule = resolveEntryModule(input.swNet, options.entryModuleId);
   ensureEntryModuleCanBeLowered(entryModule, input.swNet);
 
+  // Resolve every view of the same module before lowering:
+  // sw-net for structure, sw-mcl for inner layout, and project.json for outer placement.
   const swMclModule = resolveSwMclModule(input.swMcl, entryModule.key.moduleId);
   const submoduleCanvasOrigin = resolveSubmoduleCanvasOrigin(input.project, entryModule.key.moduleId, warnings);
   const allocator = createXmlIdAllocator([]);
@@ -126,6 +130,8 @@ export function buildStormworksXmlTree(
     entryModule.key.moduleId,
     warnings,
   );
+
+  // Once project nodes, port slots, and logic producers are indexed, the remaining XML sections are pure projection.
   const netProducerByName = buildNetProducerIndex(logicInstances, warnings);
   const projectOutputBindings = buildProjectOutputBindingIndex(logicInstances);
   const projectNodeElements = projectNodes.map((projectNode) => buildProjectNodeElement(projectNode));
@@ -173,6 +179,7 @@ export function buildStormworksXmlTree(
   };
 }
 
+// Pick the single sw-net module that will be lowered into one Stormworks microcontroller body.
 function resolveEntryModule(
   swNet: SwNetResolutionResult,
   entryModuleId: string | undefined,
@@ -207,6 +214,7 @@ function resolveEntryModule(
   return resolvedModule;
 }
 
+// Reject hierarchical constructs that XML export still cannot lower faithfully.
 function ensureEntryModuleCanBeLowered(
   entryModule: SwNetResolvedModule,
   swNet: SwNetResolutionResult,
@@ -216,6 +224,7 @@ function ensureEntryModuleCanBeLowered(
   const pending: SwNetResolvedModuleKey[] = [entryModule.key];
 
   while (pending.length > 0) {
+    // Walk the reachable module graph so we can reject unsupported nested lowering up front.
     const current = pending.pop();
 
     if (!current) {
@@ -248,6 +257,7 @@ function ensureEntryModuleCanBeLowered(
   }
 }
 
+// Match the sw-mcl document to the entry module that is being exported.
 function resolveSwMclModule(
   swMcl: StormworksSwMclDocument,
   moduleId: string,
@@ -259,6 +269,7 @@ function resolveSwMclModule(
   return swMcl;
 }
 
+// Read the project-side placement anchor for the module canvas being exported.
 function resolveSubmoduleCanvasOrigin(
   project: ProjectJsonDocument,
   moduleId: string,
@@ -277,6 +288,7 @@ function resolveSubmoduleCanvasOrigin(
   return matchingSubmodule.position;
 }
 
+// Reuse numeric hints from DSL instance ids when allocating XML object ids.
 function collectPreferredLogicObjectIds(statements: SwNetResolvedModule["module"]["statements"]): number[] {
   const ids: number[] = [];
 
@@ -295,6 +307,7 @@ function collectPreferredLogicObjectIds(statements: SwNetResolvedModule["module"
   return ids;
 }
 
+// Allocate XML ids deterministically while avoiding collisions between regenerated nodes.
 function createXmlIdAllocator(preferredIds: number[]): XmlIdAllocator {
   const used = new Set<number>(preferredIds.filter((value) => value > 0));
   let nextCandidate = 1;
@@ -321,6 +334,7 @@ function createXmlIdAllocator(preferredIds: number[]): XmlIdAllocator {
   };
 }
 
+// Lower project.json node entries into export-ready contexts with resolved definitions and XML ids.
 function buildProjectNodeContexts(
   project: ProjectJsonDocument,
   definitions: NodeDefinitionRegistry,
@@ -354,6 +368,7 @@ function buildProjectNodeContexts(
   });
 }
 
+// Merge sw-net port declarations with sw-mcl positions into concrete export-time module port slots.
 function buildModulePortSlots(
   entryModule: SwNetResolvedModule["module"],
   swMclModule: StormworksSwMclDocument,
@@ -369,6 +384,7 @@ function buildModulePortSlots(
   );
 
   return entryModule.ports.map((port) => {
+    // sw-net names ports semantically, while sw-mcl names positions by occurrence; join both here.
     const occurrenceKey = formatPortNameKey(port.direction, port.name);
     const occurrence = (occurrenceByKey.get(occurrenceKey) ?? 0) + 1;
     occurrenceByKey.set(occurrenceKey, occurrence);
@@ -390,6 +406,7 @@ function buildModulePortSlots(
   });
 }
 
+// Bind project-surface nodes to concrete module-port occurrences using project.json links.
 function bindProjectNodesToModulePorts(
   links: ProjectJsonLinkDocument[],
   projectNodes: ProjectNodeContext[],
@@ -404,6 +421,7 @@ function bindProjectNodesToModulePorts(
   const projectNodeByPortKey = new Map<string, ProjectNodeContext>();
 
   for (const portSlot of portSlots) {
+    // Group slots by semantic name first, then bind concrete occurrences in project-link order.
     const key = formatPortNameKey(portSlot.direction, portSlot.name);
     const list = portSlotsByName.get(key);
 
@@ -436,6 +454,7 @@ function bindProjectNodesToModulePorts(
   for (const [key, boundProjectNodes] of pendingProjectNodesByPort) {
     const slots = portSlotsByName.get(key) ?? [];
 
+    // project.json and sw-net must agree on how many concrete ports exist for a given semantic name.
     if (slots.length !== boundProjectNodes.length) {
       warnings.push(`Project links reference ${boundProjectNodes.length} ${key} port(s), but sw-net defines ${slots.length}.`);
     }
@@ -468,6 +487,7 @@ function bindProjectNodesToModulePorts(
   };
 }
 
+// Resolve one project.json link into a project-node-to-module-port binding candidate.
 function resolveProjectPortLink(
   link: ProjectJsonLinkDocument,
   projectNodeById: Map<string, ProjectNodeContext>,
@@ -506,6 +526,7 @@ function resolveProjectPortLink(
   return undefined;
 }
 
+// Lower sw-net inst statements into export-ready logic contexts with positions and XML ids.
 function buildLogicInstanceContexts(
   statements: SwNetResolvedModule["module"]["statements"],
   swMclModule: StormworksSwMclDocument,
@@ -524,6 +545,7 @@ function buildLogicInstanceContexts(
       continue;
     }
 
+    // Export needs both the raw Stormworks type code and an allocated object id for every instance.
     const componentDefinition = findCompatibleComponentDefinition(definitions, statement.typeId);
     const stormworksType = resolveStormworksComponentType(statement.typeId, componentDefinition);
     const position = positionsById.get(statement.instanceId);
@@ -544,6 +566,7 @@ function buildLogicInstanceContexts(
   return contexts;
 }
 
+// Index which logic instance produces each internal net name referenced by XML inputs.
 function buildNetProducerIndex(
   logicInstances: LogicInstanceContext[],
   warnings: string[],
@@ -571,6 +594,7 @@ function buildNetProducerIndex(
   return producers;
 }
 
+// Index which logic producer feeds each exported module output port.
 function buildProjectOutputBindingIndex(
   logicInstances: LogicInstanceContext[],
 ): Map<string, NetProducer[]> {
@@ -604,6 +628,7 @@ function buildProjectOutputBindingIndex(
   return bindings;
 }
 
+// Emit one <nodes><n> element for a project-facing pin.
 function buildProjectNodeElement(projectNode: ProjectNodeContext): StormworksXmlTreeElement {
   const nodeElement: StormworksXmlTreeElement = {
     "@_label": projectNode.document.label ?? projectNode.document.id,
@@ -627,6 +652,7 @@ function buildProjectNodeElement(projectNode: ProjectNodeContext): StormworksXml
   };
 }
 
+// Emit one <components><c> element for a lowered sw-net instance.
 function buildComponentElement(
   instance: LogicInstanceContext,
   netProducerByName: Map<string, NetProducer>,
@@ -654,6 +680,7 @@ function buildComponentElement(
   }
 
   for (const input of instance.statement.inputs) {
+    // Each DSL input assignment becomes one XML in* element after resolving net names and module-port refs.
     const xmlKey = resolveXmlInputKey(instance.definition, input.key);
     const inputElement = resolveXmlInputElement(
       input,
@@ -675,6 +702,7 @@ function buildComponentElement(
   return componentElement;
 }
 
+// Write definition-driven properties and preserved attributes back onto the XML object element.
 function applyInstanceAttributes(
   componentElement: StormworksXmlTreeElement,
   instance: LogicInstanceContext,
@@ -689,6 +717,7 @@ function applyInstanceAttributes(
       continue;
     }
 
+    // Non-script attributes either map through definitions or fall back to raw object attributes.
     const scalarValue = expressionToScalarValue(attribute.value);
 
     if (scalarValue === undefined) {
@@ -716,6 +745,7 @@ function applyInstanceAttributes(
   }
 }
 
+// Materialize empty inN tags required by dynamic-input components so XML editors keep their shape.
 function applyDynamicInputPlaceholders(
   instance: LogicInstanceContext,
   objectElement: StormworksXmlTreeElement,
@@ -745,6 +775,7 @@ function applyDynamicInputPlaceholders(
   }
 }
 
+// Infer how many dynamic input placeholders a component needs from its DSL attributes.
 function resolveDynamicInputCount(
   instance: LogicInstanceContext,
   dynamicInputs: ComponentDynamicInputsBinding,
@@ -758,6 +789,7 @@ function resolveDynamicInputCount(
   return Number.isInteger(assignment.value.value) ? assignment.value.value : undefined;
 }
 
+// Resolve script_ref assets into inline XML script text at export time.
 function applyScriptReferenceAttribute(
   componentElement: StormworksXmlTreeElement,
   instance: LogicInstanceContext,
@@ -789,6 +821,7 @@ function applyScriptReferenceAttribute(
   asTreeElement(componentElement.object)["@_script"] = scriptText ?? "";
 }
 
+// Lower one sw-net input assignment into the corresponding XML in* element.
 function resolveXmlInputElement(
   input: SwNetAssignment,
   instance: LogicInstanceContext,
@@ -833,6 +866,7 @@ function resolveXmlInputElement(
   return undefined;
 }
 
+// Regenerate component_states from the canonical component list for editor compatibility.
 function buildComponentStateElements(
   componentElements: StormworksXmlTreeElement[],
 ): StormworksXmlTreeElement {
@@ -851,6 +885,7 @@ function buildComponentStateElements(
   return componentStates;
 }
 
+// Emit canonical bridge components that connect project pins to the logic body.
 function buildBridgeElements(
   projectNodes: ProjectNodeContext[],
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
@@ -862,6 +897,7 @@ function buildBridgeElements(
   );
 }
 
+// Regenerate bridge state elements as editor-facing mirrors of the bridge components.
 function buildBridgeStateElements(
   projectNodes: ProjectNodeContext[],
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
@@ -882,6 +918,7 @@ function buildBridgeStateElements(
   return bridgeStates;
 }
 
+// Assemble the final XML tree rooted at <microprocessor>.
 function buildMicroprocessorElement(
   project: ProjectJsonDocument,
   projectNodeElements: StormworksXmlTreeElement[],
@@ -936,6 +973,7 @@ function buildMicroprocessorElement(
   return microprocessor;
 }
 
+// Emit one <components_bridge><c> element for a project-facing pin.
 function buildBridgeComponentElement(
   projectNode: ProjectNodeContext,
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
@@ -948,6 +986,7 @@ function buildBridgeComponentElement(
   };
 }
 
+// Emit the bridge object shared by both bridge components and bridge states.
 function buildBridgeObjectElement(
   projectNode: ProjectNodeContext,
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
@@ -973,6 +1012,7 @@ function buildBridgeObjectElement(
   if (projectNode.direction === "output") {
     const producers = slot ? projectOutputBindings.get(slot.name) ?? [] : [];
 
+    // Output bridges point from the project pin back into the logic body through component_id/node_index pairs.
     if (producers.length === 0) {
       warnings.push(`Project output ${projectNode.document.id} is not driven by any sw-net output assignment.`);
     }
@@ -994,6 +1034,7 @@ function buildBridgeObjectElement(
   return bridgeState;
 }
 
+// Infer a bridge type code when the project-node definition does not pin one explicitly.
 function inferBridgeType(
   direction: "input" | "output",
   signal: IrSignalKind,
@@ -1035,6 +1076,7 @@ function inferBridgeType(
   return "4";
 }
 
+// Map a DSL/component definition type back to the raw Stormworks component type code.
 function resolveStormworksComponentType(
   typeId: string,
   definition: ComponentDefinition | undefined,
@@ -1052,6 +1094,7 @@ function resolveStormworksComponentType(
   throw new Error(`Cannot map sw-net instance type ${typeId} back to a Stormworks component type.`);
 }
 
+// Find the property definition that should own one DSL attribute during XML export.
 function resolveDslPropertyDefinition(
   definition: ComponentDefinition | undefined,
   dslKey: string,
@@ -1068,6 +1111,7 @@ function resolveDslPropertyDefinition(
   return matches[0];
 }
 
+// Prefer the richest property mapping when multiple definitions share the same DSL key.
 function scoreDslPropertyDefinition(propertyDefinition: NodePropertyDefinition): number {
   return (
     (propertyDefinition.writeTargets ? 4 : 0) +
@@ -1077,6 +1121,7 @@ function scoreDslPropertyDefinition(propertyDefinition: NodePropertyDefinition):
   );
 }
 
+// Fall back to the import-side xmlPath when no explicit write target list was provided.
 function createDefaultWriteTargets(propertyDefinition: NodePropertyDefinition): NodePropertyWriteTarget[] {
   return propertyDefinition.source
     ? [
@@ -1088,6 +1133,7 @@ function createDefaultWriteTargets(propertyDefinition: NodePropertyDefinition): 
     : [];
 }
 
+// Apply one property write target onto the mutable XML tree under construction.
 function applyXmlWriteTarget(
   componentElement: StormworksXmlTreeElement,
   writeTarget: NodePropertyWriteTarget,
@@ -1096,6 +1142,7 @@ function applyXmlWriteTarget(
   const segments = writeTarget.xmlPath.split(".").filter((segment) => segment.length > 0);
   let current: StormworksXmlTreeElement = componentElement;
 
+  // Write targets create nested XML objects on demand so one DSL property can fan back out to multiple paths.
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
 
@@ -1121,6 +1168,7 @@ function applyXmlWriteTarget(
   }
 }
 
+// Map a DSL input key back to the XML-side in*/inc name expected by Stormworks.
 function resolveXmlInputKey(
   definition: ComponentDefinition | undefined,
   dslKey: string,
@@ -1147,6 +1195,7 @@ function resolveXmlInputKey(
   return index >= 0 ? `in${index + 1}` : dslKey;
 }
 
+// Map a DSL output key back to the optional XML node_index used by multi-output components.
 function resolveXmlOutputNodeIndex(
   definition: ComponentDefinition | undefined,
   dslKey: string,
@@ -1164,6 +1213,7 @@ function resolveXmlOutputNodeIndex(
   return outputDefinition.stormworks?.nodeIndex;
 }
 
+// Reduce a parsed DSL expression to a scalar value when XML export can embed it directly.
 function expressionToScalarValue(expression: SwNetExpression): IrScalarValue | undefined {
   switch (expression.kind) {
     case "string":
@@ -1178,10 +1228,12 @@ function expressionToScalarValue(expression: SwNetExpression): IrScalarValue | u
   }
 }
 
+// Build a stable lookup key for port names without occurrence numbers.
 function formatPortNameKey(direction: "in" | "out", name: string): string {
   return `${direction}:${name}`;
 }
 
+// Build a stable lookup key for one concrete port occurrence.
 function formatPortOccurrenceKey(
   direction: "in" | "out",
   name: string,
@@ -1190,10 +1242,12 @@ function formatPortOccurrenceKey(
   return `${direction}:${name}:${occurrence}`;
 }
 
+// Build a stable lookup key for one resolved sw-net module.
 function formatModuleKey(key: SwNetResolvedModuleKey): string {
   return `${key.documentPath}#${key.moduleId}`;
 }
 
+// Format a scalar value using the XML spellings Stormworks expects.
 function formatXmlScalarValue(value: IrScalarValue, valueType?: DefinitionValueType): string {
   if (value === null) {
     return "null";
@@ -1210,10 +1264,12 @@ function formatXmlScalarValue(value: IrScalarValue, valueType?: DefinitionValueT
   return String(value);
 }
 
+// Format numbers compactly while preserving integer-looking output.
 function formatXmlNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(value);
 }
 
+// Reuse n123-style instance ids as preferred XML object ids when available.
 function tryParseInstanceObjectId(instanceId: string): number | undefined {
   const match = /^n(\d+)$/.exec(instanceId);
 
@@ -1225,6 +1281,7 @@ function tryParseInstanceObjectId(instanceId: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+// Parse a trailing decimal suffix for natural sorting and id heuristics.
 function tryParseTrailingNumber(value: string): number | undefined {
   const match = /(\d+)$/.exec(value);
 
@@ -1236,6 +1293,7 @@ function tryParseTrailingNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+// Deep-clone a tree value so derived state sections do not alias canonical sections.
 function cloneTreeValue(value: StormworksXmlTreeValue): StormworksXmlTreeValue {
   if (Array.isArray(value)) {
     return value.map((entry) => cloneTreeValue(entry));
@@ -1254,6 +1312,7 @@ function cloneTreeValue(value: StormworksXmlTreeValue): StormworksXmlTreeValue {
   return value;
 }
 
+// Narrow a tree value into an object element before mutating it.
 function asTreeElement(value: StormworksXmlTreeValue | undefined): StormworksXmlTreeElement {
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     return value as StormworksXmlTreeElement;

@@ -1,3 +1,4 @@
+// Node-specific public entrypoint that extends the pure API with file-system convenience helpers.
 export * from "./index.js";
 export * from "./infra/fs/text-file.js";
 export * from "./infra/fs/definitions-file-loader.js";

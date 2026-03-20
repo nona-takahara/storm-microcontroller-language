@@ -1,3 +1,4 @@
+// Project-surface serializer that writes external pins, submodule references, and surface constants to JSON.
 import { type IrLink, type IrNode, type IrProgram, type IrScalarValue, type IrSubmodule, type IrVector2 } from "../ir.js";
 
 export const STORMWORKS_PROJECT_JSON_FORMAT_VERSION = "stormworks-project-json-v10";
@@ -54,6 +55,7 @@ export interface ProjectJsonDocument {
   warnings: string[];
 }
 
+// Build the project-surface document that pairs with sw-net and sw-mcl.
 export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocument {
   // project.json only describes the project surface.
   // Internal logic and its layout are serialized separately into sw-net and sw-mcl.
@@ -66,6 +68,7 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
   const constantIdByIrId = buildConstantIdMap(constantNodes);
   const bridgePositionByProjectNodeId = buildProjectNodeBridgePositionIndex(program.submodules, nodeById);
 
+  // Keep only the project-visible slice of the IR so project.json stays small and editor-friendly.
   return {
     formatVersion: STORMWORKS_PROJECT_JSON_FORMAT_VERSION,
     sourceName: program.metadata.sourceName,
@@ -103,10 +106,12 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
   };
 }
 
+// Serialize the project-surface document to human-editable JSON text.
 export function serializeProjectJson(program: IrProgram): string {
   return JSON.stringify(buildProjectJsonDocument(program), null, 2);
 }
 
+// Index the bridge-surface position of each project node from the synthesized submodule ports.
 function buildProjectNodeBridgePositionIndex(
   submodules: IrSubmodule[],
   nodeById: Map<string, IrNode>,
@@ -115,6 +120,7 @@ function buildProjectNodeBridgePositionIndex(
 
   for (const submodule of submodules) {
     for (const portNodeId of submodule.portNodeIds) {
+      // Submodule surface nodes carry the bridge-canvas position paired with each project pin.
       const portNode = nodeById.get(portNodeId);
       const projectNodeId = typeof portNode?.properties.projectNodeId === "string" ? portNode.properties.projectNodeId : undefined;
 
@@ -129,6 +135,7 @@ function buildProjectNodeBridgePositionIndex(
   return index;
 }
 
+// Prefer readable project-node ids and suffix duplicates deterministically.
 function buildProjectNodeIdMap(nodes: IrNode[]): Map<string, string> {
   const counts = new Map<string, number>();
   const idMap = new Map<string, string>();
@@ -143,6 +150,7 @@ function buildProjectNodeIdMap(nodes: IrNode[]): Map<string, string> {
   return idMap;
 }
 
+// Give project-surface constant nodes stable exported ids.
 function buildConstantIdMap(nodes: IrNode[]): Map<string, string> {
   const idMap = new Map<string, string>();
 
@@ -155,6 +163,7 @@ function buildConstantIdMap(nodes: IrNode[]): Map<string, string> {
   return idMap;
 }
 
+// Collect constants that actually appear on the project surface so the JSON stays compact.
 function collectLinkedConstantNodes(links: IrLink[], nodeById: Map<string, IrNode>): IrNode[] {
   const constantNodes = new Map<string, IrNode>();
 
@@ -171,6 +180,7 @@ function collectLinkedConstantNodes(links: IrLink[], nodeById: Map<string, IrNod
   return [...constantNodes.values()].sort(compareById);
 }
 
+// Choose a human-readable project-node id from name/label before falling back to numeric suffixes.
 function chooseProjectNodeId(node: IrNode): string {
   const preferred =
     (typeof node.properties.name === "string" && node.properties.name.length > 0
@@ -188,6 +198,7 @@ function chooseProjectNodeId(node: IrNode): string {
   return trailingId !== undefined ? `node_${trailingId}` : node.id;
 }
 
+// Lower an IR endpoint into the project-surface endpoint vocabulary used by project.json.
 function formatProjectLinkEndpoint(
   nodeId: string,
   nodeById: Map<string, IrNode>,
@@ -197,6 +208,7 @@ function formatProjectLinkEndpoint(
 ): ProjectJsonLinkEndpoint {
   const node = nodeById.get(nodeId);
 
+  // Endpoints are lowered into the small project vocabulary instead of leaking raw IR ids everywhere.
   if (!node) {
     return { kind: "node", id: nodeId };
   }
@@ -231,6 +243,7 @@ function formatProjectLinkEndpoint(
   };
 }
 
+// Build a lookup from submodule port node ids to exported submodule/port references.
 function buildSubmodulePortIndex(
   submodules: IrSubmodule[],
   nodeById: Map<string, IrNode>,
@@ -255,6 +268,7 @@ function buildSubmodulePortIndex(
   return index;
 }
 
+// Keep only links that belong on the project surface rather than inside sw-net.
 function isProjectSerializableLink(nodeById: Map<string, IrNode>, link: IrLink): boolean {
   const fromNode = nodeById.get(link.from.nodeId);
   const toNode = nodeById.get(link.to.nodeId);
@@ -262,6 +276,7 @@ function isProjectSerializableLink(nodeById: Map<string, IrNode>, link: IrLink):
   return isProjectSerializableNode(fromNode) && isProjectSerializableNode(toNode);
 }
 
+// Project JSON only knows about project pins, submodule ports, and explicit surface constants.
 function isProjectSerializableNode(node: IrNode | undefined): boolean {
   if (!node) {
     return false;
@@ -270,10 +285,12 @@ function isProjectSerializableNode(node: IrNode | undefined): boolean {
   return node.layer === "project" || node.layer === "submodule" || node.definitionId === "CONST";
 }
 
+// Prefer the canonical DSL-facing constant value while still tolerating raw imported property names.
 function resolveConstValue(properties: IrNode["properties"]): IrScalarValue {
   const textValue = properties.text;
 
   if (typeof textValue === "string") {
+    // Numeric-looking CONST text values are projected as numbers so project editors can treat them naturally.
     const parsed = Number(textValue);
 
     if (Number.isFinite(parsed)) {
@@ -286,18 +303,22 @@ function resolveConstValue(properties: IrNode["properties"]): IrScalarValue {
   return properties.value ?? null;
 }
 
+// Normalize optional scalar values into nullable JSON strings.
 function asNullableString(value: IrScalarValue | undefined): string | null {
   return typeof value === "string" ? value : null;
 }
 
+// Normalize optional numbers into nullable JSON numbers.
 function asNullableNumber(value: number | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+// Sort id-bearing records by their exported identifier.
 function compareById<T extends { id: string }>(left: T, right: T): number {
   return compareIdentifier(left.id, right.id);
 }
 
+// Compare identifiers numerically where trailing numbers exist to keep generated output stable.
 function compareIdentifier(left: string, right: string): number {
   const leftNumeric = tryParseTrailingNumber(left);
   const rightNumeric = tryParseTrailingNumber(right);
@@ -309,6 +330,7 @@ function compareIdentifier(left: string, right: string): number {
   return left.localeCompare(right);
 }
 
+// Parse a trailing decimal suffix so human-readable ids sort naturally.
 function tryParseTrailingNumber(value: string): number | undefined {
   const match = /(\d+)$/.exec(value);
 

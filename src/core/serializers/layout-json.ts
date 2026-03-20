@@ -1,3 +1,4 @@
+// Backward-compatible re-export layer for the old layout-json name now backed by sw-mcl.
 export {
   STORMWORKS_SW_MCL_FORMAT_VERSION as STORMWORKS_LAYOUT_JSON_FORMAT_VERSION,
   buildStormworksSwMclDocument as buildLayoutJsonDocument,

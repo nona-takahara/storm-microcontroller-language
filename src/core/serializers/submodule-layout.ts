@@ -1,5 +1,7 @@
+// Small vector helpers used to move between absolute IR coordinates and module-local layout coordinates.
 import { type IrNode, type IrSubmodule, type IrVector2 } from "../ir.js";
 
+// Derive a representative origin for one submodule canvas from the positions of its visible nodes.
 export function deriveSubmoduleCanvasOrigin(
   submodule: IrSubmodule,
   nodeById: Map<string, IrNode>,
@@ -27,6 +29,7 @@ export function deriveSubmoduleCanvasOrigin(
   };
 }
 
+// Translate one vector into module-local coordinates by subtracting a chosen origin.
 export function subtractVector(
   value: IrVector2,
   origin: IrVector2 | null,
@@ -41,6 +44,7 @@ export function subtractVector(
   };
 }
 
+// Translate one module-local vector back into absolute coordinates by adding the chosen origin.
 export function addVector(
   value: IrVector2,
   origin: IrVector2 | null,

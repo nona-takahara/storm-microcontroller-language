@@ -1,3 +1,4 @@
+// Browser-safe access to the bundled sample definitions shipped with the package.
 import bundledDefinitionsJson from "../../definitions.json" with { type: "json" };
 
 import {
@@ -12,6 +13,7 @@ import {
 export const bundledNodeDefinitionsDocument: NodeDefinitionsDocument =
   parseNodeDefinitionsDocument(bundledDefinitionsJson);
 
+// Create a fresh definitions registry from the bundled definitions document.
 export function createBundledNodeDefinitions(): NodeDefinitionRegistry {
   return createNodeDefinitionRegistry(bundledNodeDefinitionsDocument);
 }

@@ -1,3 +1,4 @@
+// sw-net serializer that flattens one IR submodule into a human-readable netlist-style DSL.
 import { type NodeDefinitionRegistry } from "../definitions/loader.js";
 import { type ComponentDefinition } from "../definitions/schema.js";
 import { type IrLink, type IrNode, type IrProgram, type IrScalarValue, type IrSubmodule } from "../ir.js";
@@ -37,7 +38,9 @@ export interface SwNetRenderOptions {
   definitions?: NodeDefinitionRegistry;
 }
 
+// Default serializer for the current flattened sw-net text format.
 export class StormworksSwNetSerializer implements SwNetSerializer {
+  // Serialize an IR program into bytes plus a small manifest for file-oriented callers.
   serialize(program: IrProgram, options: SwNetSerializationOptions): SwNetSerializationArtifact {
     const formatVersion = options.formatVersion ?? "stormworks-sw-net-v1";
     const text = renderStormworksSwNet(program, {
@@ -57,6 +60,7 @@ export class StormworksSwNetSerializer implements SwNetSerializer {
   }
 }
 
+// Serialize an IR program into sw-net bytes plus a small manifest for callers.
 export function serializeStormworksSwNet(
   program: IrProgram,
   options: SwNetSerializationOptions,
@@ -64,6 +68,7 @@ export function serializeStormworksSwNet(
   return new StormworksSwNetSerializer().serialize(program, options);
 }
 
+// Render an IR program into the human-readable sw-net DSL text.
 export function renderStormworksSwNet(
   program: IrProgram,
   options: SwNetRenderOptions = {},
@@ -76,6 +81,7 @@ export function renderStormworksSwNet(
   );
   const submodules = [...program.submodules].sort(compareById);
 
+  // Old or partial IRs may not expose submodules yet, so fall back to a synthetic main module.
   if (submodules.length === 0) {
     return renderModule(
       {
@@ -95,6 +101,7 @@ export function renderStormworksSwNet(
     .join("\n\n");
 }
 
+// Render one IR submodule as a flat sw-net module declaration.
 function renderModule(
   submodule: IrSubmodule,
   program: IrProgram,
@@ -103,6 +110,8 @@ function renderModule(
 ): string {
   const lines: string[] = [];
   const submoduleNodeIds = new Set([...submodule.portNodeIds, ...submodule.logicNodeIds]);
+
+  // Only links fully contained in this submodule are emitted; project wiring lives in project.json.
   const internalLinks = program.links
     .filter((link) => belongsToSubmodule(link, submoduleNodeIds))
     .sort(compareById);
@@ -136,6 +145,7 @@ function renderModule(
   return lines.join("\n");
 }
 
+// Render a project-facing boundary node as a sw-net port declaration.
 function renderModulePort(node: IrNode): string {
   const direction = String(node.properties.direction ?? "unknown") === "input" ? "in" : "out";
   const signal = String(node.properties.signal ?? "unknown");
@@ -144,6 +154,7 @@ function renderModulePort(node: IrNode): string {
   return `port ${direction} ${name} : ${signal}`;
 }
 
+// Render a logic node as one inst line with attributes and folded wiring assignments.
 function renderInstance(
   node: IrNode,
   linksByTargetNodeId: Map<string, IrLink[]>,
@@ -177,6 +188,7 @@ function renderInstance(
   return `inst ${typeName} ${instanceName}${attributesText} ${pinClause}`;
 }
 
+// Project node properties into DSL attributes, respecting definition-level rename and hide rules.
 function collectAttributeAssignments(
   node: IrNode,
   instanceName: string,
@@ -187,6 +199,7 @@ function collectAttributeAssignments(
   const emittedDslKeys = new Set<string>();
   const definedPropertyKeys = new Set((definition?.properties ?? []).map((property) => property.key));
 
+  // LUA bodies are stored as sidecar files, so the DSL keeps only a script_ref attribute here.
   if (node.definitionId === "LUA") {
     assignments.push(`script_ref=${formatDslScalar(`scripts/${instanceName}.lua`)}`);
     emittedDslKeys.add("script_ref");
@@ -225,6 +238,7 @@ function collectAttributeAssignments(
     .filter((key) => !hiddenKeys.has(key) && !definedPropertyKeys.has(key))
     .sort(compareIdentifier);
 
+  // Unknown but scalar properties are still surfaced so generic nodes do not silently lose information.
   for (const key of extraKeys) {
     if (emittedDslKeys.has(key)) {
       continue;
@@ -243,6 +257,7 @@ function collectAttributeAssignments(
   return assignments;
 }
 
+// Render incoming links as left-hand-side pin assignments.
 function collectInputAssignments(
   incomingLinks: IrLink[],
   nodeById: Map<string, IrNode>,
@@ -252,6 +267,7 @@ function collectInputAssignments(
     .map((link) => `${link.to.portKey}=${resolveIncomingReference(link, nodeById)}`);
 }
 
+// Render outgoing links as right-hand-side pin assignments, inferring named outputs when possible.
 function collectOutputAssignments(
   node: IrNode,
   instanceName: string,
@@ -268,6 +284,7 @@ function collectOutputAssignments(
     const modulePortReferences = new Set<string>();
     let needsInternalNet = linksForPort.length === 0;
 
+    // One output can feed both internal nets and module outputs, so emit both when needed.
     for (const link of linksForPort) {
       const targetNode = nodeById.get(link.to.nodeId);
 
@@ -293,6 +310,7 @@ function collectOutputAssignments(
   return assignments;
 }
 
+// Resolve which output keys this node should expose in DSL form.
 function resolveOutputPortKeys(
   definition: ComponentDefinition | undefined,
   outgoingLinksByPort: Map<string, IrLink[]>,
@@ -301,6 +319,7 @@ function resolveOutputPortKeys(
   const seenKeys = new Set<string>();
   const linkedKeys = new Set(outgoingLinksByPort.keys());
 
+  // Prefer outputs that are actually used in links, then fall back to a single declared output when appropriate.
   if (linkedKeys.size > 0) {
     for (const port of definition?.ports.outputs ?? []) {
       if (linkedKeys.has(port.key) && !seenKeys.has(port.key)) {
@@ -330,6 +349,7 @@ function resolveOutputPortKeys(
   return keys;
 }
 
+// Convert an incoming link source into either a quoted module-port reference or an internal net name.
 function resolveIncomingReference(link: IrLink, nodeById: Map<string, IrNode>): string {
   const sourceNode = nodeById.get(link.from.nodeId);
 
@@ -344,18 +364,22 @@ function resolveIncomingReference(link: IrLink, nodeById: Map<string, IrNode>): 
   return createInternalNetName(getSwNetInstanceName(sourceNode), link.from.portKey);
 }
 
+// Create the canonical internal net name for one instance output.
 function createInternalNetName(instanceName: string, portKey: string): string {
   return `${instanceName}_${sanitizeSwNetIdentifier(portKey)}`;
 }
 
+// Keep generated identifiers valid and stable even when source names contain spaces.
 function formatBareIdentifier(value: string): string {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) ? value : sanitizeSwNetIdentifier(value, "module");
 }
 
+// Keep user-facing module-port names verbatim by always quoting them in DSL.
 function formatQuotedReference(value: string): string {
   return JSON.stringify(value);
 }
 
+// Format a scalar value using DSL literals rather than XML-specific spellings.
 function formatDslScalar(value: IrScalarValue | undefined): string {
   if (value === null || value === undefined) {
     return "null";
@@ -372,6 +396,7 @@ function formatDslScalar(value: IrScalarValue | undefined): string {
   return value ? "true" : "false";
 }
 
+// Coerce imported scalar values into the DSL type expected by a property definition.
 function coerceDslScalarValue(
   value: IrScalarValue | undefined,
   valueType: "boolean" | "number" | "string",
@@ -380,6 +405,7 @@ function coerceDslScalarValue(
     return undefined;
   }
 
+  // Property definitions decide the DSL-side scalar type even when import preserved the raw XML value loosely.
   if (value === null) {
     return null;
   }
@@ -418,14 +444,17 @@ function coerceDslScalarValue(
   return undefined;
 }
 
+// Format numbers compactly while keeping integer-looking values readable.
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(value);
 }
 
+// Check whether a link is fully contained within one rendered submodule body.
 function belongsToSubmodule(link: IrLink, submoduleNodeIds: Set<string>): boolean {
   return submoduleNodeIds.has(link.from.nodeId) && submoduleNodeIds.has(link.to.nodeId);
 }
 
+// Group links by one endpoint so per-node rendering can stay simple.
 function groupLinksBy(
   links: IrLink[],
   selectKey: (link: IrLink) => string,
@@ -433,6 +462,7 @@ function groupLinksBy(
   const grouped = new Map<string, IrLink[]>();
 
   for (const link of links) {
+    // Grouping once keeps per-node rendering simple and avoids repeated scans over the full link set.
     const key = selectKey(link);
     const existing = grouped.get(key);
 
@@ -447,6 +477,7 @@ function groupLinksBy(
   return grouped;
 }
 
+// Keep multi-input rendering stable by sorting links by target port and source id.
 function compareInputLinks(left: IrLink, right: IrLink): number {
   const portComparison = compareIdentifier(left.to.portKey, right.to.portKey);
 
@@ -463,10 +494,12 @@ function compareInputLinks(left: IrLink, right: IrLink): number {
   return compareIdentifier(left.from.portKey, right.from.portKey);
 }
 
+// Sort id-bearing records with the shared sw-net identifier order.
 function compareById<T extends { id: string }>(left: T, right: T): number {
   return compareIdentifier(left.id, right.id);
 }
 
+// Compare identifiers, treating trailing numbers naturally when possible.
 function compareIdentifier(left: string, right: string): number {
   const leftNumeric = tryParseSwNetTrailingNumber(left);
   const rightNumeric = tryParseSwNetTrailingNumber(right);

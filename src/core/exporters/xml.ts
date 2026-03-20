@@ -1,3 +1,4 @@
+// Final XML string exporter that writes the reconstructed XML tree with fast-xml-parser's builder.
 import { XMLBuilder } from "fast-xml-parser";
 
 import {
@@ -26,6 +27,7 @@ export interface BuildStormworksXmlResult extends BuildStormworksXmlTreeResult {
   xml: string;
 }
 
+// Rebuild the XML tree and immediately serialize it to an XML string.
 export function buildStormworksXml(
   input: BuildStormworksXmlTreeInput,
   options: BuildStormworksXmlOptions,
@@ -38,6 +40,7 @@ export function buildStormworksXml(
   };
 }
 
+// Serialize a reconstructed XML tree object into a Stormworks-compatible XML string.
 export function serializeStormworksXmlTree(
   tree: StormworksXmlTreeDocument,
   options: SerializeStormworksXmlTreeOptions = {},
@@ -46,6 +49,7 @@ export function serializeStormworksXmlTree(
   const pretty = options.pretty ?? true;
   const declarationVersion = options.declarationVersion ?? "1.0";
   const declarationEncoding = options.declarationEncoding ?? "UTF-8";
+  // fast-xml-parser is intentionally configured to preserve raw attribute names and compact empty nodes.
   const builder = new XMLBuilder({
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
@@ -62,6 +66,8 @@ export function serializeStormworksXmlTree(
         ...tree,
       }
     : tree;
+
+  // Declaration handling is kept outside the tree builder so tree reconstruction stays format-agnostic.
   const xml = builder.build(rootDocument);
 
   return (options.newlineAtEnd ?? true) ? `${xml}\n` : xml;

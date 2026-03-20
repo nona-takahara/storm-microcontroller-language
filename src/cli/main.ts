@@ -1,3 +1,4 @@
+// CLI entrypoint that exposes the standard xml2dsl/dsl2xml workflow and related validation commands.
 import { pathToFileURL } from "node:url";
 
 import {
@@ -18,6 +19,7 @@ import {
 } from "../node.js";
 import { extname } from "node:path";
 
+// Dispatch one CLI invocation to the selected command handler.
 export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
 
@@ -43,6 +45,7 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
+// Convert XML into the standard project.json + sw-net + sw-mcl file set.
 async function runXml2DslCommand(args: string[]): Promise<number> {
   const parsedArgs = parseXml2DslArgs(args);
 
@@ -80,6 +83,7 @@ async function runXml2DslCommand(args: string[]): Promise<number> {
     return hasErrors ? 1 : 0;
   }
 
+  // Without --out-dir, print the standard file set to stdout in labeled sections for inspection.
   const entryTexts = serializeSourceDocumentTexts(result.value.entryDocument);
   const entryRelativePath = resolveEntryDocumentRelativePath(result.value);
   const entrySwMclRelativePath = replaceSwNetExtensionForDisplay(entryRelativePath, ".sw-mcl");
@@ -108,6 +112,7 @@ async function runXml2DslCommand(args: string[]): Promise<number> {
   return hasErrors ? 1 : 0;
 }
 
+// Load the standard DSL file set and rebuild Stormworks XML text.
 async function runDsl2XmlCommand(args: string[]): Promise<number> {
   const parsedArgs = parseDsl2XmlArgs(args);
 
@@ -144,6 +149,7 @@ async function runDsl2XmlCommand(args: string[]): Promise<number> {
   return loadHasErrors || buildHasErrors ? 1 : 0;
 }
 
+// Load the standard DSL file set and print the reconstructed intermediate XML tree.
 async function runDsl2XmlTreeCommand(args: string[]): Promise<number> {
   const parsedArgs = parseProjectJsonPathArgs(args);
 
@@ -174,6 +180,7 @@ async function runDsl2XmlTreeCommand(args: string[]): Promise<number> {
   return loadHasErrors || buildHasErrors ? 1 : 0;
 }
 
+// Resolve imports and report the reachable sw-net document/module graph.
 async function runCheckDslCommand(args: string[]): Promise<number> {
   const parsedArgs = parseProjectJsonPathArgs(args);
 
@@ -205,6 +212,7 @@ async function runCheckDslCommand(args: string[]): Promise<number> {
   return loadHasErrors || resolveHasErrors ? 1 : 0;
 }
 
+// Validate the loaded DSL file set against definitions and local assets.
 async function runTypecheckDslCommand(args: string[]): Promise<number> {
   const parsedArgs = parseProjectJsonPathArgs(args);
 
@@ -234,6 +242,7 @@ async function runTypecheckDslCommand(args: string[]): Promise<number> {
   return loadHasErrors || validationHasErrors || !validationResult.isValid ? 1 : 0;
 }
 
+// Debug command that prints the raw IR imported directly from XML.
 async function runImportXmlCommand(args: string[]): Promise<number> {
   const inputPath = parseSingleInputPath(args);
 
@@ -254,6 +263,7 @@ async function runImportXmlCommand(args: string[]): Promise<number> {
   return 0;
 }
 
+// Parse xml2dsl-specific command-line arguments.
 function parseXml2DslArgs(
   args: string[],
 ): { inputPath: string; outputDirectory?: string } | undefined {
@@ -294,6 +304,7 @@ function parseXml2DslArgs(
   return inputPath ? { inputPath, outputDirectory } : undefined;
 }
 
+// Parse dsl2xml-specific command-line arguments.
 function parseDsl2XmlArgs(
   args: string[],
 ): { projectJsonPath: string; outputPath?: string } | undefined {
@@ -330,6 +341,7 @@ function parseDsl2XmlArgs(
   return projectJsonPath ? { projectJsonPath, outputPath } : undefined;
 }
 
+// Parse commands that take exactly one project.json path.
 function parseProjectJsonPathArgs(
   args: string[],
 ): { projectJsonPath: string } | undefined {
@@ -342,6 +354,7 @@ function parseProjectJsonPathArgs(
   return { projectJsonPath };
 }
 
+// Parse commands that take exactly one input path.
 function parseSingleInputPath(args: string[]): string | undefined {
   const [inputPath, ...rest] = args;
 
@@ -352,6 +365,7 @@ function parseSingleInputPath(args: string[]): string | undefined {
   return inputPath;
 }
 
+// Print diagnostics and return whether any of them were errors.
 function printDiagnostics(diagnostics: StormworksLibraryDiagnostic[]): boolean {
   let hasErrors = false;
 
@@ -368,6 +382,7 @@ function printDiagnostics(diagnostics: StormworksLibraryDiagnostic[]): boolean {
   return hasErrors;
 }
 
+// Print the supported CLI command list.
 function printUsage(): void {
   console.log("Usage:");
   console.log("  storm-mcl xml2dsl <input.xml> [--out-dir output-directory]");
@@ -383,6 +398,7 @@ function printUsage(): void {
   console.log("  storm-mcl build-xml-tree <project.json>");
 }
 
+// Resolve the entry sw-net relative path to display from the loaded project source.
 function resolveEntryDocumentRelativePath(
   projectSource: StormworksProjectSource,
 ): string {
@@ -393,10 +409,12 @@ function resolveEntryDocumentRelativePath(
   return entrySubmodule?.relativePath ?? "main.sw-net";
 }
 
+// Replace a displayed .sw-net suffix with the matching companion suffix without normalizing the rest of the path.
 function replaceSwNetExtensionForDisplay(filePath: string, nextExtension: string): string {
   return extname(filePath) === ".sw-net" ? `${filePath.slice(0, -".sw-net".length)}${nextExtension}` : filePath;
 }
 
+// Join a relative asset path under the displayed document path for human-readable CLI output.
 function joinRelativeDisplayPath(baseDocumentPath: string, relativeAssetPath: string): string {
   const slashIndex = baseDocumentPath.lastIndexOf("/");
 

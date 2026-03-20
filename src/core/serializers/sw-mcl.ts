@@ -1,3 +1,4 @@
+// sw-mcl serializer that writes one module-local layout document paired 1:1 with a sw-net document.
 import { type IrNode, type IrProgram, type IrSubmodule, type IrVector2 } from "../ir.js";
 import {
   compareSwNetIdentifier,
@@ -35,6 +36,7 @@ export interface StormworksSwMclDocument {
   warnings: string[];
 }
 
+// Build the module-local layout document that pairs 1:1 with one sw-net document.
 export function buildStormworksSwMclDocument(
   program: IrProgram,
   options: BuildStormworksSwMclOptions = {},
@@ -55,6 +57,7 @@ export function buildStormworksSwMclDocument(
   };
 }
 
+// Serialize the module-local layout document to JSON text.
 export function serializeStormworksSwMcl(
   program: IrProgram,
   options: BuildStormworksSwMclOptions = {},
@@ -62,6 +65,7 @@ export function serializeStormworksSwMcl(
   return JSON.stringify(buildStormworksSwMclDocument(program, options), null, 2);
 }
 
+// Build the exported module-port layout, tracking repeated names by occurrence number.
 function buildSwMclPorts(
   submodule: IrSubmodule,
   nodeById: Map<string, IrNode>,
@@ -93,6 +97,7 @@ function buildSwMclPorts(
   return ports.sort(comparePorts);
 }
 
+// Build the exported logic-instance layout using the same ids and type names as sw-net.
 function buildSwMclInstances(
   submodule: IrSubmodule,
   nodeById: Map<string, IrNode>,
@@ -116,6 +121,7 @@ function buildSwMclInstances(
   return instances.sort(compareById);
 }
 
+// Fall back to raw logic-node positions when the IR does not expose an explicit submodule.
 function buildFallbackSwMclInstances(
   program: IrProgram,
   nodeById: Map<string, IrNode>,
@@ -130,6 +136,7 @@ function buildFallbackSwMclInstances(
     .sort(compareById);
 }
 
+// Pick the submodule whose inner layout should be written into this sw-mcl document.
 function selectSwMclSubmodule(
   program: IrProgram,
   requestedModuleId: string | undefined,
@@ -152,6 +159,7 @@ function selectSwMclSubmodule(
   );
 }
 
+// Sort ports in a stable DSL-facing order so generated layout files stay diff-friendly.
 function comparePorts(left: SwMclPortDocument, right: SwMclPortDocument): number {
   const directionComparison = compareSwNetIdentifier(left.direction, right.direction);
 
@@ -168,6 +176,7 @@ function comparePorts(left: SwMclPortDocument, right: SwMclPortDocument): number
   return left.occurrence - right.occurrence;
 }
 
+// Sort instance-like records by identifier using the shared sw-net ordering rules.
 function compareById<T extends { id: string }>(left: T, right: T): number {
   return compareSwNetIdentifier(left.id, right.id);
 }

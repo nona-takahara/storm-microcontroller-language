@@ -1,3 +1,4 @@
+// project.json parser that validates the project-surface document used alongside sw-net and sw-mcl.
 import { type IrScalarValue, type IrVector2 } from "../ir.js";
 import {
   STORMWORKS_PROJECT_JSON_FORMAT_VERSION,
@@ -9,6 +10,7 @@ import {
   type ProjectJsonSubmoduleDocument,
 } from "../serializers/project-json.js";
 
+/** Error type for malformed or schema-incompatible project.json documents. */
 export class ProjectJsonParseError extends Error {
   constructor(
     message: string,
@@ -19,10 +21,12 @@ export class ProjectJsonParseError extends Error {
   }
 }
 
+// Parse project.json text into the validated in-memory document shape.
 export function parseProjectJsonText(text: string): ProjectJsonDocument {
   return parseProjectJsonDocument(JSON.parse(text));
 }
 
+// Parse and validate the in-memory project.json document shape.
 export function parseProjectJsonDocument(input: unknown): ProjectJsonDocument {
   const root = expectRecord(input, "$");
   const formatVersion = expectString(root.formatVersion, "$.formatVersion");
@@ -59,6 +63,7 @@ export function parseProjectJsonDocument(input: unknown): ProjectJsonDocument {
   };
 }
 
+// Parse one project-node entry from project.json.
 function parseProjectJsonNode(input: unknown, path: string): ProjectJsonNodeDocument {
   const record = expectRecord(input, path);
 
@@ -72,6 +77,7 @@ function parseProjectJsonNode(input: unknown, path: string): ProjectJsonNodeDocu
   };
 }
 
+// Parse one project-surface constant entry from project.json.
 function parseProjectJsonConstant(input: unknown, path: string): ProjectJsonConstantDocument {
   const record = expectRecord(input, path);
 
@@ -82,6 +88,7 @@ function parseProjectJsonConstant(input: unknown, path: string): ProjectJsonCons
   };
 }
 
+// Parse one submodule reference entry from project.json.
 function parseProjectJsonSubmodule(input: unknown, path: string): ProjectJsonSubmoduleDocument {
   const record = expectRecord(input, path);
 
@@ -93,6 +100,7 @@ function parseProjectJsonSubmodule(input: unknown, path: string): ProjectJsonSub
   };
 }
 
+// Parse one project-surface link entry from project.json.
 function parseProjectJsonLink(input: unknown, path: string): ProjectJsonLinkDocument {
   const record = expectRecord(input, path);
 
@@ -102,6 +110,7 @@ function parseProjectJsonLink(input: unknown, path: string): ProjectJsonLinkDocu
   };
 }
 
+// Parse one project-surface link endpoint.
 function parseProjectJsonLinkEndpoint(input: unknown, path: string): ProjectJsonLinkEndpoint {
   const record = expectRecord(input, path);
   const kind = expectString(record.kind, `${path}.kind`);
@@ -118,6 +127,7 @@ function parseProjectJsonLinkEndpoint(input: unknown, path: string): ProjectJson
   };
 }
 
+// Parse a 2D vector used for node and layout positions.
 function parseVector2(input: unknown, path: string): IrVector2 {
   const record = expectRecord(input, path);
 
@@ -127,6 +137,7 @@ function parseVector2(input: unknown, path: string): IrVector2 {
   };
 }
 
+// Parse an optional vector that may be absent or null in persisted project.json.
 function optionalVector2OrNull(input: unknown, path: string): IrVector2 | null {
   if (input === null || input === undefined) {
     return null;
@@ -135,6 +146,7 @@ function optionalVector2OrNull(input: unknown, path: string): IrVector2 | null {
   return parseVector2(input, path);
 }
 
+// Parse one scalar JSON value used by project-surface constants.
 function parseScalarValue(input: unknown, path: string): IrScalarValue {
   if (typeof input === "string" || typeof input === "number" || typeof input === "boolean" || input === null) {
     return input;
@@ -143,6 +155,7 @@ function parseScalarValue(input: unknown, path: string): IrScalarValue {
   throw new ProjectJsonParseError("Expected scalar value", path);
 }
 
+// Require a plain object at the current project.json path.
 function expectRecord(input: unknown, path: string): Record<string, unknown> {
   if (typeof input === "object" && input !== null && !Array.isArray(input)) {
     return input as Record<string, unknown>;
@@ -151,6 +164,7 @@ function expectRecord(input: unknown, path: string): Record<string, unknown> {
   throw new ProjectJsonParseError("Expected object", path);
 }
 
+// Require an array at the current project.json path.
 function expectArray(input: unknown, path: string): unknown[] {
   if (Array.isArray(input)) {
     return input;
@@ -159,6 +173,7 @@ function expectArray(input: unknown, path: string): unknown[] {
   throw new ProjectJsonParseError("Expected array", path);
 }
 
+// Require a string at the current project.json path.
 function expectString(input: unknown, path: string): string {
   if (typeof input === "string") {
     return input;
@@ -167,6 +182,7 @@ function expectString(input: unknown, path: string): string {
   throw new ProjectJsonParseError("Expected string", path);
 }
 
+// Parse an optional string field that may be absent.
 function optionalString(input: unknown, path: string): string | undefined {
   if (input === undefined) {
     return undefined;
@@ -175,6 +191,7 @@ function optionalString(input: unknown, path: string): string | undefined {
   return expectString(input, path);
 }
 
+// Parse an optional string field that may be absent or explicitly null.
 function optionalStringOrNull(input: unknown, path: string): string | null {
   if (input === undefined || input === null) {
     return null;
@@ -183,6 +200,7 @@ function optionalStringOrNull(input: unknown, path: string): string | null {
   return expectString(input, path);
 }
 
+// Require a finite numeric value at the current project.json path.
 function expectFiniteNumber(input: unknown, path: string): number {
   if (typeof input === "number" && Number.isFinite(input)) {
     return input;
@@ -191,6 +209,7 @@ function expectFiniteNumber(input: unknown, path: string): number {
   throw new ProjectJsonParseError("Expected finite number", path);
 }
 
+// Parse an optional finite number that may be absent or explicitly null.
 function optionalFiniteNumberOrNull(input: unknown, path: string): number | null {
   if (input === undefined || input === null) {
     return null;

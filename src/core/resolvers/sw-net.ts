@@ -1,3 +1,4 @@
+// sw-net document-graph resolver that loads imports, resolves module refs, and rejects cycles.
 import {
   type SwNetDocument,
   type SwNetImportedModuleRef,
@@ -42,6 +43,7 @@ export interface SwNetResolutionResult {
   uses: SwNetResolvedUse[];
 }
 
+// Error type for import-resolution and module-graph failures.
 export class SwNetResolveError extends Error {
   constructor(
     message: string,
@@ -61,6 +63,7 @@ export class SwNetResolveError extends Error {
   }
 }
 
+// Resolve the full sw-net document graph starting from one entry document handle.
 export async function resolveSwNetDocumentGraph(
   entry: SwNetDocumentHandle,
   resolver: SwNetDocumentResolver,
@@ -70,6 +73,7 @@ export async function resolveSwNetDocumentGraph(
   const resolvedUses: SwNetResolvedUse[] = [];
 
   for (const documentHandle of documentsByPath.values()) {
+    // Resolve aliases and local modules per document before lowering use statements to explicit targets.
     const importPathByAlias = buildImportAliasIndex(
       documentHandle.path,
       documentHandle.document.imports,
@@ -112,6 +116,7 @@ export async function resolveSwNetDocumentGraph(
   };
 }
 
+// Load the transitive closure of imported documents starting from the entry document.
 async function loadDocumentClosure(
   entry: SwNetDocumentHandle,
   resolver: SwNetDocumentResolver,
@@ -136,6 +141,7 @@ async function loadDocumentClosure(
     }
 
     for (const imported of currentDocument.document.imports) {
+      // Import-path validation happens before the external resolver is consulted.
       validateImportPath(imported.path, currentPath);
       const resolvedPath = resolver.resolveImportPath(currentPath, imported.path);
 
@@ -157,6 +163,7 @@ async function loadDocumentClosure(
   return documentsByPath;
 }
 
+// Resolve one use statement into an explicit caller/target edge in the module graph.
 function resolveUseStatement(
   documentPath: string,
   caller: SwNetResolvedModuleKey,
@@ -174,6 +181,7 @@ function resolveUseStatement(
   };
 }
 
+// Resolve either a local or imported module reference into a concrete module key.
 function resolveModuleRef(
   documentPath: string,
   moduleRef: SwNetModuleRef,
@@ -198,6 +206,7 @@ function resolveModuleRef(
   return resolveImportedModuleRef(documentPath, moduleRef, documentsByPath, importPathByAlias);
 }
 
+// Resolve an imported module reference through its alias and imported document path.
 function resolveImportedModuleRef(
   documentPath: string,
   moduleRef: SwNetImportedModuleRef,
@@ -237,6 +246,7 @@ function resolveImportedModuleRef(
   };
 }
 
+// Build the import-alias index for one document while validating duplicates and path syntax.
 function buildImportAliasIndex(
   documentPath: string,
   imports: SwNetImport[],
@@ -259,6 +269,7 @@ function buildImportAliasIndex(
   return index;
 }
 
+// Build the local module index for one document while validating duplicate module ids.
 function buildLocalModuleIndex(documentPath: string, modules: SwNetModule[]): Map<string, SwNetModule> {
   const index = new Map<string, SwNetModule>();
 
@@ -276,10 +287,12 @@ function buildLocalModuleIndex(documentPath: string, modules: SwNetModule[]): Ma
   return index;
 }
 
+// Collect only use statements from a module's mixed statement list.
 function collectUseStatements(statements: SwNetStatement[]): SwNetUseStatement[] {
   return statements.filter((statement): statement is SwNetUseStatement => statement.kind === "use");
 }
 
+// Reject recursive module-call graphs before later export stages attempt lowering.
 function ensureAcyclicModuleGraph(modules: SwNetResolvedModule[]): void {
   const moduleByKey = new Map(modules.map((module) => [createModuleKeyText(module.key), module] as const));
   const visiting = new Set<string>();
@@ -290,6 +303,7 @@ function ensureAcyclicModuleGraph(modules: SwNetResolvedModule[]): void {
     visitModule(module.key);
   }
 
+  // A depth-first walk keeps the first discovered cycle readable in the final error.
   function visitModule(key: SwNetResolvedModuleKey): void {
     const keyText = createModuleKeyText(key);
 
@@ -329,6 +343,7 @@ function ensureAcyclicModuleGraph(modules: SwNetResolvedModule[]): void {
   }
 }
 
+// Validate one raw import path against the current sw-net import rules.
 function validateImportPath(importPath: string, documentPath: string): void {
   const isRelative = importPath.startsWith("./") || importPath.startsWith("../");
 
@@ -347,18 +362,22 @@ function validateImportPath(importPath: string, documentPath: string): void {
   }
 }
 
+// Build a unique map key for one resolved module.
 function createModuleKeyText(key: SwNetResolvedModuleKey): string {
   return `${key.documentPath}#${key.moduleId}`;
 }
 
+// Format one resolved module key for human-readable diagnostics.
 function formatModuleKey(key: SwNetResolvedModuleKey): string {
   return `${key.documentPath}:${key.moduleId}`;
 }
 
+// Sort document handles by path for stable diagnostics and tests.
 function compareDocumentHandles(left: SwNetDocumentHandle, right: SwNetDocumentHandle): number {
   return left.path.localeCompare(right.path);
 }
 
+// Sort resolved modules by document path and then module id.
 function compareResolvedModules(left: SwNetResolvedModule, right: SwNetResolvedModule): number {
   const pathComparison = left.key.documentPath.localeCompare(right.key.documentPath);
 
@@ -369,6 +388,7 @@ function compareResolvedModules(left: SwNetResolvedModule, right: SwNetResolvedM
   return left.key.moduleId.localeCompare(right.key.moduleId);
 }
 
+// Sort resolved use edges by caller first and target second for stable output.
 function compareResolvedUses(left: SwNetResolvedUse, right: SwNetResolvedUse): number {
   const callerComparison = createModuleKeyText(left.caller).localeCompare(createModuleKeyText(right.caller));
 

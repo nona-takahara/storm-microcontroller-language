@@ -1,3 +1,4 @@
+// Stormworks XML importer that rebuilds layered IR from project nodes, bridge components, and logic components.
 import { XMLParser } from "fast-xml-parser";
 
 import {
@@ -66,9 +67,10 @@ interface ProjectNodeContext {
   path: string;
 }
 
-interface BridgeStateContext {
+interface ProjectBridgeContext {
   rawId: string;
-  record: Record<string, unknown>;
+  componentType?: string;
+  bridgeRecord: Record<string, unknown>;
   path: string;
 }
 
@@ -95,6 +97,7 @@ const SUBMODULE_INPUT_TO_LOGIC_PORT_KEY = "toLogic";
 const SUBMODULE_OUTPUT_FROM_LOGIC_PORT_KEY = "fromLogic";
 const SUBMODULE_OUTPUT_TO_PROJECT_PORT_KEY = "toProject";
 
+// Parse raw Stormworks XML into the generic object tree consumed by the importer.
 export function parseStormworksXml(
   xmlText: string,
   parserOptions: Partial<StormworksXmlParserOptions> = {},
@@ -111,6 +114,7 @@ export function parseStormworksXml(
   };
 }
 
+// Parse Stormworks XML and lower it into the layered IR consumed by the rest of the toolchain.
 export function importStormworksXml(
   xmlText: string,
   options: StormworksXmlImportOptions,
@@ -136,6 +140,7 @@ export function importStormworksXml(
   };
 }
 
+// Convert the parsed XML tree into the layered IR used by project.json, sw-net, and sw-mcl.
 function buildIrProgram(
   root: unknown,
   definitions: NodeDefinitionRegistry,
@@ -143,22 +148,25 @@ function buildIrProgram(
   warnings: StormworksXmlImportWarning[],
 ): IrProgram {
   // Import is intentionally split into:
-  // 1. project nodes from <nodes>
-  // 2. implicit submodule boundary from component_bridge_states
-  // 3. pure logic graph from group.components.c
+  // 1. project nodes from <nodes><n>
+  // 2. project bridge components from <components_bridge><c>
+  //    (with component_bridge_states as a legacy fallback only)
+  // 3. pure logic graph from <components><c>
   const program = createEmptyIrProgram({
     sourceFormat: "stormworks-xml",
     sourceName,
   });
   program.metadata.microprocessor = extractMicroprocessorMetadata(root);
 
-  const bridgeStates = collectBridgeStates(root);
-  const projectNodes = collectProjectNodes(root, definitions, bridgeStates, program, warnings);
+  // Import in source-order so later stages can resolve references against already-collected nodes.
+  const projectBridges = collectProjectBridges(root, warnings);
+  const projectNodes = collectProjectNodes(root, definitions, program, warnings);
   const logicNodes = collectLogicNodes(root, definitions, program, warnings);
-  const submodulePorts = synthesizeSubmodulePorts(projectNodes, bridgeStates, program, warnings);
+  const submodulePorts = synthesizeSubmodulePorts(projectNodes, projectBridges, program, warnings);
 
+  // Logic links and project/bridge links are rebuilt separately because they come from different XML sections.
   importLogicLinks(root, definitions, program, logicNodes, submodulePorts, warnings);
-  importProjectAndBridgeLinks(projectNodes, bridgeStates, definitions, program, logicNodes, submodulePorts, warnings);
+  importProjectAndBridgeLinks(projectNodes, projectBridges, definitions, program, logicNodes, submodulePorts, warnings);
   registerImplicitSubmodule(program, submodulePorts, logicNodes);
 
   warnings.unshift({
@@ -169,6 +177,7 @@ function buildIrProgram(
   return program;
 }
 
+// Read top-level microprocessor metadata that belongs to project.json rather than the logic graph.
 function extractMicroprocessorMetadata(root: unknown): IrMicroprocessorMetadata | undefined {
   const microprocessorRecord = asRecord(getValueByPath(root, "microprocessor"));
 
@@ -195,10 +204,10 @@ function extractMicroprocessorMetadata(root: unknown): IrMicroprocessorMetadata 
   return metadata;
 }
 
+// Import project-facing pins from <nodes><n> and classify them with project-node definitions.
 function collectProjectNodes(
   root: unknown,
   definitions: NodeDefinitionRegistry,
-  bridgeStates: Map<string, BridgeStateContext>,
   program: IrProgram,
   warnings: StormworksXmlImportWarning[],
 ): Map<string, ProjectNodeContext> {
@@ -206,6 +215,7 @@ function collectProjectNodes(
   const projectNodes = getArrayByPath(root, "microprocessor.nodes.n");
 
   for (let index = 0; index < projectNodes.length; index += 1) {
+    // Each <n> wraps a project-visible pin and points at the bridge/component id used elsewhere in XML.
     const record = asRecord(projectNodes[index]);
 
     if (!record) {
@@ -231,7 +241,7 @@ function collectProjectNodes(
     const typeKey = toProjectTypeKey(type, mode);
     const label = getAttribute(nodeRecord, "label") ?? rawId;
     const definition = findProjectNodeDefinition(definitions, type, mode);
-    const binding = resolveProjectNodeBinding(type, mode, definition, bridgeStates.get(rawId)?.record);
+    const binding = resolveProjectNodeBinding(type, mode, definition);
     const importedNode: IrNode = {
       id: `project:${rawId}`,
       layer: "project",
@@ -278,36 +288,87 @@ function collectProjectNodes(
   return contexts;
 }
 
-function collectBridgeStates(root: unknown): Map<string, BridgeStateContext> {
-  const bridgeStates = new Map<string, BridgeStateContext>();
+// Collect project/logics boundary data from bridge components, with legacy state data as fallback.
+function collectProjectBridges(
+  root: unknown,
+  warnings: StormworksXmlImportWarning[],
+): Map<string, ProjectBridgeContext> {
+  const bridgeComponents = getArrayByPath(root, "microprocessor.group.components_bridge.c");
+
+  if (bridgeComponents.length > 0) {
+    return collectProjectBridgesFromComponents(bridgeComponents, warnings);
+  }
+
+  return collectProjectBridgesFromLegacyStates(root);
+}
+
+// Read canonical bridge components from <components_bridge><c>.
+function collectProjectBridgesFromComponents(
+  bridgeComponents: unknown[],
+  warnings: StormworksXmlImportWarning[],
+): Map<string, ProjectBridgeContext> {
+  const projectBridges = new Map<string, ProjectBridgeContext>();
+
+  for (let index = 0; index < bridgeComponents.length; index += 1) {
+    // Bridge components reuse the same <c><object> shape as logic components, so normalize them the same way.
+    const component = asRecord(bridgeComponents[index]);
+
+    if (!component) {
+      continue;
+    }
+
+    const componentType = getAttribute(component, "type") ?? "0";
+    const bridgeRecord = asRecord(component.object);
+    const rawId = bridgeRecord ? getAttribute(bridgeRecord, "id") : undefined;
+
+    if (!bridgeRecord || !rawId) {
+      warnings.push({
+        code: "PROJECT_BRIDGE_SKIPPED",
+        message: "Skipped a project bridge component because object or object id was missing.",
+        path: `microprocessor.group.components_bridge.c[${index}]`,
+      });
+      continue;
+    }
+
+    projectBridges.set(rawId, {
+      rawId,
+      componentType,
+      bridgeRecord,
+      path: `microprocessor.group.components_bridge.c[${index}]`,
+    });
+  }
+
+  return projectBridges;
+}
+
+// Fall back to editor-oriented bridge state data when bridge components are unavailable.
+function collectProjectBridgesFromLegacyStates(root: unknown): Map<string, ProjectBridgeContext> {
+  const projectBridges = new Map<string, ProjectBridgeContext>();
   const bridgeGroup = asRecord(getValueByPath(root, "microprocessor.group.component_bridge_states"));
 
   if (!bridgeGroup) {
-    return bridgeStates;
+    return projectBridges;
   }
 
   for (const [childName, childValue] of Object.entries(bridgeGroup)) {
-    if (!/^c\d+$/.test(childName)) {
+    const bridgeRecord = asRecord(childValue);
+    const rawId = bridgeRecord ? getAttribute(bridgeRecord, "id") : undefined;
+
+    if (!bridgeRecord || !rawId) {
       continue;
     }
 
-    const record = asRecord(childValue);
-    const rawId = record ? getAttribute(record, "id") : undefined;
-
-    if (!record || !rawId) {
-      continue;
-    }
-
-    bridgeStates.set(rawId, {
+    projectBridges.set(rawId, {
       rawId,
-      record,
+      bridgeRecord,
       path: `microprocessor.group.component_bridge_states.${childName}`,
     });
   }
 
-  return bridgeStates;
+  return projectBridges;
 }
 
+// Import logic nodes from <components><c>, normalizing missing types to 0 for graph stability.
 function collectLogicNodes(
   root: unknown,
   definitions: NodeDefinitionRegistry,
@@ -318,20 +379,21 @@ function collectLogicNodes(
   const components = getArrayByPath(root, "microprocessor.group.components.c");
 
   for (let index = 0; index < components.length; index += 1) {
+    // object.id is the only identifier that later link sections can rely on, so missing ids are fatal here.
     const component = asRecord(components[index]);
 
     if (!component) {
       continue;
     }
 
-    const componentType = getAttribute(component, "type");
+    const componentType = getAttribute(component, "type") ?? "0";
     const objectRecord = asRecord(component.object);
     const rawId = objectRecord ? getAttribute(objectRecord, "id") : undefined;
 
-    if (!componentType || !objectRecord || !rawId) {
+    if (!objectRecord || !rawId) {
       warnings.push({
         code: "LOGIC_COMPONENT_SKIPPED",
-        message: "Skipped a logic component because type, object, or object id was missing.",
+        message: "Skipped a logic component because object or object id was missing.",
         path: `microprocessor.group.components.c[${index}]`,
       });
       continue;
@@ -371,9 +433,10 @@ function collectLogicNodes(
   return logicNodes;
 }
 
+// Synthesize the implicit submodule boundary that sits between project pins and the logic body.
 function synthesizeSubmodulePorts(
   projectNodes: Map<string, ProjectNodeContext>,
-  bridgeStates: Map<string, BridgeStateContext>,
+  projectBridges: Map<string, ProjectBridgeContext>,
   program: IrProgram,
   warnings: StormworksXmlImportWarning[],
 ): Map<string, SubmodulePortContext> {
@@ -382,12 +445,13 @@ function synthesizeSubmodulePorts(
   const ports = new Map<string, SubmodulePortContext>();
 
   for (const [rawId, projectNode] of projectNodes) {
-    const bridgeState = bridgeStates.get(rawId);
+    const projectBridge = projectBridges.get(rawId);
+    // The implicit submodule boundary keeps project.json and sw-net layered even though XML has no explicit module.
     const importedNode: IrNode = {
       id: `submodule:${rawId}`,
       layer: "submodule",
       definitionId: createSyntheticSubmoduleDefinitionId(projectNode.binding.direction, projectNode.binding.signal),
-      position: bridgeState ? readBridgePosition(bridgeState.record) : projectNode.irNode.position,
+      position: projectBridge ? readBridgePosition(projectBridge.bridgeRecord) : projectNode.irNode.position,
       properties: {
         componentId: rawId,
         name: projectNode.label,
@@ -400,15 +464,25 @@ function synthesizeSubmodulePorts(
       },
       source: {
         format: "stormworks-xml",
-        path: bridgeState?.path ?? projectNode.path,
+        path: projectBridge?.path ?? projectNode.path,
       },
     };
 
-    if (!bridgeState) {
+    if (!projectBridge) {
       warnings.push({
         code: "PROJECT_NODE_WITHOUT_BRIDGE",
-        message: `Project node ${rawId} has no component_bridge_states entry.`,
+        message: `Project node ${rawId} has no components_bridge.c entry.`,
         path: projectNode.path,
+      });
+    } else if (
+      projectNode.definition?.stormworks.bridgeType !== undefined &&
+      projectBridge.componentType !== undefined &&
+      projectBridge.componentType !== projectNode.definition.stormworks.bridgeType
+    ) {
+      warnings.push({
+        code: "PROJECT_BRIDGE_TYPE_MISMATCH",
+        message: `Project node ${rawId} expected bridge type ${projectNode.definition.stormworks.bridgeType} but found ${projectBridge.componentType}.`,
+        path: projectBridge.path,
       });
     }
 
@@ -429,12 +503,12 @@ function synthesizeSubmodulePorts(
     });
   }
 
-  for (const [rawId, bridgeState] of bridgeStates) {
+  for (const [rawId, projectBridge] of projectBridges) {
     if (!projectNodes.has(rawId)) {
       warnings.push({
         code: "BRIDGE_WITHOUT_PROJECT_NODE",
-        message: `component_bridge_states entry ${rawId} has no matching project node.`,
-        path: bridgeState.path,
+        message: `Bridge component ${rawId} has no matching project node.`,
+        path: projectBridge.path,
       });
     }
   }
@@ -442,6 +516,7 @@ function synthesizeSubmodulePorts(
   return ports;
 }
 
+// Rebuild logic-to-logic and project-input-to-logic links from <components><c>.object.in* references.
 function importLogicLinks(
   root: unknown,
   definitions: NodeDefinitionRegistry,
@@ -459,11 +534,11 @@ function importLogicLinks(
       continue;
     }
 
-    const componentType = getAttribute(component, "type");
+    const componentType = getAttribute(component, "type") ?? "0";
     const objectRecord = asRecord(component.object);
     const rawId = objectRecord ? getAttribute(objectRecord, "id") : undefined;
 
-    if (!componentType || !objectRecord || !rawId) {
+    if (!objectRecord || !rawId) {
       continue;
     }
 
@@ -479,6 +554,7 @@ function importLogicLinks(
         continue;
       }
 
+      // Logic inputs can point either at another logic node or at a project-facing bridge component.
       const inputRecord = asRecord(childValue);
 
       if (!inputRecord) {
@@ -519,9 +595,10 @@ function importLogicLinks(
   }
 }
 
+// Rebuild project-surface links, using bridge components to discover output-side bindings.
 function importProjectAndBridgeLinks(
   projectNodes: Map<string, ProjectNodeContext>,
-  bridgeStates: Map<string, BridgeStateContext>,
+  projectBridges: Map<string, ProjectBridgeContext>,
   definitions: NodeDefinitionRegistry,
   program: IrProgram,
   logicNodes: Map<string, IrNode>,
@@ -529,7 +606,7 @@ function importProjectAndBridgeLinks(
   warnings: StormworksXmlImportWarning[],
 ): void {
   for (const [rawId, projectNode] of projectNodes) {
-    const bridgeState = bridgeStates.get(rawId);
+    const projectBridge = projectBridges.get(rawId);
     const submodulePort = submodulePorts.get(rawId);
 
     if (!submodulePort) {
@@ -537,6 +614,7 @@ function importProjectAndBridgeLinks(
     }
 
     if (projectNode.binding.direction === "input") {
+      // Project inputs are simple: XML already says the outside world feeds the module boundary directly.
       program.links.push({
         id: `project:${projectNode.irNode.id}->${submodulePort.irNode.id}`,
         from: {
@@ -549,29 +627,31 @@ function importProjectAndBridgeLinks(
         },
         source: {
           format: "stormworks-xml",
-          path: bridgeState?.path ?? projectNode.path,
+          path: projectBridge?.path ?? projectNode.path,
         },
       });
       continue;
     }
 
-    const outputBindings = getBridgeInputBindings(bridgeState?.record);
+    const outputBindings = getBridgeInputBindings(projectBridge?.bridgeRecord);
 
-    if (!bridgeState) {
+    // Project outputs need the bridge section because XML stores the internal driving component there.
+    if (!projectBridge) {
       warnings.push({
         code: "PROJECT_OUTPUT_WITHOUT_BRIDGE",
-        message: `Project output node ${rawId} has no component_bridge_states entry.`,
+        message: `Project output node ${rawId} has no components_bridge.c entry.`,
         path: projectNode.path,
       });
     } else if (outputBindings.length === 0) {
       warnings.push({
         code: "BRIDGE_OUTPUT_SOURCE_MISSING",
         message: `Output bridge ${rawId} does not specify an internal source component.`,
-        path: bridgeState.path,
+        path: projectBridge.path,
       });
     }
 
     for (const binding of outputBindings) {
+      // Output bridges can currently fan in from either logic nodes or synthesized external inputs.
       const sourceRawId = getAttribute(binding.record, "component_id");
 
       if (!sourceRawId) {
@@ -599,7 +679,7 @@ function importProjectAndBridgeLinks(
         },
         source: {
           format: "stormworks-xml",
-          path: bridgeState ? `${bridgeState.path}.${binding.tagName}` : projectNode.path,
+          path: projectBridge ? `${projectBridge.path}.object.${binding.tagName}` : projectNode.path,
         },
       });
     }
@@ -616,12 +696,13 @@ function importProjectAndBridgeLinks(
       },
       source: {
         format: "stormworks-xml",
-        path: bridgeState?.path ?? projectNode.path,
+        path: projectBridge?.path ?? projectNode.path,
       },
     });
   }
 }
 
+// Register the single implicit submodule that XML import exposes to the DSL side.
 function registerImplicitSubmodule(
   program: IrProgram,
   submodulePorts: Map<string, SubmodulePortContext>,
@@ -639,6 +720,7 @@ function registerImplicitSubmodule(
   });
 }
 
+// Create synthetic module-input ports for unresolved external references so links do not disappear.
 function ensureSubmoduleInputPort(
   submodulePorts: Map<string, SubmodulePortContext>,
   rawId: string,
@@ -673,7 +755,7 @@ function ensureSubmoduleInputPort(
 
   warnings.push({
     code: "SUBMODULE_EXTERNAL_INPUT_SYNTHESIZED",
-    message: `Synthesized a submodule input port for external component_id=${rawId} referenced from components.c or component_bridge_states.`,
+    message: `Synthesized a submodule input port for external component_id=${rawId} referenced from components.c or components_bridge.c.`,
     path: describeInputRecord(inputRecord),
   });
 
@@ -692,18 +774,18 @@ function ensureSubmoduleInputPort(
   return context;
 }
 
+// Resolve a project pin into the normalized IR-facing binding used by later serializers.
 function resolveProjectNodeBinding(
   type: string,
   mode: string | undefined,
   definition: ProjectNodeDefinition | undefined,
-  bridgeRecord: Record<string, unknown> | undefined,
 ): ProjectNodeBinding {
   if (definition) {
     return createProjectNodeBindingFromDefinition(definition);
   }
 
-  const normalizedMode = mode ?? "0";
-  const direction = inferProjectDirection(normalizedMode, bridgeRecord);
+  // Fallback inference keeps unknown project node types visible instead of dropping them on the floor.
+  const direction = inferProjectDirection(mode ?? "0");
   const signal = inferProjectSignal(type);
 
   return {
@@ -714,6 +796,7 @@ function resolveProjectNodeBinding(
   };
 }
 
+// Convert a project-node definition into the normalized binding shape shared by inferred nodes.
 function createProjectNodeBindingFromDefinition(definition: ProjectNodeDefinition): ProjectNodeBinding {
   const direction = definition.ports.outputs.length > 0 ? "input" : "output";
   const signal =
@@ -729,21 +812,18 @@ function createProjectNodeBindingFromDefinition(definition: ProjectNodeDefinitio
   };
 }
 
+// Infer project pin direction directly from node mode when no explicit definition is available.
 function inferProjectDirection(
   mode: string,
-  bridgeRecord: Record<string, unknown> | undefined,
 ): SubmodulePortDirection {
   if (mode === "1") {
     return "input";
   }
 
-  if (getBridgeInputBindings(bridgeRecord).length > 0) {
-    return "output";
-  }
-
   return "output";
 }
 
+// Infer the project signal kind from the raw Stormworks node type code.
 function inferProjectSignal(type: string): IrSignalKind {
   if (type === "0") {
     return "boolean";
@@ -764,6 +844,7 @@ function inferProjectSignal(type: string): IrSignalKind {
   return "unknown";
 }
 
+// Pick the normalized port key used by IR for project-facing pins.
 function createProjectPortKey(
   direction: SubmodulePortDirection,
   signal: IrSignalKind,
@@ -787,6 +868,7 @@ function createProjectPortKey(
   return direction === "input" ? "out1" : "in1";
 }
 
+// Name synthesized submodule boundary nodes in a way serializers can pattern-match later.
 function createSyntheticSubmoduleDefinitionId(
   direction: SubmodulePortDirection,
   signal: IrSignalKind,
@@ -794,6 +876,7 @@ function createSyntheticSubmoduleDefinitionId(
   return `SUBMODULE_PORT:${direction}:${signal}`;
 }
 
+// Read bridge-side source bindings from in* children on bridge records.
 function getBridgeInputBindings(
   bridgeRecord: Record<string, unknown> | undefined,
 ): Array<{ tagName: string; record: Record<string, unknown> }> {
@@ -818,6 +901,7 @@ function getBridgeInputBindings(
   return bindings;
 }
 
+// Extract definition-driven properties from XML into normalized IR scalar values.
 function extractDefinedProperties(
   sourceRecord: Record<string, unknown>,
   definition: DefinitionBase | undefined,
@@ -848,6 +932,7 @@ function extractDefinedProperties(
   return properties;
 }
 
+// Preserve unclaimed object attributes so unknown nodes can still round-trip through the DSL.
 function extractObjectAttributes(
   objectRecord: Record<string, unknown>,
   definition: DefinitionBase | undefined,
@@ -880,6 +965,7 @@ function extractObjectAttributes(
   return properties;
 }
 
+// Detect when a definition property reads a direct object attribute so it is not duplicated later.
 function tryGetDirectObjectAttributeName(source: NodePropertySource | undefined): string | undefined {
   if (!source) {
     return undefined;
@@ -889,6 +975,7 @@ function tryGetDirectObjectAttributeName(source: NodePropertySource | undefined)
   return match?.[1];
 }
 
+// Resolve one property value from its XML path and coerce it into the requested scalar type.
 function extractPropertyValue(
   sourceRecord: Record<string, unknown>,
   valueType: DefinitionValueType,
@@ -907,6 +994,7 @@ function extractPropertyValue(
   return coerceScalarValue(rawValue, valueType);
 }
 
+// Coerce XML text and attribute data into the scalar types stored in IR properties.
 function coerceScalarValue(value: unknown, valueType: DefinitionValueType): IrScalarValue | undefined {
   if (valueType === "string") {
     return typeof value === "string" ? value : String(value);
@@ -942,6 +1030,7 @@ function coerceScalarValue(value: unknown, valueType: DefinitionValueType): IrSc
   return undefined;
 }
 
+// Coerce unclaimed object attributes into best-effort scalar values for generic round-tripping.
 function coerceXmlAttributeScalar(value: unknown): IrScalarValue | undefined {
   if (typeof value === "number" || typeof value === "boolean" || value === null) {
     return value;
@@ -967,10 +1056,12 @@ function coerceXmlAttributeScalar(value: unknown): IrScalarValue | undefined {
   return value;
 }
 
+// Build the registry lookup key for project nodes from raw XML type/mode values.
 function toProjectTypeKey(type: string, mode?: string): string {
   return `${type}:${mode ?? "0"}`;
 }
 
+// Resolve an XML-side output reference into a DSL/IR source port key.
 function resolveSourcePortKey(
   sourceNode: IrNode,
   definitions: NodeDefinitionRegistry,
@@ -980,6 +1071,7 @@ function resolveSourcePortKey(
   const rawIndex = getAttribute(inputRecord, "node_index");
   const parsedIndex = rawIndex ? Number.parseInt(rawIndex, 10) : Number.NaN;
 
+  // node_index is only meaningful for explicit multi-output components; otherwise we fall back to the primary output.
   if (sourceDefinition && Number.isInteger(parsedIndex) && parsedIndex > 0) {
     const explicitOutput = sourceDefinition.ports.outputs.find((output) => output.stormworks?.nodeIndex === parsedIndex);
 
@@ -1002,11 +1094,13 @@ function resolveSourcePortKey(
   return "out1";
 }
 
+// Resolve an XML input tag such as in1/in2/inc into the normalized target port key.
 function resolveTargetPortKey(definition: ComponentDefinition | undefined, rawPortKey: string): string {
   if (!definition) {
     return rawPortKey;
   }
 
+  // Explicit xmlKey aliases win first, then dynamic inN families, then positional inN fallback.
   const explicitInput = definition.ports.inputs.find((input) => input.stormworks?.xmlKey === rawPortKey);
 
   if (explicitInput) {
@@ -1040,10 +1134,12 @@ function resolveTargetPortKey(definition: ComponentDefinition | undefined, rawPo
   return input?.key ?? rawPortKey;
 }
 
+// Escape literal text so XML input-key patterns can be compiled into safe regular expressions.
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Read the vehicle-space position attached to a project node.
 function readProjectPosition(nodeRecord: Record<string, unknown>): { x: number; y: number } | undefined {
   const positionRecord = asRecord(nodeRecord.position);
 
@@ -1057,6 +1153,7 @@ function readProjectPosition(nodeRecord: Record<string, unknown>): { x: number; 
   };
 }
 
+// Read the bridge-canvas position attached to a project bridge record.
 function readBridgePosition(bridgeRecord: Record<string, unknown>): { x: number; y: number } | undefined {
   const positionRecord = asRecord(bridgeRecord.pos);
 
@@ -1070,6 +1167,7 @@ function readBridgePosition(bridgeRecord: Record<string, unknown>): { x: number;
   };
 }
 
+// Read the module-canvas position attached to a logic component.
 function readLogicPosition(componentRecord: Record<string, unknown>): { x: number; y: number } | undefined {
   const positionRecord = asRecord(getValueByPath(componentRecord, "object.pos"));
 
@@ -1083,6 +1181,7 @@ function readLogicPosition(componentRecord: Record<string, unknown>): { x: numbe
   };
 }
 
+// Walk a dotted path through the parsed XML object tree.
 function getValueByPath(root: unknown, path: string): unknown {
   const segments = path.split(".").filter((segment) => segment.length > 0);
   let current = root;
@@ -1101,6 +1200,7 @@ function getValueByPath(root: unknown, path: string): unknown {
   return current;
 }
 
+// Normalize one tree value into an array so callers can consume singletons and arrays uniformly.
 function getArrayByPath(root: unknown, path: string): unknown[] {
   const value = getValueByPath(root, path);
 
@@ -1115,11 +1215,13 @@ function getArrayByPath(root: unknown, path: string): unknown[] {
   return [value];
 }
 
+// Read one XML attribute from the parser's @_ prefixed attribute convention.
 function getAttribute(record: Record<string, unknown>, attributeName: string): string | undefined {
   const value = record[`@_${attributeName}`];
   return typeof value === "string" ? value : undefined;
 }
 
+// Parse one numeric XML attribute from the parser's string-backed representation.
 function parseNumberAttribute(record: Record<string, unknown>, attributeName: string): number | undefined {
   const value = getAttribute(record, attributeName);
 
@@ -1131,6 +1233,7 @@ function parseNumberAttribute(record: Record<string, unknown>, attributeName: st
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+// Narrow unknown values into plain object records before property access.
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     return value as Record<string, unknown>;
@@ -1139,10 +1242,12 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return undefined;
 }
 
+// Treat in1/in2/inc-style child names as XML input bindings.
 function isInputTagName(name: string): boolean {
   return name === "inc" || /^in\d+$/.test(name);
 }
 
+// Describe one XML input record for diagnostics when no stable source path is available.
 function describeInputRecord(inputRecord: Record<string, unknown>): string {
   const componentId = getAttribute(inputRecord, "component_id");
   const nodeIndex = getAttribute(inputRecord, "node_index");

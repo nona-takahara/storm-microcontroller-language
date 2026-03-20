@@ -1,3 +1,4 @@
+// Definitions registry helpers that validate, index, and resolve project/component definitions for the toolchain.
 import {
   NODE_DEFINITIONS_SCHEMA_VERSION,
   type ComponentDefinition,
@@ -15,10 +16,12 @@ export interface NodeDefinitionRegistry {
   componentByStormworksType: Map<string, ComponentDefinition>;
 }
 
+// Parse JSON text into the raw definitions document shape before registry indexing.
 export function parseNodeDefinitionsJson(jsonText: string): NodeDefinitionsDocument {
   return parseNodeDefinitionsDocument(JSON.parse(jsonText));
 }
 
+// Build the indexed definitions registry used by importers, serializers, and validators.
 export function createNodeDefinitionRegistry(document: NodeDefinitionsDocument): NodeDefinitionRegistry {
   if (document.schemaVersion !== NODE_DEFINITIONS_SCHEMA_VERSION) {
     throw new Error(
@@ -58,18 +61,22 @@ export function createNodeDefinitionRegistry(document: NodeDefinitionsDocument):
   };
 }
 
+// Parse an unknown in-memory value and immediately index it as a definitions registry.
 export function loadNodeDefinitionsDocument(input: unknown): NodeDefinitionRegistry {
   return createNodeDefinitionRegistry(parseNodeDefinitionsDocument(input));
 }
 
+// Parse JSON text and immediately index it as a definitions registry.
 export function loadNodeDefinitionsJson(jsonText: string): NodeDefinitionRegistry {
   return createNodeDefinitionRegistry(parseNodeDefinitionsJson(jsonText));
 }
 
+// Build the normalized Stormworks lookup key used for project-node definitions.
 export function createProjectNodeStormworksKey(type: string, mode?: string): string {
   return `${type}:${mode ?? "0"}`;
 }
 
+// Look up a project-node definition by the raw Stormworks type/mode pair.
 export function findProjectNodeDefinition(
   registry: NodeDefinitionRegistry,
   type: string,
@@ -78,6 +85,7 @@ export function findProjectNodeDefinition(
   return registry.nodeByStormworksKey.get(createProjectNodeStormworksKey(type, mode));
 }
 
+// Look up a component definition by the raw Stormworks component type code.
 export function findComponentDefinitionByStormworksType(
   registry: NodeDefinitionRegistry,
   type: string,
@@ -85,6 +93,7 @@ export function findComponentDefinitionByStormworksType(
   return registry.componentByStormworksType.get(type);
 }
 
+// Resolve a component definition from either DSL ids, generic wrapper ids, or raw Stormworks type ids.
 export function findCompatibleComponentDefinition(
   registry: NodeDefinitionRegistry,
   typeId: string,
@@ -110,6 +119,7 @@ export function findCompatibleComponentDefinition(
   return registry.componentByStormworksType.get(wrappedStormworksType);
 }
 
+// Extract a raw Stormworks type code from supported generic component id spellings.
 export function extractCompatibleStormworksType(typeId: string): string | undefined {
   if (/^\d+$/.test(typeId)) {
     return typeId;
@@ -130,6 +140,7 @@ export function extractCompatibleStormworksType(typeId: string): string | undefi
   return undefined;
 }
 
+// Register one project-node definition into the Stormworks key index with duplicate checking.
 function registerProjectNodeDefinition(
   nodeByStormworksKey: Map<string, ProjectNodeDefinition>,
   definition: ProjectNodeDefinition,
@@ -143,6 +154,7 @@ function registerProjectNodeDefinition(
   nodeByStormworksKey.set(key, definition);
 }
 
+// Register one component definition into the raw Stormworks type index with duplicate checking.
 function registerComponentDefinition(
   componentByStormworksType: Map<string, ComponentDefinition>,
   definition: ComponentDefinition,

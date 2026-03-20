@@ -1,3 +1,4 @@
+// Browser-safe facade that treats project.json, sw-net, sw-mcl, and scripts as one logical source package.
 import {
   extractCompatibleStormworksType,
   findCompatibleComponentDefinition,
@@ -118,6 +119,7 @@ export interface ValidateProjectSourceResult {
   diagnostics: StormworksLibraryDiagnostic[];
 }
 
+// Parse one paired sw-net/sw-mcl text set into the in-memory document shape used by the library.
 export function parseSourceDocumentTexts(
   input: StormworksSourceDocumentTextInput,
 ): StormworksLibraryResult<StormworksSourceDocument> {
@@ -152,6 +154,7 @@ export function parseSourceDocumentTexts(
   }
 }
 
+// Serialize one in-memory source document back to the standard CLI text-file shape.
 export function serializeSourceDocumentTexts(
   sourceDocument: StormworksSourceDocument,
 ): StormworksSourceDocumentTexts {
@@ -163,6 +166,7 @@ export function serializeSourceDocumentTexts(
   };
 }
 
+// Import one XML microcontroller directly into the standard project + entry-document surface.
 export function importStormworksXmlToProjectSource(
   xmlText: string,
   options: ImportStormworksXmlToProjectSourceOptions,
@@ -170,6 +174,7 @@ export function importStormworksXmlToProjectSource(
   const diagnostics: StormworksLibraryDiagnostic[] = [];
 
   try {
+    // Import to IR first, then immediately project that IR into the standard CLI-facing document trio.
     const imported = importStormworksXml(xmlText, {
       definitions: options.definitions,
       sourceName: options.sourceName,
@@ -223,6 +228,7 @@ export function importStormworksXmlToProjectSource(
   }
 }
 
+// Resolve imported sw-net documents through the caller-provided loader and build a linked module graph.
 export async function resolveProjectSource(
   projectSource: StormworksProjectSource,
   options: ResolveProjectSourceOptions = {},
@@ -236,6 +242,7 @@ export async function resolveProjectSource(
   }
 
   try {
+    // The actual sw-net resolver stays file-system agnostic; this facade only adapts preloaded documents to it.
     const entryHandle: SwNetDocumentHandle = {
       path: projectSource.entryDocument.documentId,
       document: projectSource.entryDocument.swNet,
@@ -268,6 +275,7 @@ export async function resolveProjectSource(
   }
 }
 
+// Run structural validation across project.json, reachable sw-net documents, sw-mcl, and scripts.
 export async function validateProjectSource(
   projectSource: StormworksProjectSource,
   options: ValidateProjectSourceOptions,
@@ -284,6 +292,7 @@ export async function validateProjectSource(
   };
 }
 
+// Build the intermediate XML tree from the standard project-source surface.
 export async function buildStormworksXmlTreeFromProjectSource(
   projectSource: StormworksProjectSource,
   options: BuildStormworksXmlTreeFromProjectSourceOptions,
@@ -346,6 +355,7 @@ export async function buildStormworksXmlTreeFromProjectSource(
   }
 }
 
+// Build the final XML text from the standard project-source surface.
 export async function buildStormworksXmlFromProjectSource(
   projectSource: StormworksProjectSource,
   options: BuildStormworksXmlFromProjectSourceOptions,
@@ -408,6 +418,7 @@ export async function buildStormworksXmlFromProjectSource(
   }
 }
 
+// Collect all diagnostics needed by validation and export without duplicating traversal logic.
 async function collectProjectSourceDiagnostics(
   projectSource: StormworksProjectSource,
   definitions: NodeDefinitionRegistry,
@@ -437,6 +448,7 @@ async function collectProjectSourceDiagnostics(
   return diagnostics;
 }
 
+// Preload every imported document reachable from the entry document through the caller-provided loader.
 async function preloadProjectSourceDocuments(
   projectSource: StormworksProjectSource,
   loadImportedDocument: StormworksDocumentLoader["loadImportedDocument"] | undefined,
@@ -466,6 +478,7 @@ async function preloadProjectSourceDocuments(
     }
 
     for (const imported of currentDocument.swNet.imports) {
+      // The library never interprets import paths itself; it only asks the caller to resolve them.
       const resolutionKey = formatImportResolutionKey(currentDocument.documentId, imported.path);
 
       if (resolvedImports.has(resolutionKey)) {
@@ -531,6 +544,7 @@ async function preloadProjectSourceDocuments(
   };
 }
 
+// Validate that every project node type still exists in the current definitions set.
 function validateProjectDocument(
   project: ProjectJsonDocument,
   definitions: NodeDefinitionRegistry,
@@ -553,6 +567,7 @@ function validateProjectDocument(
   }
 }
 
+// Validate one source document against its paired sw-mcl document and all inst statements inside it.
 function validateSourceDocument(
   sourceDocument: StormworksSourceDocument,
   definitions: NodeDefinitionRegistry,
@@ -597,6 +612,7 @@ function validateSourceDocument(
   }
 }
 
+// Validate one inst statement against definitions and referenced local script assets.
 function validateInstStatement(
   sourceDocument: StormworksSourceDocument,
   statement: SwNetInstStatement,
@@ -636,6 +652,7 @@ function validateInstStatement(
   }
 }
 
+// Adapt preloaded project-source documents to the sw-net resolver interface.
 function createProjectSourceSwNetResolver(
   documentsById: Map<string, StormworksSourceDocument>,
   resolvedImports: Map<string, string>,
@@ -662,6 +679,7 @@ function createProjectSourceSwNetResolver(
   };
 }
 
+// Collect Lua source text from imported IR nodes into the per-document script map.
 function collectLocalScriptsFromProgram(program: IrProgram): Record<string, string> {
   const scripts: Record<string, string> = {};
 
@@ -682,10 +700,12 @@ function collectLocalScriptsFromProgram(program: IrProgram): Record<string, stri
   return scripts;
 }
 
+// Build a stable key for one import edge without imposing any path semantics on callers.
 function formatImportResolutionKey(fromDocumentId: string, importPath: string): string {
   return `${fromDocumentId}\u0000${importPath}`;
 }
 
+// Rewrite the entry submodule path in project.json so library imports match the chosen document id.
 function applyEntryDocumentPath(
   project: ProjectJsonDocument,
   moduleId: string,
@@ -704,14 +724,17 @@ function applyEntryDocumentPath(
   };
 }
 
+// Sort source documents by document id for stable diagnostics and export ordering.
 function compareSourceDocuments(left: StormworksSourceDocument, right: StormworksSourceDocument): number {
   return left.documentId.localeCompare(right.documentId);
 }
 
+// Check whether a diagnostic list already contains at least one build-blocking error.
 function hasErrorDiagnostics(diagnostics: StormworksLibraryDiagnostic[]): boolean {
   return diagnostics.some((diagnostic) => diagnostic.severity === "error");
 }
 
+// Build a warning diagnostic in the public library result format.
 function createWarningDiagnostic(
   code: string,
   message: string,
@@ -729,6 +752,7 @@ function createWarningDiagnostic(
   };
 }
 
+// Build an error diagnostic in the public library result format.
 function createErrorDiagnostic(
   code: string,
   message: string,

@@ -1,3 +1,4 @@
+// Node-side helpers that load and write the standard CLI project-source file layout on disk.
 import { mkdir } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 
@@ -28,6 +29,7 @@ export interface ProjectSourceFilePaths {
   directoryPath: string;
 }
 
+// Resolve the standard companion-file paths for one project.json location.
 export function resolveProjectSourceFilePaths(
   projectJsonPath: string,
   project?: ProjectJsonDocument,
@@ -45,6 +47,7 @@ export function resolveProjectSourceFilePaths(
   };
 }
 
+// Load project.json plus its standard entry sw-net/sw-mcl companions from disk.
 export async function loadProjectSourceFromProjectJsonFile(
   projectJsonPath: string,
 ): Promise<StormworksLibraryResult<StormworksProjectSource>> {
@@ -54,6 +57,7 @@ export async function loadProjectSourceFromProjectJsonFile(
   try {
     const projectJsonText = await readUtf8TextFile(filePaths.projectJsonPath);
     const project = parseProjectJsonText(projectJsonText);
+    // The entry sw-net path comes from project.json when available so renamed entry documents still load correctly.
     const entrySubmodule = selectEntrySubmodule(project);
     const entryRelativePath = entrySubmodule?.relativePath ?? DEFAULT_ENTRY_SW_NET_FILE_NAME;
     const entrySwNetPath = resolve(filePaths.directoryPath, ...entryRelativePath.split("/"));
@@ -103,6 +107,7 @@ export async function loadProjectSourceFromProjectJsonFile(
   }
 }
 
+// Create a document loader that resolves imported sw-net files from the local file system.
 export function createFileSystemProjectSourceDocumentLoader(): StormworksDocumentLoader["loadImportedDocument"] {
   return async ({ fromDocumentId, importPath }) => {
     const resolvedSwNetPath = resolveRelativeSwNetImportPath(fromDocumentId, importPath);
@@ -115,6 +120,7 @@ export function createFileSystemProjectSourceDocumentLoader(): StormworksDocumen
   };
 }
 
+// Load one sw-net/sw-mcl document pair plus its referenced script assets from disk.
 export async function loadSourceDocumentFromSwNetFile(
   swNetPath: string,
 ): Promise<StormworksSourceDocument> {
@@ -140,6 +146,7 @@ export async function loadSourceDocumentFromSwNetFile(
   };
 }
 
+// Write the standard CLI file layout for one project source into a target directory.
 export async function writeProjectSourceToDirectory(
   projectSource: StormworksProjectSource,
   outputDirectory: string,
@@ -154,6 +161,7 @@ export async function writeProjectSourceToDirectory(
   const entrySwMclPath = replaceSwNetExtension(entrySwNetPath, ".sw-mcl");
   const entryAssetDirectory = dirname(entrySwNetPath);
 
+  // Create directories up front so writes can happen in parallel without races on missing folders.
   await mkdir(resolvedOutputDirectory, { recursive: true });
   await mkdir(dirname(entrySwNetPath), { recursive: true });
   await Promise.all([
@@ -168,6 +176,7 @@ export async function writeProjectSourceToDirectory(
   ]);
 }
 
+// Load script files referenced by script_ref attributes within one sw-net document.
 async function loadReferencedScriptsFromDocument(
   documentPath: string,
   swNet: SwNetDocument,
@@ -180,6 +189,7 @@ async function loadReferencedScriptsFromDocument(
       try {
         scripts[scriptRef] = await readUtf8TextFile(resolveRelativeSwNetAssetPath(documentPath, scriptRef));
       } catch {
+        // Missing scripts are surfaced by validation later; this loader simply omits absent files.
         // Missing scripts are validated later; loading omits them.
       }
     }),
@@ -188,6 +198,7 @@ async function loadReferencedScriptsFromDocument(
   return scripts;
 }
 
+// Collect the distinct script_ref paths mentioned by inst statements in a sw-net document.
 function collectScriptRefs(swNet: SwNetDocument): Set<string> {
   const scriptRefs = new Set<string>();
 
@@ -206,6 +217,7 @@ function collectScriptRefs(swNet: SwNetDocument): Set<string> {
   return scriptRefs;
 }
 
+// Extract one string-valued script_ref from an inst statement when present.
 function getStatementScriptRef(statement: SwNetInstStatement): string | undefined {
   const scriptRefValue = statement.attributes.find(
     (attribute) => attribute.key === "script_ref" && attribute.value.kind === "string",
@@ -214,6 +226,7 @@ function getStatementScriptRef(statement: SwNetInstStatement): string | undefine
   return typeof scriptRefValue === "string" ? scriptRefValue : undefined;
 }
 
+// Replace a .sw-net extension with the matching companion-file extension.
 function replaceSwNetExtension(filePath: string, nextExtension: string): string {
   if (extname(filePath) !== ".sw-net") {
     throw new Error(`Expected a .sw-net file path, received ${filePath}.`);
@@ -222,6 +235,7 @@ function replaceSwNetExtension(filePath: string, nextExtension: string): string 
   return filePath.slice(0, -".sw-net".length) + nextExtension;
 }
 
+// Select the entry submodule record used to locate the primary sw-net/sw-mcl files.
 function selectEntrySubmodule(
   project: ProjectJsonDocument,
   preferredModuleId?: string,

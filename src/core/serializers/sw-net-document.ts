@@ -1,3 +1,4 @@
+// AST-level sw-net serializer used when callers already operate on parsed sw-net documents.
 import {
   type SwNetAssignment,
   type SwNetDocument,
@@ -10,6 +11,7 @@ export interface SerializeSwNetDocumentOptions {
   newlineAtEnd?: boolean;
 }
 
+// Serialize a parsed sw-net document back into canonical text form.
 export function serializeSwNetDocument(
   document: SwNetDocument,
   options: SerializeSwNetDocumentOptions = {},
@@ -20,6 +22,7 @@ export function serializeSwNetDocument(
     lines.push(`import ${imported.alias} from ${JSON.stringify(imported.path)}`);
   }
 
+  // Keep one blank line between imports and modules so the result matches the hand-written style.
   if (document.imports.length > 0 && document.modules.length > 0) {
     lines.push("");
   }
@@ -36,6 +39,7 @@ export function serializeSwNetDocument(
   return (options.newlineAtEnd ?? true) ? `${rendered}\n` : rendered;
 }
 
+// Serialize one sw-net module declaration.
 function serializeSwNetModule(module: SwNetModule): string[] {
   const lines: string[] = [];
 
@@ -58,6 +62,7 @@ function serializeSwNetModule(module: SwNetModule): string[] {
   return lines;
 }
 
+// Serialize either an inst or use statement from the sw-net AST.
 function serializeSwNetStatement(statement: SwNetStatement): string {
   if (statement.kind === "inst") {
     const attributesText =
@@ -80,6 +85,7 @@ function serializeSwNetStatement(statement: SwNetStatement): string {
   )}`;
 }
 
+// Serialize the shared `: inputs -> outputs` clause used by inst and use statements.
 function serializePinAssignments(inputs: SwNetAssignment[], outputs: SwNetAssignment[]): string {
   const inputText = serializeAssignments(inputs);
   const outputText = serializeAssignments(outputs);
@@ -88,10 +94,12 @@ function serializePinAssignments(inputs: SwNetAssignment[], outputs: SwNetAssign
   return inputText.length > 0 ? `: ${inputText} ${rightHandSide}` : `: ${rightHandSide}`;
 }
 
+// Serialize a comma-separated assignment list.
 function serializeAssignments(assignments: SwNetAssignment[]): string {
   return assignments.map((assignment) => `${assignment.key}=${serializeExpression(assignment.value)}`).join(", ");
 }
 
+// Serialize one sw-net expression back to source text.
 function serializeExpression(expression: SwNetExpression): string {
   switch (expression.kind) {
     case "identifier":
@@ -107,6 +115,7 @@ function serializeExpression(expression: SwNetExpression): string {
   }
 }
 
+// Quote port names only when a bare identifier would not preserve the original text.
 function formatPortName(name: string): string {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : JSON.stringify(name);
 }
