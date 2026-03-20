@@ -11,7 +11,7 @@ import {
   type SwNetDocumentResolver,
   type SwNetResolutionResult,
 } from "../../core/resolvers/sw-net.js";
-import { readUtf8TextFile } from "./text-file.js";
+import { readUtf8TextFile, readUtf8TextFileSync } from "./text-file.js";
 
 export async function loadSwNetDocumentFromFile(
   filePath: string,
@@ -30,6 +30,14 @@ export async function loadSwNetDocumentFromFile(
 
 export function resolveRelativeSwNetImportPath(fromDocumentPath: string, importPath: string): string {
   return resolve(dirname(fromDocumentPath), importPath);
+}
+
+export function resolveRelativeSwNetAssetPath(fromDocumentPath: string, assetPath: string): string {
+  return resolve(dirname(fromDocumentPath), assetPath);
+}
+
+export function readRelativeSwNetTextFileSync(fromDocumentPath: string, assetPath: string): string {
+  return readUtf8TextFileSync(resolveRelativeSwNetAssetPath(fromDocumentPath, assetPath));
 }
 
 export function createFileSystemSwNetDocumentResolver(): SwNetDocumentResolver {

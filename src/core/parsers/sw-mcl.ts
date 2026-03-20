@@ -3,7 +3,6 @@ import {
   STORMWORKS_SW_MCL_FORMAT_VERSION,
   type StormworksSwMclDocument,
   type SwMclInstanceDocument,
-  type SwMclModuleDocument,
   type SwMclPortDocument,
 } from "../serializers/sw-mcl.js";
 
@@ -35,25 +34,15 @@ export function parseStormworksSwMclDocument(input: unknown): StormworksSwMclDoc
   return {
     formatVersion,
     sourceName: optionalString(root.sourceName, "$.sourceName"),
-    modules: expectArray(root.modules, "$.modules").map((value, index) =>
-      parseSwMclModule(value, `$.modules[${index}]`),
+    moduleId: expectString(root.moduleId, "$.moduleId"),
+    ports: expectArray(root.ports, "$.ports").map((value, index) =>
+      parseSwMclPort(value, `$.ports[${index}]`),
+    ),
+    instances: expectArray(root.instances, "$.instances").map((value, index) =>
+      parseSwMclInstance(value, `$.instances[${index}]`),
     ),
     warnings: expectArray(root.warnings, "$.warnings").map((value, index) =>
       expectString(value, `$.warnings[${index}]`),
-    ),
-  };
-}
-
-function parseSwMclModule(input: unknown, path: string): SwMclModuleDocument {
-  const record = expectRecord(input, path);
-
-  return {
-    id: expectString(record.id, `${path}.id`),
-    ports: expectArray(record.ports, `${path}.ports`).map((value, index) =>
-      parseSwMclPort(value, `${path}.ports[${index}]`),
-    ),
-    instances: expectArray(record.instances, `${path}.instances`).map((value, index) =>
-      parseSwMclInstance(value, `${path}.instances[${index}]`),
     ),
   };
 }

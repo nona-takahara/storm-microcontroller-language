@@ -6,7 +6,6 @@ export {
 
 export type {
   SwMclInstanceDocument as LayoutJsonModuleInstanceDocument,
-  SwMclModuleDocument as LayoutJsonModuleDocument,
   SwMclPortDocument as LayoutJsonModulePortDocument,
   StormworksSwMclDocument as LayoutJsonDocument,
 } from "./sw-mcl.js";

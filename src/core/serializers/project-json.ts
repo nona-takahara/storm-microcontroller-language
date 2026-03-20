@@ -1,13 +1,16 @@
 import { type IrLink, type IrNode, type IrProgram, type IrScalarValue, type IrSubmodule, type IrVector2 } from "../ir.js";
 
-export const STORMWORKS_PROJECT_JSON_FORMAT_VERSION = "stormworks-project-json-v7";
+export const STORMWORKS_PROJECT_JSON_FORMAT_VERSION = "stormworks-project-json-v10";
 
 export interface ProjectJsonNodeDocument {
   id: string;
   type: string;
   label: string | null;
   description: string | null;
+  // nodePosition is the Stormworks vehicle-space position of the external pin.
   nodePosition: IrVector2;
+  // position is the bridge/submodule-canvas position paired with the implicit submodule surface.
+  position: IrVector2 | null;
 }
 
 export interface ProjectJsonConstantDocument {
@@ -19,6 +22,9 @@ export interface ProjectJsonConstantDocument {
 export interface ProjectJsonSubmoduleDocument {
   id: string;
   name: string;
+  // relativePath points at the sw-net document that defines this submodule.
+  relativePath: string;
+  // Auto-generated submodules currently start at the origin and let sw-mcl own the inner layout.
   position: IrVector2 | null;
 }
 
@@ -49,6 +55,8 @@ export interface ProjectJsonDocument {
 }
 
 export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocument {
+  // project.json only describes the project surface.
+  // Internal logic and its layout are serialized separately into sw-net and sw-mcl.
   const nodeById = new Map(program.nodes.map((node) => [node.id, node] as const));
   const submodulePortIndex = buildSubmodulePortIndex(program.submodules, nodeById);
   const projectNodes = program.nodes.filter((node) => node.layer === "project").sort(compareById);
@@ -56,6 +64,7 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
   const projectLinks = program.links.filter((link) => isProjectSerializableLink(nodeById, link)).sort(compareById);
   const constantNodes = collectLinkedConstantNodes(projectLinks, nodeById);
   const constantIdByIrId = buildConstantIdMap(constantNodes);
+  const bridgePositionByProjectNodeId = buildProjectNodeBridgePositionIndex(program.submodules, nodeById);
 
   return {
     formatVersion: STORMWORKS_PROJECT_JSON_FORMAT_VERSION,
@@ -70,6 +79,7 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
       label: asNullableString(node.properties.label),
       description: asNullableString(node.properties.description),
       nodePosition: node.position ?? { x: 0, y: 0 },
+      position: bridgePositionByProjectNodeId.get(node.id) ?? null,
     })),
     constants: constantNodes.map((node) => ({
       id: constantIdByIrId.get(node.id) ?? node.id,
@@ -82,7 +92,8 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
       .map((submodule) => ({
         id: submodule.name,
         name: submodule.name,
-        position: deriveSubmodulePosition(submodule, nodeById),
+        relativePath: `${submodule.name}.sw-net`,
+        position: { x: 0, y: 0 },
       })),
     links: projectLinks.map((link) => ({
       from: formatProjectLinkEndpoint(link.from.nodeId, nodeById, projectNodeIdByIrId, constantIdByIrId, submodulePortIndex),
@@ -94,6 +105,28 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
 
 export function serializeProjectJson(program: IrProgram): string {
   return JSON.stringify(buildProjectJsonDocument(program), null, 2);
+}
+
+function buildProjectNodeBridgePositionIndex(
+  submodules: IrSubmodule[],
+  nodeById: Map<string, IrNode>,
+): Map<string, IrVector2> {
+  const index = new Map<string, IrVector2>();
+
+  for (const submodule of submodules) {
+    for (const portNodeId of submodule.portNodeIds) {
+      const portNode = nodeById.get(portNodeId);
+      const projectNodeId = typeof portNode?.properties.projectNodeId === "string" ? portNode.properties.projectNodeId : undefined;
+
+      if (!projectNodeId || !portNode?.position) {
+        continue;
+      }
+
+      index.set(projectNodeId, portNode.position);
+    }
+  }
+
+  return index;
 }
 
 function buildProjectNodeIdMap(nodes: IrNode[]): Map<string, string> {
@@ -251,32 +284,6 @@ function resolveConstValue(properties: IrNode["properties"]): IrScalarValue {
   }
 
   return properties.value ?? null;
-}
-
-function deriveSubmodulePosition(
-  submodule: IrSubmodule,
-  nodeById: Map<string, IrNode>,
-): IrVector2 | null {
-  const positions = submodule.portNodeIds
-    .map((portNodeId) => nodeById.get(portNodeId)?.position)
-    .filter((position): position is IrVector2 => position !== undefined);
-
-  if (positions.length === 0) {
-    return null;
-  }
-
-  const total = positions.reduce(
-    (sum, position) => ({
-      x: sum.x + position.x,
-      y: sum.y + position.y,
-    }),
-    { x: 0, y: 0 },
-  );
-
-  return {
-    x: total.x / positions.length,
-    y: total.y / positions.length,
-  };
 }
 
 function asNullableString(value: IrScalarValue | undefined): string | null {

@@ -1,6 +1,6 @@
 import type { IrScalarValue, IrSignalKind } from "../ir.js";
 
-export const NODE_DEFINITIONS_SCHEMA_VERSION = "7";
+export const NODE_DEFINITIONS_SCHEMA_VERSION = "9";
 
 export type DefinitionValueType = "boolean" | "number" | "string";
 
@@ -30,10 +30,19 @@ export interface ComponentDefinition extends DefinitionBase {
 export interface ProjectNodeBinding {
   type: string;
   mode?: string;
+  bridgeType?: string;
 }
 
 export interface ComponentBinding {
   type: string;
+  dynamicInputs?: ComponentDynamicInputsBinding;
+}
+
+export interface ComponentDynamicInputsBinding {
+  prefix: string;
+  countProperty: string;
+  startIndex?: number;
+  signal?: IrSignalKind;
 }
 
 export interface NodePortCollection {
@@ -151,6 +160,8 @@ function parseProjectNodeBinding(input: unknown, path: string): ProjectNodeBindi
   return {
     type: expectString(record.type, `${path}.type`),
     mode: record.mode === undefined ? undefined : expectString(record.mode, `${path}.mode`),
+    bridgeType:
+      record.bridgeType === undefined ? undefined : expectString(record.bridgeType, `${path}.bridgeType`),
   };
 }
 
@@ -159,6 +170,25 @@ function parseComponentBinding(input: unknown, path: string): ComponentBinding {
 
   return {
     type: expectString(record.type, `${path}.type`),
+    dynamicInputs:
+      record.dynamicInputs === undefined
+        ? undefined
+        : parseComponentDynamicInputsBinding(record.dynamicInputs, `${path}.dynamicInputs`),
+  };
+}
+
+function parseComponentDynamicInputsBinding(
+  input: unknown,
+  path: string,
+): ComponentDynamicInputsBinding {
+  const record = expectRecord(input, path);
+
+  return {
+    prefix: expectString(record.prefix, `${path}.prefix`),
+    countProperty: expectString(record.countProperty, `${path}.countProperty`),
+    startIndex:
+      record.startIndex === undefined ? undefined : expectInteger(record.startIndex, `${path}.startIndex`),
+    signal: record.signal === undefined ? undefined : parseSignalKind(record.signal, `${path}.signal`),
   };
 }
 

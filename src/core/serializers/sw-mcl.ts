@@ -21,46 +21,45 @@ export interface SwMclInstanceDocument {
   position: IrVector2;
 }
 
-export interface SwMclModuleDocument {
-  id: string;
-  ports: SwMclPortDocument[];
-  instances: SwMclInstanceDocument[];
+export interface BuildStormworksSwMclOptions {
+  moduleId?: string;
 }
 
 export interface StormworksSwMclDocument {
   formatVersion: typeof STORMWORKS_SW_MCL_FORMAT_VERSION;
   sourceName?: string;
-  modules: SwMclModuleDocument[];
+  moduleId: string;
+  // sw-mcl is 1:1 with a sw-net document and stores only module-internal layout.
+  ports: SwMclPortDocument[];
+  instances: SwMclInstanceDocument[];
   warnings: string[];
 }
 
-export function buildStormworksSwMclDocument(program: IrProgram): StormworksSwMclDocument {
+export function buildStormworksSwMclDocument(
+  program: IrProgram,
+  options: BuildStormworksSwMclOptions = {},
+): StormworksSwMclDocument {
+  // Generated layouts use module-local coordinates.
+  // The module anchor itself lives in project.json.
   const nodeById = new Map(program.nodes.map((node) => [node.id, node] as const));
+  const submodule = selectSwMclSubmodule(program, options.moduleId);
+  const moduleId = submodule?.name ?? options.moduleId ?? "main";
 
   return {
     formatVersion: STORMWORKS_SW_MCL_FORMAT_VERSION,
     sourceName: program.metadata.sourceName,
-    modules: program.submodules
-      .slice()
-      .sort(compareById)
-      .map((submodule) => buildSwMclModuleDocument(submodule, nodeById)),
+    moduleId,
+    ports: submodule ? buildSwMclPorts(submodule, nodeById) : [],
+    instances: submodule ? buildSwMclInstances(submodule, nodeById) : buildFallbackSwMclInstances(program, nodeById),
     warnings: [...program.metadata.warnings],
   };
 }
 
-export function serializeStormworksSwMcl(program: IrProgram): string {
-  return JSON.stringify(buildStormworksSwMclDocument(program), null, 2);
-}
-
-function buildSwMclModuleDocument(
-  submodule: IrSubmodule,
-  nodeById: Map<string, IrNode>,
-): SwMclModuleDocument {
-  return {
-    id: submodule.name,
-    ports: buildSwMclPorts(submodule, nodeById),
-    instances: buildSwMclInstances(submodule, nodeById),
-  };
+export function serializeStormworksSwMcl(
+  program: IrProgram,
+  options: BuildStormworksSwMclOptions = {},
+): string {
+  return JSON.stringify(buildStormworksSwMclDocument(program, options), null, 2);
 }
 
 function buildSwMclPorts(
@@ -115,6 +114,42 @@ function buildSwMclInstances(
   }
 
   return instances.sort(compareById);
+}
+
+function buildFallbackSwMclInstances(
+  program: IrProgram,
+  nodeById: Map<string, IrNode>,
+): SwMclInstanceDocument[] {
+  return program.nodes
+    .filter((node) => node.layer === "logic" && node.position !== undefined)
+    .map((node) => ({
+      id: getSwNetInstanceName(node),
+      type: getSwNetInstanceTypeName(node),
+      position: node.position as IrVector2,
+    }))
+    .sort(compareById);
+}
+
+function selectSwMclSubmodule(
+  program: IrProgram,
+  requestedModuleId: string | undefined,
+): IrSubmodule | undefined {
+  if (requestedModuleId) {
+    const selected =
+      program.submodules.find((submodule) => submodule.name === requestedModuleId) ??
+      program.submodules.find((submodule) => submodule.id === requestedModuleId);
+
+    if (!selected) {
+      throw new Error(`Could not find submodule ${requestedModuleId} for sw-mcl serialization.`);
+    }
+
+    return selected;
+  }
+
+  return (
+    program.submodules.find((submodule) => submodule.name === "main") ??
+    (program.submodules.length === 1 ? program.submodules[0] : undefined)
+  );
 }
 
 function comparePorts(left: SwMclPortDocument, right: SwMclPortDocument): number {

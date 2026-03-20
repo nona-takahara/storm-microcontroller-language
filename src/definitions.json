@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "7",
+  "schemaVersion": "9",
   "nodes": [
     {
       "id": "composite_in",
@@ -7,7 +7,8 @@
       "category": "project",
       "stormworks": {
         "type": "5",
-        "mode": "1"
+        "mode": "1",
+        "bridgeType": "4"
       },
       "ports": {
         "inputs": [],
@@ -25,7 +26,8 @@
       "displayName": "Project Output Composite",
       "category": "project",
       "stormworks": {
-        "type": "5"
+        "type": "5",
+        "bridgeType": "5"
       },
       "ports": {
         "inputs": [
@@ -44,7 +46,8 @@
       "category": "project",
       "stormworks": {
         "type": "6",
-        "mode": "1"
+        "mode": "1",
+        "bridgeType": "6"
       },
       "ports": {
         "inputs": [],
@@ -62,7 +65,8 @@
       "displayName": "Project Output Video",
       "category": "project",
       "stormworks": {
-        "type": "6"
+        "type": "6",
+        "bridgeType": "7"
       },
       "ports": {
         "inputs": [
@@ -81,7 +85,8 @@
       "category": "project",
       "stormworks": {
         "type": "1",
-        "mode": "1"
+        "mode": "1",
+        "bridgeType": "2"
       },
       "ports": {
         "inputs": [],
@@ -99,7 +104,8 @@
       "displayName": "Project Output Number",
       "category": "project",
       "stormworks": {
-        "type": "1"
+        "type": "1",
+        "bridgeType": "3"
       },
       "ports": {
         "inputs": [
@@ -118,7 +124,8 @@
       "category": "project",
       "stormworks": {
         "type": "0",
-        "mode": "1"
+        "mode": "1",
+        "bridgeType": "0"
       },
       "ports": {
         "inputs": [],
@@ -136,7 +143,8 @@
       "displayName": "Project Output Boolean",
       "category": "project",
       "stormworks": {
-        "type": "0"
+        "type": "0",
+        "bridgeType": "1"
       },
       "ports": {
         "inputs": [
@@ -152,6 +160,104 @@
   ],
   "components": [
     {
+      "id": "COMPOSITE_WRITE_BOOLEAN",
+      "displayName": "Composite Write Boolean",
+      "category": "composite-write",
+      "stormworks": {
+        "type": "40",
+        "dynamicInputs": {
+          "prefix": "in",
+          "countProperty": "count",
+          "startIndex": 1,
+          "signal": "boolean"
+        }
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "inc",
+            "signal": "composite",
+            "label": "Composite",
+            "stormworks": {
+              "xmlKey": "inc"
+            }
+          }
+        ],
+        "outputs": []
+      },
+      "properties": [
+        {
+          "key": "count",
+          "valueType": "number",
+          "required": true,
+          "source": {
+            "xmlPath": "object.@count"
+          }
+        },
+        {
+          "key": "offset",
+          "valueType": "number",
+          "required": false,
+          "source": {
+            "xmlPath": "object.@offset"
+          }
+        }
+      ],
+      "defaults": {
+        "count": 1,
+        "offset": 0
+      }
+    },
+    {
+      "id": "COMPOSITE_WRITE_NUMBER",
+      "displayName": "Composite Write Number",
+      "category": "composite-write",
+      "stormworks": {
+        "type": "41",
+        "dynamicInputs": {
+          "prefix": "in",
+          "countProperty": "count",
+          "startIndex": 1,
+          "signal": "number"
+        }
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "inc",
+            "signal": "composite",
+            "label": "Composite",
+            "stormworks": {
+              "xmlKey": "inc"
+            }
+          }
+        ],
+        "outputs": []
+      },
+      "properties": [
+        {
+          "key": "count",
+          "valueType": "number",
+          "required": true,
+          "source": {
+            "xmlPath": "object.@count"
+          }
+        },
+        {
+          "key": "offset",
+          "valueType": "number",
+          "required": false,
+          "source": {
+            "xmlPath": "object.@offset"
+          }
+        }
+      ],
+      "defaults": {
+        "count": 1,
+        "offset": 0
+      }
+    },
+    {
       "id": "CONST",
       "displayName": "Constant Number",
       "category": "value",
@@ -164,10 +270,7 @@
           {
             "key": "value",
             "signal": "number",
-            "label": "Value",
-            "stormworks": {
-              "nodeIndex": 1
-            }
+            "label": "Value"
           }
         ]
       },

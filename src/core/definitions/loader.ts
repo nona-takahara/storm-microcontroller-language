@@ -85,6 +85,51 @@ export function findComponentDefinitionByStormworksType(
   return registry.componentByStormworksType.get(type);
 }
 
+export function findCompatibleComponentDefinition(
+  registry: NodeDefinitionRegistry,
+  typeId: string,
+): ComponentDefinition | undefined {
+  const direct = registry.byId.get(typeId);
+
+  if (direct && "stormworks" in direct && direct.category !== "project") {
+    return direct as ComponentDefinition;
+  }
+
+  const byStormworksType = registry.componentByStormworksType.get(typeId);
+
+  if (byStormworksType) {
+    return byStormworksType;
+  }
+
+  const wrappedStormworksType = extractCompatibleStormworksType(typeId);
+
+  if (!wrappedStormworksType) {
+    return undefined;
+  }
+
+  return registry.componentByStormworksType.get(wrappedStormworksType);
+}
+
+export function extractCompatibleStormworksType(typeId: string): string | undefined {
+  if (/^\d+$/.test(typeId)) {
+    return typeId;
+  }
+
+  const wrappedMatch = /^LOGIC_COMPONENT_(\d+)$/.exec(typeId);
+
+  if (wrappedMatch?.[1]) {
+    return wrappedMatch[1];
+  }
+
+  const importedMatch = /^LOGIC_COMPONENT:(\d+)$/.exec(typeId);
+
+  if (importedMatch?.[1]) {
+    return importedMatch[1];
+  }
+
+  return undefined;
+}
+
 function registerProjectNodeDefinition(
   nodeByStormworksKey: Map<string, ProjectNodeDefinition>,
   definition: ProjectNodeDefinition,

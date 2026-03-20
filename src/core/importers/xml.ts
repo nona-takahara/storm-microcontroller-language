@@ -9,6 +9,7 @@ import {
   type IrSignalKind,
 } from "../ir.js";
 import {
+  findCompatibleComponentDefinition,
   findProjectNodeDefinition,
   findComponentDefinitionByStormworksType,
   type NodeDefinitionRegistry,
@@ -141,6 +142,10 @@ function buildIrProgram(
   sourceName: string | undefined,
   warnings: StormworksXmlImportWarning[],
 ): IrProgram {
+  // Import is intentionally split into:
+  // 1. project nodes from <nodes>
+  // 2. implicit submodule boundary from component_bridge_states
+  // 3. pure logic graph from group.components.c
   const program = createEmptyIrProgram({
     sourceFormat: "stormworks-xml",
     sourceName,
@@ -372,6 +377,8 @@ function synthesizeSubmodulePorts(
   program: IrProgram,
   warnings: StormworksXmlImportWarning[],
 ): Map<string, SubmodulePortContext> {
+  // XML has no explicit "submodule" object.
+  // We synthesize one IR boundary so DSL/project representations can stay layered.
   const ports = new Map<string, SubmodulePortContext>();
 
   for (const [rawId, projectNode] of projectNodes) {
@@ -969,7 +976,7 @@ function resolveSourcePortKey(
   definitions: NodeDefinitionRegistry,
   inputRecord: Record<string, unknown>,
 ): string {
-  const sourceDefinition = definitions.byId.get(sourceNode.definitionId);
+  const sourceDefinition = findCompatibleComponentDefinition(definitions, sourceNode.definitionId);
   const rawIndex = getAttribute(inputRecord, "node_index");
   const parsedIndex = rawIndex ? Number.parseInt(rawIndex, 10) : Number.NaN;
 
@@ -1010,6 +1017,12 @@ function resolveTargetPortKey(definition: ComponentDefinition | undefined, rawPo
     return rawPortKey;
   }
 
+  const dynamicInputPrefix = definition.stormworks.dynamicInputs?.prefix;
+
+  if (dynamicInputPrefix && new RegExp(`^${escapeRegExp(dynamicInputPrefix)}\\d+$`).test(rawPortKey)) {
+    return rawPortKey;
+  }
+
   const match = /^in(\d+)$/.exec(rawPortKey);
 
   if (!match) {
@@ -1025,6 +1038,10 @@ function resolveTargetPortKey(definition: ComponentDefinition | undefined, rawPo
   const index = Number.parseInt(indexText, 10);
   const input = definition.ports.inputs[index - 1];
   return input?.key ?? rawPortKey;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function readProjectPosition(nodeRecord: Record<string, unknown>): { x: number; y: number } | undefined {

@@ -1,6 +1,11 @@
-import { type NodeDefinitionRegistry } from "../definitions/loader.js";
+import {
+  extractCompatibleStormworksType,
+  findCompatibleComponentDefinition,
+  type NodeDefinitionRegistry,
+} from "../definitions/loader.js";
 import {
   type ComponentDefinition,
+  type ComponentDynamicInputsBinding,
   type DefinitionValueType,
   type NodePropertyDefinition,
   type NodePropertyWriteTarget,
@@ -9,7 +14,8 @@ import {
 import { type IrSignalKind, type IrScalarValue, type IrVector2 } from "../ir.js";
 import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement } from "../parsers/sw-net.js";
 import { type ProjectJsonDocument, type ProjectJsonLinkDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
-import { type StormworksSwMclDocument, type SwMclModuleDocument } from "../serializers/sw-mcl.js";
+import { addVector } from "../serializers/submodule-layout.js";
+import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule, type SwNetResolvedModuleKey } from "../resolvers/sw-net.js";
 
 export type StormworksXmlTreeScalar = string | number | boolean | null;
@@ -30,6 +36,7 @@ export interface BuildStormworksXmlTreeOptions {
 }
 
 export interface StormworksXmlScriptResolveContext {
+  documentPath: string;
   moduleId: string;
   instanceId: string;
   typeId: string;
@@ -53,6 +60,7 @@ interface ProjectNodeContext {
   componentId: number;
   direction: "input" | "output";
   signal: IrSignalKind;
+  bridgeType: string;
 }
 
 interface ModulePortSlot {
@@ -93,15 +101,19 @@ export function buildStormworksXmlTree(
   input: BuildStormworksXmlTreeInput,
   options: BuildStormworksXmlTreeOptions,
 ): BuildStormworksXmlTreeResult {
+  // This stage stops at a plain object tree on purpose.
+  // XML string generation is a separate concern layered on top of this structure.
   const warnings: string[] = [];
   const entryModule = resolveEntryModule(input.swNet, options.entryModuleId);
   ensureEntryModuleCanBeLowered(entryModule, input.swNet);
 
   const swMclModule = resolveSwMclModule(input.swMcl, entryModule.key.moduleId);
+  const submoduleCanvasOrigin = resolveSubmoduleCanvasOrigin(input.project, entryModule.key.moduleId, warnings);
   const allocator = createXmlIdAllocator([]);
   const logicInstances = buildLogicInstanceContexts(
     entryModule.module.statements,
     swMclModule,
+    submoduleCanvasOrigin,
     options.definitions,
     allocator,
     warnings,
@@ -110,13 +122,19 @@ export function buildStormworksXmlTree(
   const projectPortBindings = bindProjectNodesToModulePorts(
     input.project.links,
     projectNodes,
-    buildModulePortSlots(entryModule.module, swMclModule, warnings),
+    buildModulePortSlots(entryModule.module, swMclModule, submoduleCanvasOrigin, warnings),
     entryModule.key.moduleId,
     warnings,
   );
   const netProducerByName = buildNetProducerIndex(logicInstances, warnings);
   const projectOutputBindings = buildProjectOutputBindingIndex(logicInstances);
   const projectNodeElements = projectNodes.map((projectNode) => buildProjectNodeElement(projectNode));
+  const bridgeElements = buildBridgeElements(
+    projectNodes,
+    projectPortBindings.portSlotsByProjectNodeId,
+    projectOutputBindings,
+    warnings,
+  );
   const componentElements = logicInstances.map((instance) =>
     buildComponentElement(
       instance,
@@ -124,6 +142,7 @@ export function buildStormworksXmlTree(
       projectPortBindings.projectNodeByPortKey,
       warnings,
       options,
+      entryModule.key.documentPath,
       entryModule.key.moduleId,
     ),
   );
@@ -143,6 +162,7 @@ export function buildStormworksXmlTree(
         input.project,
         projectNodeElements,
         componentElements,
+        bridgeElements,
         componentStateElements,
         bridgeStateElements,
         idCounter,
@@ -231,14 +251,30 @@ function ensureEntryModuleCanBeLowered(
 function resolveSwMclModule(
   swMcl: StormworksSwMclDocument,
   moduleId: string,
-): SwMclModuleDocument {
-  const moduleDocument = swMcl.modules.find((module) => module.id === moduleId);
-
-  if (!moduleDocument) {
-    throw new Error(`sw-mcl layout does not contain module ${moduleId}.`);
+): StormworksSwMclDocument {
+  if (swMcl.moduleId !== moduleId) {
+    throw new Error(`sw-mcl layout targets module ${swMcl.moduleId}, but XML export needs ${moduleId}.`);
   }
 
-  return moduleDocument;
+  return swMcl;
+}
+
+function resolveSubmoduleCanvasOrigin(
+  project: ProjectJsonDocument,
+  moduleId: string,
+  warnings: string[],
+): IrVector2 | null {
+  // sw-mcl stores module-local positions; project.json provides the placement anchor for XML export.
+  const matchingSubmodule =
+    project.submodules.find((submodule) => submodule.id === moduleId) ??
+    project.submodules.find((submodule) => submodule.name === moduleId);
+
+  if (!matchingSubmodule) {
+    warnings.push(`project.json does not define a submodule entry for ${moduleId}; treating sw-mcl positions as absolute.`);
+    return null;
+  }
+
+  return matchingSubmodule.position;
 }
 
 function collectPreferredLogicObjectIds(statements: SwNetResolvedModule["module"]["statements"]): number[] {
@@ -313,18 +349,23 @@ function buildProjectNodeContexts(
       componentId: allocator.allocate(),
       direction,
       signal,
+      bridgeType: projectDefinition.stormworks.bridgeType ?? inferBridgeType(direction, signal),
     };
   });
 }
 
 function buildModulePortSlots(
   entryModule: SwNetResolvedModule["module"],
-  swMclModule: SwMclModuleDocument,
+  swMclModule: StormworksSwMclDocument,
+  submoduleCanvasOrigin: IrVector2 | null,
   warnings: string[],
 ): ModulePortSlot[] {
   const occurrenceByKey = new Map<string, number>();
   const positionByKey = new Map(
-    swMclModule.ports.map((port) => [formatPortOccurrenceKey(port.direction, port.name, port.occurrence), port.position] as const),
+    swMclModule.ports.map((port) => [
+      formatPortOccurrenceKey(port.direction, port.name, port.occurrence),
+      addVector(port.position, submoduleCanvasOrigin),
+    ] as const),
   );
 
   return entryModule.ports.map((port) => {
@@ -467,12 +508,15 @@ function resolveProjectPortLink(
 
 function buildLogicInstanceContexts(
   statements: SwNetResolvedModule["module"]["statements"],
-  swMclModule: SwMclModuleDocument,
+  swMclModule: StormworksSwMclDocument,
+  submoduleCanvasOrigin: IrVector2 | null,
   definitions: NodeDefinitionRegistry,
   allocator: XmlIdAllocator,
   warnings: string[],
 ): LogicInstanceContext[] {
-  const positionsById = new Map(swMclModule.instances.map((instance) => [instance.id, instance.position] as const));
+  const positionsById = new Map(
+    swMclModule.instances.map((instance) => [instance.id, addVector(instance.position, submoduleCanvasOrigin)] as const),
+  );
   const contexts: LogicInstanceContext[] = [];
 
   for (const statement of statements) {
@@ -480,11 +524,7 @@ function buildLogicInstanceContexts(
       continue;
     }
 
-    const definition = definitions.byId.get(statement.typeId);
-    const componentDefinition =
-      definition && "stormworks" in definition && definition.category !== "project"
-        ? (definition as ComponentDefinition)
-        : undefined;
+    const componentDefinition = findCompatibleComponentDefinition(definitions, statement.typeId);
     const stormworksType = resolveStormworksComponentType(statement.typeId, componentDefinition);
     const position = positionsById.get(statement.instanceId);
 
@@ -593,6 +633,7 @@ function buildComponentElement(
   projectNodeByPortKey: Map<string, ProjectNodeContext>,
   warnings: string[],
   options: BuildStormworksXmlTreeOptions,
+  documentPath: string,
   moduleId: string,
 ): StormworksXmlTreeElement {
   const componentElement: StormworksXmlTreeElement = {
@@ -603,7 +644,7 @@ function buildComponentElement(
   };
   const objectElement = asTreeElement(componentElement.object);
 
-  applyInstanceAttributes(componentElement, instance, warnings, options, moduleId);
+  applyInstanceAttributes(componentElement, instance, warnings, options, documentPath, moduleId);
 
   if (instance.position) {
     objectElement.pos = {
@@ -629,6 +670,8 @@ function buildComponentElement(
     objectElement[xmlKey] = inputElement;
   }
 
+  applyDynamicInputPlaceholders(instance, objectElement);
+
   return componentElement;
 }
 
@@ -637,11 +680,12 @@ function applyInstanceAttributes(
   instance: LogicInstanceContext,
   warnings: string[],
   options: BuildStormworksXmlTreeOptions,
+  documentPath: string,
   moduleId: string,
 ): void {
   for (const attribute of instance.statement.attributes) {
     if (attribute.key === "script_ref") {
-      applyScriptReferenceAttribute(componentElement, instance, attribute, warnings, options, moduleId);
+      applyScriptReferenceAttribute(componentElement, instance, attribute, warnings, options, documentPath, moduleId);
       continue;
     }
 
@@ -672,12 +716,55 @@ function applyInstanceAttributes(
   }
 }
 
+function applyDynamicInputPlaceholders(
+  instance: LogicInstanceContext,
+  objectElement: StormworksXmlTreeElement,
+): void {
+  const dynamicInputs = instance.definition?.stormworks.dynamicInputs;
+
+  if (!dynamicInputs) {
+    return;
+  }
+
+  const dynamicInputCount = resolveDynamicInputCount(instance, dynamicInputs);
+
+  if (dynamicInputCount === undefined || dynamicInputCount < 1) {
+    return;
+  }
+
+  const startIndex = dynamicInputs.startIndex ?? 1;
+
+  for (let index = startIndex; index <= dynamicInputCount; index += 1) {
+    const xmlKey = `${dynamicInputs.prefix}${index}`;
+
+    if (objectElement[xmlKey] !== undefined) {
+      continue;
+    }
+
+    objectElement[xmlKey] = {};
+  }
+}
+
+function resolveDynamicInputCount(
+  instance: LogicInstanceContext,
+  dynamicInputs: ComponentDynamicInputsBinding,
+): number | undefined {
+  const assignment = instance.statement.attributes.find((attribute) => attribute.key === dynamicInputs.countProperty);
+
+  if (!assignment || assignment.value.kind !== "number") {
+    return undefined;
+  }
+
+  return Number.isInteger(assignment.value.value) ? assignment.value.value : undefined;
+}
+
 function applyScriptReferenceAttribute(
   componentElement: StormworksXmlTreeElement,
   instance: LogicInstanceContext,
   attribute: SwNetAssignment,
   warnings: string[],
   options: BuildStormworksXmlTreeOptions,
+  documentPath: string,
   moduleId: string,
 ): void {
   const scalarValue = expressionToScalarValue(attribute.value);
@@ -689,6 +776,7 @@ function applyScriptReferenceAttribute(
   }
 
   const scriptText = options.resolveScriptText?.(scriptRef, {
+    documentPath,
     moduleId,
     instanceId: instance.statement.instanceId,
     typeId: instance.statement.typeId,
@@ -763,6 +851,17 @@ function buildComponentStateElements(
   return componentStates;
 }
 
+function buildBridgeElements(
+  projectNodes: ProjectNodeContext[],
+  portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
+  projectOutputBindings: Map<string, NetProducer[]>,
+  warnings: string[],
+): StormworksXmlTreeElement[] {
+  return projectNodes.map((projectNode) =>
+    buildBridgeComponentElement(projectNode, portSlotsByProjectNodeId, projectOutputBindings, warnings),
+  );
+}
+
 function buildBridgeStateElements(
   projectNodes: ProjectNodeContext[],
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
@@ -772,42 +871,12 @@ function buildBridgeStateElements(
   const bridgeStates: StormworksXmlTreeElement = {};
 
   projectNodes.forEach((projectNode, index) => {
-    const bridgeState: StormworksXmlTreeElement = {
-      "@_id": String(projectNode.componentId),
-    };
-    const slot = portSlotsByProjectNodeId.get(projectNode.document.id);
-
-    if (slot?.position) {
-      bridgeState.pos = {
-        "@_x": formatXmlNumber(slot.position.x),
-        "@_y": formatXmlNumber(slot.position.y),
-      };
-    } else {
-      warnings.push(`No submodule port layout was found for project node ${projectNode.document.id}.`);
-    }
-
-    if (projectNode.direction === "output") {
-      const producers = slot ? projectOutputBindings.get(slot.name) ?? [] : [];
-
-      if (producers.length === 0) {
-        warnings.push(`Project output ${projectNode.document.id} is not driven by any sw-net output assignment.`);
-      }
-
-      producers.forEach((producer, producerIndex) => {
-        const element: StormworksXmlTreeElement = {
-          "@_component_id": String(producer.instance.objectId),
-        };
-        const nodeIndex = resolveXmlOutputNodeIndex(producer.instance.definition, producer.outputKey);
-
-        if (nodeIndex !== undefined) {
-          element["@_node_index"] = String(nodeIndex);
-        }
-
-        bridgeState[`in${producerIndex + 1}`] = element;
-      });
-    }
-
-    bridgeStates[`c${index}`] = bridgeState;
+    bridgeStates[`c${index}`] = buildBridgeObjectElement(
+      projectNode,
+      portSlotsByProjectNodeId,
+      projectOutputBindings,
+      warnings,
+    );
   });
 
   return bridgeStates;
@@ -817,6 +886,7 @@ function buildMicroprocessorElement(
   project: ProjectJsonDocument,
   projectNodeElements: StormworksXmlTreeElement[],
   componentElements: StormworksXmlTreeElement[],
+  bridgeElements: StormworksXmlTreeElement[],
   componentStateElements: StormworksXmlTreeElement,
   bridgeStateElements: StormworksXmlTreeElement,
   idCounter: number,
@@ -837,6 +907,10 @@ function buildMicroprocessorElement(
       components: {
         c: componentElements,
       },
+      components_bridge: {
+        c: bridgeElements,
+      },
+      groups: {},
       component_states: componentStateElements,
       component_bridge_states: bridgeStateElements,
       group_states: {},
@@ -862,6 +936,105 @@ function buildMicroprocessorElement(
   return microprocessor;
 }
 
+function buildBridgeComponentElement(
+  projectNode: ProjectNodeContext,
+  portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
+  projectOutputBindings: Map<string, NetProducer[]>,
+  warnings: string[],
+): StormworksXmlTreeElement {
+  return {
+    "@_type": projectNode.bridgeType,
+    object: buildBridgeObjectElement(projectNode, portSlotsByProjectNodeId, projectOutputBindings, warnings),
+  };
+}
+
+function buildBridgeObjectElement(
+  projectNode: ProjectNodeContext,
+  portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
+  projectOutputBindings: Map<string, NetProducer[]>,
+  warnings: string[],
+): StormworksXmlTreeElement {
+  // Bridge objects are the XML-side glue between project pins and the logic body.
+  const bridgeState: StormworksXmlTreeElement = {
+    "@_id": String(projectNode.componentId),
+  };
+  const slot = portSlotsByProjectNodeId.get(projectNode.document.id);
+  const position = projectNode.document.position ?? slot?.position;
+
+  if (position) {
+    bridgeState.pos = {
+      "@_x": formatXmlNumber(position.x),
+      "@_y": formatXmlNumber(position.y),
+    };
+  } else {
+    warnings.push(`No bridge position was found for project node ${projectNode.document.id}.`);
+  }
+
+  if (projectNode.direction === "output") {
+    const producers = slot ? projectOutputBindings.get(slot.name) ?? [] : [];
+
+    if (producers.length === 0) {
+      warnings.push(`Project output ${projectNode.document.id} is not driven by any sw-net output assignment.`);
+    }
+
+    producers.forEach((producer, producerIndex) => {
+      const element: StormworksXmlTreeElement = {
+        "@_component_id": String(producer.instance.objectId),
+      };
+      const nodeIndex = resolveXmlOutputNodeIndex(producer.instance.definition, producer.outputKey);
+
+      if (nodeIndex !== undefined) {
+        element["@_node_index"] = String(nodeIndex);
+      }
+
+      bridgeState[`in${producerIndex + 1}`] = element;
+    });
+  }
+
+  return bridgeState;
+}
+
+function inferBridgeType(
+  direction: "input" | "output",
+  signal: IrSignalKind,
+): string {
+  if (direction === "input") {
+    if (signal === "boolean") {
+      return "0";
+    }
+
+    if (signal === "number") {
+      return "2";
+    }
+
+    if (signal === "composite") {
+      return "4";
+    }
+
+    if (signal === "video") {
+      return "6";
+    }
+  }
+
+  if (signal === "boolean") {
+    return "1";
+  }
+
+  if (signal === "number") {
+    return "3";
+  }
+
+  if (signal === "composite") {
+    return "5";
+  }
+
+  if (signal === "video") {
+    return "7";
+  }
+
+  return "4";
+}
+
 function resolveStormworksComponentType(
   typeId: string,
   definition: ComponentDefinition | undefined,
@@ -870,10 +1043,10 @@ function resolveStormworksComponentType(
     return definition.stormworks.type;
   }
 
-  const match = /^LOGIC_COMPONENT_(\d+)$/.exec(typeId);
+  const compatibleStormworksType = extractCompatibleStormworksType(typeId);
 
-  if (match?.[1]) {
-    return match[1];
+  if (compatibleStormworksType) {
+    return compatibleStormworksType;
   }
 
   throw new Error(`Cannot map sw-net instance type ${typeId} back to a Stormworks component type.`);
@@ -979,13 +1152,13 @@ function resolveXmlOutputNodeIndex(
   dslKey: string,
 ): number | undefined {
   if (!definition) {
-    return tryParseTrailingNumber(dslKey);
+    return undefined;
   }
 
   const outputDefinition = definition.ports.outputs.find((output) => output.key === dslKey);
 
   if (!outputDefinition) {
-    return tryParseTrailingNumber(dslKey);
+    return undefined;
   }
 
   return outputDefinition.stormworks?.nodeIndex;

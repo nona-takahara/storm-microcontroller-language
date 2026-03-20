@@ -68,6 +68,8 @@ export function renderStormworksSwNet(
   program: IrProgram,
   options: SwNetRenderOptions = {},
 ): string {
+  // sw-net is emitted as a flattened module-local netlist.
+  // Project wiring stays in project.json, while module-internal layout stays in sw-mcl.
   const nodeById = new Map(program.nodes.map((node) => [node.id, node] as const));
   const componentById = new Map(
     (options.definitions?.components ?? []).map((definition) => [definition.id, definition] as const),
@@ -149,6 +151,7 @@ function renderInstance(
   nodeById: Map<string, IrNode>,
   componentById: Map<string, ComponentDefinition>,
 ): string {
+  // Links are folded into the inst line so the DSL stays SPICE-like and easy to eyeball.
   const definition = componentById.get(node.definitionId);
   const typeName = getSwNetInstanceTypeName(node);
   const instanceName = getSwNetInstanceName(node);

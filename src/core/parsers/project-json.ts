@@ -68,6 +68,7 @@ function parseProjectJsonNode(input: unknown, path: string): ProjectJsonNodeDocu
     label: optionalStringOrNull(record.label, `${path}.label`),
     description: optionalStringOrNull(record.description, `${path}.description`),
     nodePosition: parseVector2(record.nodePosition, `${path}.nodePosition`),
+    position: optionalVector2OrNull(record.position, `${path}.position`),
   };
 }
 
@@ -87,6 +88,7 @@ function parseProjectJsonSubmodule(input: unknown, path: string): ProjectJsonSub
   return {
     id: expectString(record.id, `${path}.id`),
     name: expectString(record.name, `${path}.name`),
+    relativePath: expectString(record.relativePath, `${path}.relativePath`),
     position: optionalVector2OrNull(record.position, `${path}.position`),
   };
 }
