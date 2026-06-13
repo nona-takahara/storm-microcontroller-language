@@ -15,11 +15,11 @@ There are no tests. The primary way to validate behavior is `pnpm cli`.
 ## CLI usage
 
 ```bash
-pnpm cli xml2dsl <input.xml> <output-dir>   # Stormworks XML → project.json + sw-net + sw-mcl
-pnpm cli dsl2xml <project-dir>              # project.json + sw-net + sw-mcl → XML
-pnpm cli import-xml <input.xml> <output-dir>
-pnpm cli check-dsl <project-dir>
-pnpm cli typecheck-dsl <project-dir>
+pnpm cli xml2dsl <input.xml> --out-dir <output-dir>   # Stormworks XML → project.json + sw-net + sw-mcl
+pnpm cli dsl2xml <project.json> --out <output.xml>    # project.json + sw-net + sw-mcl → XML
+pnpm cli import-xml <input.xml> --out-dir <output-dir>
+pnpm cli check-dsl <project.json>
+pnpm cli typecheck-dsl <project.json>
 ```
 
 ## Architecture

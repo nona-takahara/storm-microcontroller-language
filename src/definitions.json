@@ -160,6 +160,204 @@
   ],
   "components": [
     {
+      "id": "NOT",
+      "displayName": "NOT",
+      "category": "logic-bool",
+      "stormworks": { "type": "0" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "boolean", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "AND",
+      "displayName": "AND",
+      "category": "logic-bool",
+      "stormworks": { "type": "1" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "OR",
+      "displayName": "OR",
+      "category": "logic-bool",
+      "stormworks": { "type": "2" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "XOR",
+      "displayName": "XOR",
+      "category": "logic-bool",
+      "stormworks": { "type": "3" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "NAND",
+      "displayName": "NAND",
+      "category": "logic-bool",
+      "stormworks": { "type": "4" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "NOR",
+      "displayName": "NOR",
+      "category": "logic-bool",
+      "stormworks": { "type": "5" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "CONST_BOOL",
+      "displayName": "Constant On",
+      "category": "value",
+      "stormworks": { "type": "16" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "SR_LATCH",
+      "displayName": "SR Latch",
+      "category": "logic-flip-flop",
+      "stormworks": { "type": "24" },
+      "ports": {
+        "inputs": [
+          { "key": "s", "signal": "boolean", "label": "S" },
+          { "key": "r", "signal": "boolean", "label": "R" }
+        ],
+        "outputs": [
+          { "key": "q", "signal": "boolean", "label": "Q" },
+          { "key": "not_q", "signal": "boolean", "label": "not Q", "stormworks": { "nodeIndex": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "JK_FF",
+      "displayName": "JK Flip-Flop",
+      "category": "logic-flip-flop",
+      "stormworks": { "type": "25" },
+      "ports": {
+        "inputs": [
+          { "key": "j", "signal": "boolean", "label": "J" },
+          { "key": "k", "signal": "boolean", "label": "K" }
+        ],
+        "outputs": [
+          { "key": "q", "signal": "boolean", "label": "Q" },
+          { "key": "not_q", "signal": "boolean", "label": "not Q", "stormworks": { "nodeIndex": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "TOGGLE",
+      "displayName": "Toggle",
+      "category": "logic-bool",
+      "stormworks": { "type": "28" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "boolean", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "BOOL_FUNC_4",
+      "displayName": "Boolean Function (4 inputs)",
+      "category": "logic-bool",
+      "stormworks": { "type": "46" },
+      "ports": {
+        "inputs": [
+          { "key": "x", "signal": "boolean", "label": "x" },
+          { "key": "y", "signal": "boolean", "label": "y" },
+          { "key": "z", "signal": "boolean", "label": "z" },
+          { "key": "w", "signal": "boolean", "label": "w" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "BOOL_FUNC_8",
+      "displayName": "Boolean Function (8 inputs)",
+      "category": "logic-bool",
+      "stormworks": { "type": "47" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "a" },
+          { "key": "b", "signal": "boolean", "label": "b" },
+          { "key": "c", "signal": "boolean", "label": "c" },
+          { "key": "d", "signal": "boolean", "label": "d" },
+          { "key": "e", "signal": "boolean", "label": "e" },
+          { "key": "f", "signal": "boolean", "label": "f" },
+          { "key": "g", "signal": "boolean", "label": "g" },
+          { "key": "h", "signal": "boolean", "label": "h" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        }
+      ],
+      "defaults": { "expression": "a" }
+    },
+    {
+      "id": "PULSE",
+      "displayName": "Pulse",
+      "category": "logic-bool",
+      "stormworks": { "type": "48" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "boolean", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "mode",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@m" }
+        }
+      ],
+      "defaults": { "mode": null }
+    },
+    {
       "id": "COMPOSITE_WRITE_BOOLEAN",
       "displayName": "Composite Write Boolean",
       "category": "composite-write",
