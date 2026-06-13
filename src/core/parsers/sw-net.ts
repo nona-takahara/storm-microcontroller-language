@@ -697,6 +697,18 @@ class SwNetLexer {
       }
     }
 
+    if (this.text[this.index] === "e" || this.text[this.index] === "E") {
+      this.advance();
+
+      if (this.text[this.index] === "+" || this.text[this.index] === "-") {
+        this.advance();
+      }
+
+      while (isDigit(this.text[this.index])) {
+        this.advance();
+      }
+    }
+
     return this.text.slice(start, this.index);
   }
 

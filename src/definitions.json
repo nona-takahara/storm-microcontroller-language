@@ -358,6 +358,241 @@
       "defaults": { "mode": null }
     },
     {
+      "id": "ADD",
+      "displayName": "Add",
+      "category": "arithmetic",
+      "stormworks": { "type": "6" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "SUBTRACT",
+      "displayName": "Subtract",
+      "category": "arithmetic",
+      "stormworks": { "type": "7" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "MULTIPLY",
+      "displayName": "Multiply",
+      "category": "arithmetic",
+      "stormworks": { "type": "8" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "DIVIDE",
+      "displayName": "Divide",
+      "category": "arithmetic",
+      "stormworks": { "type": "9" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [
+          { "key": "out", "signal": "number", "label": "Out" },
+          { "key": "error", "signal": "boolean", "label": "Divide by Zero", "stormworks": { "nodeIndex": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "FUNC_NUM_1",
+      "displayName": "Function (x)",
+      "category": "arithmetic",
+      "stormworks": { "type": "45" },
+      "ports": {
+        "inputs": [{ "key": "x", "signal": "number", "label": "x" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "FUNC_NUM_3",
+      "displayName": "Function (x,y,z)",
+      "category": "arithmetic",
+      "stormworks": { "type": "10" },
+      "ports": {
+        "inputs": [
+          { "key": "x", "signal": "number", "label": "x" },
+          { "key": "y", "signal": "number", "label": "y" },
+          { "key": "z", "signal": "number", "label": "z" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        },
+        {
+          "key": "p1",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@p1" }
+        },
+        {
+          "key": "p2",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@p2" }
+        },
+        {
+          "key": "p3",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@p3" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "FUNC_NUM_8",
+      "displayName": "Function (x,y,z,w,a,b,c,d)",
+      "category": "arithmetic",
+      "stormworks": { "type": "36" },
+      "ports": {
+        "inputs": [
+          { "key": "x", "signal": "number", "label": "x" },
+          { "key": "y", "signal": "number", "label": "y" },
+          { "key": "z", "signal": "number", "label": "z" },
+          { "key": "w", "signal": "number", "label": "w" },
+          { "key": "a", "signal": "number", "label": "a" },
+          { "key": "b", "signal": "number", "label": "b" },
+          { "key": "c", "signal": "number", "label": "c" },
+          { "key": "d", "signal": "number", "label": "d" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "CLAMP",
+      "displayName": "Clamp",
+      "category": "arithmetic",
+      "stormworks": { "type": "11" },
+      "ports": {
+        "inputs": [{ "key": "value", "signal": "number", "label": "Value" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "min",
+          "valueType": "number",
+          "required": true,
+          "source": { "xmlPath": "object.min.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.min.@text", "valueType": "string" },
+            { "xmlPath": "object.min.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "max",
+          "valueType": "number",
+          "required": true,
+          "source": { "xmlPath": "object.max.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.max.@text", "valueType": "string" },
+            { "xmlPath": "object.max.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "min": 0, "max": 1 }
+    },
+    {
+      "id": "ABS",
+      "displayName": "Abs",
+      "category": "arithmetic",
+      "stormworks": { "type": "14" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "number", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "DELTA",
+      "displayName": "Delta",
+      "category": "arithmetic",
+      "stormworks": { "type": "35" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "number", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "MODULO",
+      "displayName": "Modulo",
+      "category": "arithmetic",
+      "stormworks": { "type": "38" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "EQUAL",
+      "displayName": "Equal",
+      "category": "arithmetic",
+      "stormworks": { "type": "42" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "epsilon",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.e.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.e.@text", "valueType": "string" },
+            { "xmlPath": "object.e.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "epsilon": 0.0001 }
+    },
+    {
       "id": "COMPOSITE_WRITE_BOOLEAN",
       "displayName": "Composite Write Boolean",
       "category": "composite-write",
