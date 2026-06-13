@@ -1,7 +1,7 @@
 // Shared intermediate representation used to decouple XML parsing from DSL/project serialization and export.
 export type IrScalarValue = boolean | number | string | null;
 
-export type IrSignalKind = "number" | "boolean" | "composite" | "video" | "execute" | "unknown";
+export type IrSignalKind = "number" | "boolean" | "composite" | "video" | "audio" | "execute" | "unknown";
 export type IrNodeLayer = "project" | "submodule" | "logic";
 
 export interface IrVector2 {

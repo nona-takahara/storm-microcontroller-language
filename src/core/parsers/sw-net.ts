@@ -796,6 +796,7 @@ function parseSignalKind(token: Token, sourceName?: string): IrSignalKind {
     token.text === "boolean" ||
     token.text === "composite" ||
     token.text === "video" ||
+    token.text === "audio" ||
     token.text === "execute" ||
     token.text === "unknown"
   ) {

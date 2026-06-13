@@ -334,6 +334,7 @@ function parseSignalKind(input: unknown, path: string): IrSignalKind {
     value === "boolean" ||
     value === "composite" ||
     value === "video" ||
+    value === "audio" ||
     value === "execute" ||
     value === "unknown"
   ) {

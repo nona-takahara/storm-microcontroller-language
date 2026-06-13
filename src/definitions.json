@@ -598,7 +598,11 @@
           { "key": "duration", "signal": "number", "label": "Duration" }
         ],
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
-      }
+      },
+      "properties": [
+        { "key": "units", "valueType": "number", "required": false, "source": { "xmlPath": "object.@u" } }
+      ],
+      "defaults": { "units": null }
     },
     {
       "id": "TIMER_TOF",
@@ -611,7 +615,11 @@
           { "key": "duration", "signal": "number", "label": "Duration" }
         ],
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
-      }
+      },
+      "properties": [
+        { "key": "units", "valueType": "number", "required": false, "source": { "xmlPath": "object.@u" } }
+      ],
+      "defaults": { "units": null }
     },
     {
       "id": "TIMER_RTO",
@@ -625,7 +633,11 @@
           { "key": "reset", "signal": "boolean", "label": "Reset" }
         ],
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
-      }
+      },
+      "properties": [
+        { "key": "units", "valueType": "number", "required": false, "source": { "xmlPath": "object.@u" } }
+      ],
+      "defaults": { "units": null }
     },
     {
       "id": "TIMER_RTF",
@@ -639,7 +651,11 @@
           { "key": "reset", "signal": "boolean", "label": "Reset" }
         ],
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
-      }
+      },
+      "properties": [
+        { "key": "units", "valueType": "number", "required": false, "source": { "xmlPath": "object.@u" } }
+      ],
+      "defaults": { "units": null }
     },
     {
       "id": "COUNTER",
@@ -934,11 +950,247 @@
       "defaults": { "epsilon": 0.0001 }
     },
     {
+      "id": "COMPOSITE_READ_NUMBER",
+      "displayName": "Composite Read Number",
+      "category": "composite-read",
+      "stormworks": { "type": "31" },
+      "ports": {
+        "inputs": [{ "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" } }
+      ],
+      "defaults": { "channel": null }
+    },
+    {
+      "id": "COMPOSITE_READ_BOOLEAN",
+      "displayName": "Composite Read Boolean",
+      "category": "composite-read",
+      "stormworks": { "type": "29" },
+      "ports": {
+        "inputs": [{ "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" } }
+      ],
+      "defaults": { "channel": null }
+    },
+    {
+      "id": "COMPOSITE_SWITCHBOX",
+      "displayName": "Composite Switchbox",
+      "category": "composite",
+      "stormworks": { "type": "53" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "composite", "label": "A" },
+          { "key": "b", "signal": "composite", "label": "B" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [{ "key": "out", "signal": "composite", "label": "Out" }]
+      }
+    },
+    {
+      "id": "COMPOSITE_TO_NUMBER",
+      "displayName": "Composite Binary to Number",
+      "category": "composite",
+      "stormworks": { "type": "55" },
+      "ports": {
+        "inputs": [{ "key": "composite", "signal": "composite", "label": "Composite" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "NUMBER_TO_COMPOSITE",
+      "displayName": "Number to Composite Binary",
+      "category": "composite",
+      "stormworks": { "type": "54" },
+      "ports": {
+        "inputs": [{ "key": "number", "signal": "number", "label": "Number" }],
+        "outputs": [{ "key": "out", "signal": "composite", "label": "Out" }]
+      }
+    },
+    {
+      "id": "AUDIO_SWITCHBOX",
+      "displayName": "Audio Switchbox",
+      "category": "composite",
+      "stormworks": { "type": "59" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "audio", "label": "A" },
+          { "key": "b", "signal": "audio", "label": "B" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [{ "key": "out", "signal": "audio", "label": "Out" }]
+      }
+    },
+    {
+      "id": "VIDEO_SWITCHBOX",
+      "displayName": "Video Switchbox",
+      "category": "composite",
+      "stormworks": { "type": "57" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "video", "label": "A" },
+          { "key": "b", "signal": "video", "label": "B" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [{ "key": "out", "signal": "video", "label": "Out" }]
+      }
+    },
+    {
+      "id": "PROPERTY_NUMBER",
+      "displayName": "Property Number",
+      "category": "property",
+      "stormworks": { "type": "34" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "value",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.v.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.v.@text", "valueType": "string" },
+            { "xmlPath": "object.v.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "value": 0 }
+    },
+    {
+      "id": "PROPERTY_SLIDER",
+      "displayName": "Property Slider",
+      "category": "property",
+      "stormworks": { "type": "19" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "min",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.min.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.min.@text", "valueType": "string" },
+            { "xmlPath": "object.min.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "max",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.max.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.max.@text", "valueType": "string" },
+            { "xmlPath": "object.max.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "increment",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.int.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.int.@text", "valueType": "string" }
+          ]
+        },
+        {
+          "key": "value",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.v.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.v.@text", "valueType": "string" }
+          ]
+        }
+      ],
+      "defaults": { "min": 0, "max": 1, "increment": 0.1, "value": 0 }
+    },
+    {
+      "id": "PROPERTY_TOGGLE",
+      "displayName": "Property Toggle",
+      "category": "property",
+      "stormworks": { "type": "33" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@l" } },
+        { "key": "on_label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@on" } },
+        { "key": "off_label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@off" } }
+      ],
+      "defaults": { "label": "", "on_label": "On", "off_label": "Off" }
+    },
+    {
+      "id": "PROPERTY_TEXT",
+      "displayName": "Property Text",
+      "category": "property",
+      "stormworks": { "type": "58" },
+      "ports": { "inputs": [], "outputs": [] },
+      "properties": [
+        { "key": "name", "valueType": "string", "required": false, "source": { "xmlPath": "object.@n" } }
+      ],
+      "defaults": { "name": "" }
+    },
+    {
+      "id": "PROPERTY_DROPDOWN",
+      "displayName": "Property Dropdown",
+      "category": "property",
+      "stormworks": { "type": "20" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "TOOLTIP_NUMBER",
+      "displayName": "Tooltip Number",
+      "category": "debug",
+      "stormworks": { "type": "43" },
+      "ports": {
+        "inputs": [
+          { "key": "value", "signal": "number", "label": "Value" },
+          { "key": "error", "signal": "boolean", "label": "Is Error" }
+        ],
+        "outputs": []
+      },
+      "properties": [
+        { "key": "label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@l" } }
+      ],
+      "defaults": { "label": "" }
+    },
+    {
+      "id": "TOOLTIP_BOOLEAN",
+      "displayName": "Tooltip On/Off",
+      "category": "debug",
+      "stormworks": { "type": "44" },
+      "ports": {
+        "inputs": [
+          { "key": "value", "signal": "boolean", "label": "Value" }
+        ],
+        "outputs": []
+      },
+      "properties": [
+        { "key": "label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@l" } },
+        { "key": "on_label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@on" } },
+        { "key": "off_label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@off" } }
+      ],
+      "defaults": { "label": "", "on_label": "On", "off_label": "Off" }
+    },
+    {
       "id": "COMPOSITE_WRITE_BOOLEAN",
       "displayName": "Composite Write Boolean",
       "category": "composite-write",
       "stormworks": {
-        "type": "40",
+        "type": "41",
         "dynamicInputs": {
           "prefix": "in",
           "countProperty": "count",
@@ -987,7 +1239,7 @@
       "displayName": "Composite Write Number",
       "category": "composite-write",
       "stormworks": {
-        "type": "41",
+        "type": "40",
         "dynamicInputs": {
           "prefix": "in",
           "countProperty": "count",
