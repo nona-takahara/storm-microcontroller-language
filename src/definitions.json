@@ -358,6 +358,347 @@
       "defaults": { "mode": null }
     },
     {
+      "id": "GREATER_THAN",
+      "displayName": "Greater Than",
+      "category": "comparison",
+      "stormworks": { "type": "17" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "LESS_THAN",
+      "displayName": "Less Than",
+      "category": "comparison",
+      "stormworks": { "type": "18" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "THRESHOLD",
+      "displayName": "Threshold",
+      "category": "comparison",
+      "stormworks": { "type": "12" },
+      "ports": {
+        "inputs": [{ "key": "value", "signal": "number", "label": "Value" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "min",
+          "valueType": "number",
+          "required": true,
+          "source": { "xmlPath": "object.min.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.min.@text", "valueType": "string" },
+            { "xmlPath": "object.min.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "max",
+          "valueType": "number",
+          "required": true,
+          "source": { "xmlPath": "object.max.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.max.@text", "valueType": "string" },
+            { "xmlPath": "object.max.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "min": 0, "max": 1 }
+    },
+    {
+      "id": "MEMORY_REGISTER",
+      "displayName": "Memory Register",
+      "category": "control",
+      "stormworks": { "type": "13" },
+      "ports": {
+        "inputs": [
+          { "key": "set", "signal": "boolean", "label": "Set" },
+          { "key": "reset", "signal": "boolean", "label": "Reset" },
+          { "key": "value", "signal": "number", "label": "Value" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "reset_value",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.r.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.r.@text", "valueType": "string" },
+            { "xmlPath": "object.r.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "reset_value": 0 }
+    },
+    {
+      "id": "NUM_JUNCTION",
+      "displayName": "Numerical Junction",
+      "category": "control",
+      "stormworks": { "type": "21" },
+      "ports": {
+        "inputs": [
+          { "key": "value", "signal": "number", "label": "Value" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [
+          { "key": "on", "signal": "number", "label": "On Path" },
+          { "key": "off", "signal": "number", "label": "Off Path", "stormworks": { "nodeIndex": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "NUM_SWITCHBOX",
+      "displayName": "Numerical Switchbox",
+      "category": "control",
+      "stormworks": { "type": "22" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "BLINKER",
+      "displayName": "Blinker",
+      "category": "control",
+      "stormworks": { "type": "27" },
+      "ports": {
+        "inputs": [{ "key": "enable", "signal": "boolean", "label": "Enable" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "on_time",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@on" }
+        },
+        {
+          "key": "off_time",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@off" }
+        }
+      ],
+      "defaults": { "on_time": 0.5, "off_time": 0.5 }
+    },
+    {
+      "id": "CAPACITOR",
+      "displayName": "Capacitor",
+      "category": "control",
+      "stormworks": { "type": "26" },
+      "ports": {
+        "inputs": [{ "key": "enable", "signal": "boolean", "label": "Enable" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "charge_time",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@ct" }
+        },
+        {
+          "key": "discharge_time",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@dt" }
+        }
+      ],
+      "defaults": { "charge_time": 1.0, "discharge_time": 1.0 }
+    },
+    {
+      "id": "PID",
+      "displayName": "PID Controller",
+      "category": "control",
+      "stormworks": { "type": "23" },
+      "ports": {
+        "inputs": [
+          { "key": "setpoint", "signal": "number", "label": "Setpoint" },
+          { "key": "pv", "signal": "number", "label": "Process Value" },
+          { "key": "active", "signal": "boolean", "label": "Active" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "kp",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.kp.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.kp.@text", "valueType": "string" },
+            { "xmlPath": "object.kp.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "ki",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.ki.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.ki.@text", "valueType": "string" },
+            { "xmlPath": "object.ki.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "kd",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.kd.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.kd.@text", "valueType": "string" },
+            { "xmlPath": "object.kd.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "kp": 1, "ki": 0, "kd": 0 }
+    },
+    {
+      "id": "PID_ADVANCED",
+      "displayName": "PID Controller (Advanced)",
+      "category": "control",
+      "stormworks": { "type": "39" },
+      "ports": {
+        "inputs": [
+          { "key": "setpoint", "signal": "number", "label": "Setpoint" },
+          { "key": "pv", "signal": "number", "label": "Process Value" },
+          { "key": "kp", "signal": "number", "label": "P Gain" },
+          { "key": "ki", "signal": "number", "label": "I Gain" },
+          { "key": "kd", "signal": "number", "label": "D Gain" },
+          { "key": "active", "signal": "boolean", "label": "Active" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "TIMER_TON",
+      "displayName": "Timer (TON)",
+      "category": "control",
+      "stormworks": { "type": "49" },
+      "ports": {
+        "inputs": [
+          { "key": "enable", "signal": "boolean", "label": "Enable" },
+          { "key": "duration", "signal": "number", "label": "Duration" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "TIMER_TOF",
+      "displayName": "Timer (TOF)",
+      "category": "control",
+      "stormworks": { "type": "50" },
+      "ports": {
+        "inputs": [
+          { "key": "enable", "signal": "boolean", "label": "Enable" },
+          { "key": "duration", "signal": "number", "label": "Duration" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "TIMER_RTO",
+      "displayName": "Timer (RTO)",
+      "category": "control",
+      "stormworks": { "type": "51" },
+      "ports": {
+        "inputs": [
+          { "key": "enable", "signal": "boolean", "label": "Enable" },
+          { "key": "duration", "signal": "number", "label": "Duration" },
+          { "key": "reset", "signal": "boolean", "label": "Reset" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "TIMER_RTF",
+      "displayName": "Timer (RTF)",
+      "category": "control",
+      "stormworks": { "type": "52" },
+      "ports": {
+        "inputs": [
+          { "key": "enable", "signal": "boolean", "label": "Enable" },
+          { "key": "duration", "signal": "number", "label": "Duration" },
+          { "key": "reset", "signal": "boolean", "label": "Reset" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "COUNTER",
+      "displayName": "Up/Down Counter",
+      "category": "control",
+      "stormworks": { "type": "37" },
+      "ports": {
+        "inputs": [
+          { "key": "up", "signal": "boolean", "label": "Up" },
+          { "key": "down", "signal": "boolean", "label": "Down" },
+          { "key": "reset", "signal": "boolean", "label": "Reset" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "reset_value",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.r.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.r.@text", "valueType": "string" },
+            { "xmlPath": "object.r.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "increment",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.i.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.i.@text", "valueType": "string" },
+            { "xmlPath": "object.i.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "min",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.min.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.min.@text", "valueType": "string" },
+            { "xmlPath": "object.min.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "max",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.max.@value" },
+          "writeTargets": [
+            { "xmlPath": "object.max.@text", "valueType": "string" },
+            { "xmlPath": "object.max.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "reset_value": 0, "increment": 1, "min": 0, "max": 100 }
+    },
+    {
       "id": "ADD",
       "displayName": "Add",
       "category": "arithmetic",
