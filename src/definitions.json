@@ -390,7 +390,7 @@
       "stormworks": { "type": "12" },
       "ports": {
         "inputs": [{ "key": "value", "signal": "number", "label": "Value" }],
-        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
       },
       "properties": [
         {
@@ -955,7 +955,10 @@
       "category": "composite-read",
       "stormworks": { "type": "31" },
       "ports": {
-        "inputs": [{ "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } }],
+        "inputs": [
+          { "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } },
+          { "key": "channel_input", "signal": "number", "label": "Start Channel", "stormworks": { "xmlKey": "inoff" } }
+        ],
         "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
       },
       "properties": [
@@ -969,7 +972,10 @@
       "category": "composite-read",
       "stormworks": { "type": "29" },
       "ports": {
-        "inputs": [{ "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } }],
+        "inputs": [
+          { "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } },
+          { "key": "channel_input", "signal": "number", "label": "Start Channel", "stormworks": { "xmlKey": "inoff" } }
+        ],
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
       "properties": [
@@ -1036,7 +1042,7 @@
           { "key": "b", "signal": "video", "label": "B" },
           { "key": "switch", "signal": "boolean", "label": "Switch" }
         ],
-        "outputs": [{ "key": "out", "signal": "video", "label": "Out" }]
+        "outputs": [{ "key": "out", "signal": "composite", "label": "Out" }]
       }
     },
     {
@@ -1209,7 +1215,9 @@
             }
           }
         ],
-        "outputs": []
+        "outputs": [
+          { "key": "out", "signal": "composite", "label": "Out" }
+        ]
       },
       "properties": [
         {
@@ -1258,7 +1266,9 @@
             }
           }
         ],
-        "outputs": []
+        "outputs": [
+          { "key": "out", "signal": "composite", "label": "Out" }
+        ]
       },
       "properties": [
         {
