@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm build          # tsc compile + copy definitions to dist/
+pnpm build          # tsc compile + copy src/definitions.json to dist/
 pnpm check          # type-check only (no emit)
 pnpm cli <args>     # run CLI directly via tsx (no build required)
 ```
@@ -17,7 +17,6 @@ There are no tests. The primary way to validate behavior is `pnpm cli`.
 ```bash
 pnpm cli xml2dsl <input.xml> --out-dir <output-dir>   # Stormworks XML → project.json + sw-net + sw-mcl
 pnpm cli dsl2xml <project.json> --out <output.xml>    # project.json + sw-net + sw-mcl → XML
-pnpm cli import-xml <input.xml> --out-dir <output-dir>
 pnpm cli check-dsl <project.json>
 pnpm cli typecheck-dsl <project.json>
 ```
@@ -47,8 +46,10 @@ All formats pass through `IrProgram` (nodes + links + submodules + metadata). Th
 - `.sw-mcl` — Lua script attachments for logic nodes
 - `project.json` — metadata + layout (node positions)
 
-**Node definitions** — `src/core/definitions/`  
-A JSON schema (`definitions/sample/`) maps Stormworks node types to IR `definitionId`s, including port signals and property types. The bundled definitions are embedded at build time via `scripts/copy-definitions.mjs`. Schema version is enforced (`NODE_DEFINITIONS_SCHEMA_VERSION = "9"`).
+**Node definitions** — `src/definitions.json`  
+The single source of truth for all gate definitions. Maps Stormworks XML `type` numbers to DSL `definitionId`s, including port signals and property XML paths. `scripts/copy-definitions.mjs` copies this file to `dist/` at build time. Schema version is enforced (`NODE_DEFINITIONS_SCHEMA_VERSION = "9"`). `definitions/sample/` is intentionally empty (the directory exists for historical reasons).
+
+Gate coverage as of the current definitions: all known boolean logic, arithmetic, comparison, control (PID/timer/counter), composite signal, property, debug, and Lua gates are defined. Unknown XML types pass through as `LOGIC_COMPONENT:<type>` with a warning.
 
 **Public API split:**
 - `src/index.ts` — browser-safe, pure logic only (no Node.js I/O)
