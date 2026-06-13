@@ -390,7 +390,7 @@
       "stormworks": { "type": "12" },
       "ports": {
         "inputs": [{ "key": "value", "signal": "number", "label": "Value" }],
-        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
       "properties": [
         {
@@ -1042,7 +1042,7 @@
           { "key": "b", "signal": "video", "label": "B" },
           { "key": "switch", "signal": "boolean", "label": "Switch" }
         ],
-        "outputs": [{ "key": "out", "signal": "composite", "label": "Out" }]
+        "outputs": [{ "key": "out", "signal": "video", "label": "Out" }]
       }
     },
     {
