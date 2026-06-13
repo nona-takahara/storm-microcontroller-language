@@ -16,12 +16,14 @@
     }
   },
   "bin": {
-    "storm-mcl": "./dist/cli/main.js"
+    "storm-mcl": "./dist/cli/main.js",
+    "storm-mcl-mcp": "./dist/mcp/server.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && node ./scripts/copy-definitions.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
-    "cli": "node --import tsx ./src/cli/main.ts"
+    "cli": "node --import tsx ./src/cli/main.ts",
+    "mcp": "node --import tsx ./src/mcp/server.ts"
   },
   "keywords": [
     "stormworks",
@@ -32,6 +34,7 @@
   "license": "MIT",
   "packageManager": "pnpm@10.28.2",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "fast-xml-parser": "^4.5.3"
   },
   "devDependencies": {
