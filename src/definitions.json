@@ -965,7 +965,7 @@
       "properties": [
         { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" }, "xmlDelta": -1, "xmlDeltaExcept": -1 }
       ],
-      "defaults": { "channel": null }
+      "defaults": { "channel": 1 }
     },
     {
       "id": "COMPOSITE_READ_BOOLEAN",
@@ -982,7 +982,7 @@
       "properties": [
         { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" }, "xmlDelta": -1, "xmlDeltaExcept": -1 }
       ],
-      "defaults": { "channel": null }
+      "defaults": { "channel": 1 }
     },
     {
       "id": "COMPOSITE_SWITCHBOX",
