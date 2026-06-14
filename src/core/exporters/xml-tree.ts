@@ -739,10 +739,34 @@ function applyInstanceAttributes(
       continue;
     }
 
+    const xmlValue = applyPropertyExportTransform(scalarValue, propertyDefinition);
+
+    if (xmlValue === undefined) {
+      continue;
+    }
+
     for (const target of targets) {
-      applyXmlWriteTarget(componentElement, target, scalarValue);
+      applyXmlWriteTarget(componentElement, target, xmlValue);
     }
   }
+}
+
+function applyPropertyExportTransform(
+  value: IrScalarValue,
+  propertyDefinition: NodePropertyDefinition,
+): IrScalarValue | undefined {
+  if (propertyDefinition.enum !== undefined && typeof value === "string") {
+    const numericValue = propertyDefinition.enum[value];
+    return numericValue !== undefined ? numericValue : undefined;
+  }
+
+  if (propertyDefinition.xmlDelta !== undefined && typeof value === "number") {
+    if (propertyDefinition.xmlDeltaExcept === undefined || value !== propertyDefinition.xmlDeltaExcept) {
+      return value + propertyDefinition.xmlDelta;
+    }
+  }
+
+  return value;
 }
 
 // Materialize empty inN tags required by dynamic-input components so XML editors keep their shape.

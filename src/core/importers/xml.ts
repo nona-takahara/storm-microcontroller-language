@@ -914,7 +914,14 @@ function extractDefinedProperties(
   };
 
   for (const propertyDefinition of definition?.properties ?? []) {
-    const value = extractPropertyValue(sourceRecord, propertyDefinition.valueType, propertyDefinition.source);
+    const value = extractPropertyValue(
+      sourceRecord,
+      propertyDefinition.valueType,
+      propertyDefinition.source,
+      propertyDefinition.enum,
+      propertyDefinition.xmlDelta,
+      propertyDefinition.xmlDeltaExcept,
+    );
 
     if (value !== undefined) {
       properties[propertyDefinition.key] = value;
@@ -981,6 +988,9 @@ function extractPropertyValue(
   sourceRecord: Record<string, unknown>,
   valueType: DefinitionValueType,
   source: NodePropertySource | undefined,
+  enumMapping?: Record<string, number>,
+  xmlDelta?: number,
+  xmlDeltaExcept?: number,
 ): IrScalarValue | undefined {
   if (!source) {
     return undefined;
@@ -990,6 +1000,20 @@ function extractPropertyValue(
 
   if (rawValue === undefined) {
     return undefined;
+  }
+
+  const numericValue = coerceScalarValue(rawValue, "number");
+
+  if (enumMapping !== undefined && typeof numericValue === "number") {
+    const label = Object.entries(enumMapping).find(([, v]) => v === numericValue)?.[0];
+    return label ?? numericValue;
+  }
+
+  if (xmlDelta !== undefined && typeof numericValue === "number") {
+    if (xmlDeltaExcept === undefined || numericValue !== xmlDeltaExcept) {
+      return numericValue - xmlDelta;
+    }
+    return numericValue;
   }
 
   return coerceScalarValue(rawValue, valueType);

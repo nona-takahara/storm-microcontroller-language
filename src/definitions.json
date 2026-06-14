@@ -350,12 +350,13 @@
       "properties": [
         {
           "key": "mode",
-          "valueType": "number",
+          "valueType": "string",
           "required": false,
-          "source": { "xmlPath": "object.@m" }
+          "source": { "xmlPath": "object.@m" },
+          "enum": { "fall": 0, "both": 2 }
         }
       ],
-      "defaults": { "mode": null }
+      "defaults": { "mode": "rise" }
     },
     {
       "id": "GREATER_THAN",
@@ -600,9 +601,9 @@
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
       "properties": [
-        { "key": "units", "valueType": "number", "required": false, "source": { "xmlPath": "object.@u" } }
+        { "key": "units", "valueType": "string", "required": false, "source": { "xmlPath": "object.@u" }, "enum": { "ticks": 1 } }
       ],
-      "defaults": { "units": null }
+      "defaults": { "units": "seconds" }
     },
     {
       "id": "TIMER_TOF",
@@ -617,9 +618,9 @@
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
       "properties": [
-        { "key": "units", "valueType": "number", "required": false, "source": { "xmlPath": "object.@u" } }
+        { "key": "units", "valueType": "string", "required": false, "source": { "xmlPath": "object.@u" }, "enum": { "ticks": 1 } }
       ],
-      "defaults": { "units": null }
+      "defaults": { "units": "seconds" }
     },
     {
       "id": "TIMER_RTO",
@@ -635,9 +636,9 @@
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
       "properties": [
-        { "key": "units", "valueType": "number", "required": false, "source": { "xmlPath": "object.@u" } }
+        { "key": "units", "valueType": "string", "required": false, "source": { "xmlPath": "object.@u" }, "enum": { "ticks": 1 } }
       ],
-      "defaults": { "units": null }
+      "defaults": { "units": "seconds" }
     },
     {
       "id": "TIMER_RTF",
@@ -653,9 +654,9 @@
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
       "properties": [
-        { "key": "units", "valueType": "number", "required": false, "source": { "xmlPath": "object.@u" } }
+        { "key": "units", "valueType": "string", "required": false, "source": { "xmlPath": "object.@u" }, "enum": { "ticks": 1 } }
       ],
-      "defaults": { "units": null }
+      "defaults": { "units": "seconds" }
     },
     {
       "id": "COUNTER",
@@ -962,7 +963,7 @@
         "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
       },
       "properties": [
-        { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" } }
+        { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" }, "xmlDelta": -1, "xmlDeltaExcept": -1 }
       ],
       "defaults": { "channel": null }
     },
@@ -979,7 +980,7 @@
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
       "properties": [
-        { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" } }
+        { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" }, "xmlDelta": -1, "xmlDeltaExcept": -1 }
       ],
       "defaults": { "channel": null }
     },
@@ -1234,12 +1235,14 @@
           "required": false,
           "source": {
             "xmlPath": "object.@offset"
-          }
+          },
+          "xmlDelta": -1,
+          "xmlDeltaExcept": -1
         }
       ],
       "defaults": {
         "count": 1,
-        "offset": 0
+        "offset": 1
       }
     },
     {
@@ -1285,12 +1288,14 @@
           "required": false,
           "source": {
             "xmlPath": "object.@offset"
-          }
+          },
+          "xmlDelta": -1,
+          "xmlDeltaExcept": -1
         }
       ],
       "defaults": {
         "count": 1,
-        "offset": 0
+        "offset": 1
       }
     },
     {

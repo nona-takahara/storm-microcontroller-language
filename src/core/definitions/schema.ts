@@ -65,6 +65,9 @@ export interface NodePropertyDefinition {
   source?: NodePropertySource;
   dsl?: NodePropertyDslBinding;
   writeTargets?: NodePropertyWriteTarget[];
+  enum?: Record<string, number>;
+  xmlDelta?: number;
+  xmlDeltaExcept?: number;
 }
 
 export interface NodePropertySource {
@@ -247,6 +250,10 @@ function parseNodePropertyDefinition(input: unknown, path: string): NodeProperty
         : expectArray(record.writeTargets, `${path}.writeTargets`).map((value, index) =>
             parseNodePropertyWriteTarget(value, `${path}.writeTargets[${index}]`),
           ),
+    enum: record.enum === undefined ? undefined : parseEnumMapping(record.enum, `${path}.enum`),
+    xmlDelta: record.xmlDelta === undefined ? undefined : expectNumber(record.xmlDelta, `${path}.xmlDelta`),
+    xmlDeltaExcept:
+      record.xmlDeltaExcept === undefined ? undefined : expectNumber(record.xmlDeltaExcept, `${path}.xmlDeltaExcept`),
   };
 }
 
@@ -390,4 +397,23 @@ function expectInteger(input: unknown, path: string): number {
   }
 
   throw new NodeDefinitionsSchemaError("Expected an integer", path);
+}
+
+function expectNumber(input: unknown, path: string): number {
+  if (typeof input === "number" && Number.isFinite(input)) {
+    return input;
+  }
+
+  throw new NodeDefinitionsSchemaError("Expected a number", path);
+}
+
+function parseEnumMapping(input: unknown, path: string): Record<string, number> {
+  const record = expectRecord(input, path);
+  const result: Record<string, number> = {};
+
+  for (const [key, value] of Object.entries(record)) {
+    result[key] = expectInteger(value, `${path}.${key}`);
+  }
+
+  return result;
 }
