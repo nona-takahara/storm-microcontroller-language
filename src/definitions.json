@@ -317,14 +317,14 @@
       "stormworks": { "type": "47" },
       "ports": {
         "inputs": [
+          { "key": "x", "signal": "boolean", "label": "x" },
+          { "key": "y", "signal": "boolean", "label": "y" },
+          { "key": "z", "signal": "boolean", "label": "z" },
+          { "key": "w", "signal": "boolean", "label": "w" },
           { "key": "a", "signal": "boolean", "label": "a" },
           { "key": "b", "signal": "boolean", "label": "b" },
           { "key": "c", "signal": "boolean", "label": "c" },
-          { "key": "d", "signal": "boolean", "label": "d" },
-          { "key": "e", "signal": "boolean", "label": "e" },
-          { "key": "f", "signal": "boolean", "label": "f" },
-          { "key": "g", "signal": "boolean", "label": "g" },
-          { "key": "h", "signal": "boolean", "label": "h" }
+          { "key": "d", "signal": "boolean", "label": "d" }
         ],
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
