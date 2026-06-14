@@ -1,6 +1,6 @@
 // Node-side helpers that load and write the standard CLI project-source file layout on disk.
 import { mkdir } from "node:fs/promises";
-import { dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 
 import {
   parseProjectJsonText,
@@ -15,6 +15,7 @@ import {
   type StormworksSourceDocument,
 } from "../../index.js";
 import { type SwNetDocument, type SwNetInstStatement } from "../../core/parsers/sw-net.js";
+import { STORMWORKS_SW_MCL_FORMAT_VERSION } from "../../core/serializers/sw-mcl.js";
 import { readUtf8TextFile, writeUtf8TextFile } from "./text-file.js";
 import { resolveRelativeSwNetAssetPath, resolveRelativeSwNetImportPath } from "./sw-net-file-loader.js";
 
@@ -62,9 +63,10 @@ export async function loadProjectSourceFromProjectJsonFile(
     const entryRelativePath = entrySubmodule?.relativePath ?? DEFAULT_ENTRY_SW_NET_FILE_NAME;
     const entrySwNetPath = resolve(filePaths.directoryPath, ...entryRelativePath.split("/"));
     const entrySwMclPath = replaceSwNetExtension(entrySwNetPath, ".sw-mcl");
+    const entryModuleId = basename(entrySwNetPath, ".sw-net");
     const [swNetText, swMclText] = await Promise.all([
       readUtf8TextFile(entrySwNetPath),
-      readUtf8TextFile(entrySwMclPath),
+      readSwMclTextOrStub(entrySwMclPath, entryModuleId),
     ]);
     const parsedEntry = parseSourceDocumentTexts({
       documentId: entrySwNetPath,
@@ -126,9 +128,10 @@ export async function loadSourceDocumentFromSwNetFile(
 ): Promise<StormworksSourceDocument> {
   const resolvedSwNetPath = resolve(swNetPath);
   const swMclPath = replaceSwNetExtension(resolvedSwNetPath, ".sw-mcl");
+  const moduleId = basename(resolvedSwNetPath, ".sw-net");
   const [swNetText, swMclText] = await Promise.all([
     readUtf8TextFile(resolvedSwNetPath),
-    readUtf8TextFile(swMclPath),
+    readSwMclTextOrStub(swMclPath, moduleId),
   ]);
   const parsed = parseSourceDocumentTexts({
     documentId: resolvedSwNetPath,
@@ -233,6 +236,19 @@ function replaceSwNetExtension(filePath: string, nextExtension: string): string 
   }
 
   return filePath.slice(0, -".sw-net".length) + nextExtension;
+}
+
+// Read a sw-mcl file, returning a minimal stub if the file does not exist.
+async function readSwMclTextOrStub(swMclPath: string, moduleId: string): Promise<string> {
+  try {
+    return await readUtf8TextFile(swMclPath);
+  } catch (error: unknown) {
+    if (typeof error === "object" && error !== null && (error as NodeJS.ErrnoException).code === "ENOENT") {
+      return JSON.stringify({ formatVersion: STORMWORKS_SW_MCL_FORMAT_VERSION, moduleId, ports: [], instances: [], warnings: [] });
+    }
+
+    throw error;
+  }
 }
 
 // Select the entry submodule record used to locate the primary sw-net/sw-mcl files.
