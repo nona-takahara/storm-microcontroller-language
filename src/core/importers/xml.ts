@@ -88,6 +88,7 @@ const DEFAULT_XML_PARSER_OPTIONS: StormworksXmlParserOptions = {
   attributeNamePrefix: "@_",
   parseTagValue: false,
   trimValues: false,
+  processEntities: { maxTotalExpansions: 10000 },
 };
 
 const IMPLICIT_SUBMODULE_ID = "submodule:main";
