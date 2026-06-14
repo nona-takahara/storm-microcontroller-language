@@ -477,9 +477,22 @@ function groupLinksBy(
   return grouped;
 }
 
+const FUNCTION_PORT_KEY_ORDER: readonly string[] = ["x", "y", "z", "w", "a", "b", "c", "d"];
+
+function compareFunctionPortKey(left: string, right: string): number {
+  const leftIndex = FUNCTION_PORT_KEY_ORDER.indexOf(left);
+  const rightIndex = FUNCTION_PORT_KEY_ORDER.indexOf(right);
+
+  if (leftIndex !== -1 && rightIndex !== -1) return leftIndex - rightIndex;
+  if (leftIndex !== -1) return -1;
+  if (rightIndex !== -1) return 1;
+
+  return compareIdentifier(left, right);
+}
+
 // Keep multi-input rendering stable by sorting links by target port and source id.
 function compareInputLinks(left: IrLink, right: IrLink): number {
-  const portComparison = compareIdentifier(left.to.portKey, right.to.portKey);
+  const portComparison = compareFunctionPortKey(left.to.portKey, right.to.portKey);
 
   if (portComparison !== 0) {
     return portComparison;
