@@ -1,7 +1,7 @@
 // Definitions schema parser that validates the external node-definition JSON used by import/export.
 import type { IrScalarValue, IrSignalKind } from "../ir.js";
 
-export const NODE_DEFINITIONS_SCHEMA_VERSION = "9";
+export const NODE_DEFINITIONS_SCHEMA_VERSION = "10";
 
 export type DefinitionValueType = "boolean" | "number" | "string";
 
@@ -72,6 +72,7 @@ export interface NodePropertyDefinition {
 
 export interface NodePropertySource {
   xmlPath: string;
+  itemList?: boolean;
 }
 
 export interface NodePortStormworksBinding {
@@ -88,6 +89,7 @@ export interface NodePropertyDslBinding {
 export interface NodePropertyWriteTarget {
   xmlPath: string;
   valueType?: DefinitionValueType;
+  itemList?: boolean;
 }
 
 // Error type that keeps precise schema paths for invalid definitions documents.
@@ -263,6 +265,7 @@ function parseNodePropertySource(input: unknown, path: string): NodePropertySour
 
   return {
     xmlPath: expectString(record.xmlPath, `${path}.xmlPath`),
+    itemList: record.itemList === undefined ? undefined : expectBoolean(record.itemList, `${path}.itemList`),
   };
 }
 
@@ -297,6 +300,7 @@ function parseNodePropertyWriteTarget(input: unknown, path: string): NodePropert
     xmlPath: expectString(record.xmlPath, `${path}.xmlPath`),
     valueType:
       record.valueType === undefined ? undefined : parseDefinitionValueType(record.valueType, `${path}.valueType`),
+    itemList: record.itemList === undefined ? undefined : expectBoolean(record.itemList, `${path}.itemList`),
   };
 }
 

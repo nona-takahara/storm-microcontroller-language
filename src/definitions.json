@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "9",
+  "schemaVersion": "10",
   "nodes": [
     {
       "id": "composite_in",
@@ -1155,7 +1155,15 @@
       "ports": {
         "inputs": [],
         "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
-      }
+      },
+      "properties": [
+        {
+          "key": "items",
+          "valueType": "string",
+          "required": false,
+          "source": { "xmlPath": "object.items", "itemList": true }
+        }
+      ]
     },
     {
       "id": "TOOLTIP_NUMBER",
