@@ -227,7 +227,7 @@ function getStatementScriptRef(statement: SwNetInstStatement): string | undefine
 }
 
 // Replace a .sw-net extension with the matching companion-file extension.
-function replaceSwNetExtension(filePath: string, nextExtension: string): string {
+export function replaceSwNetExtension(filePath: string, nextExtension: string): string {
   if (extname(filePath) !== ".sw-net") {
     throw new Error(`Expected a .sw-net file path, received ${filePath}.`);
   }
