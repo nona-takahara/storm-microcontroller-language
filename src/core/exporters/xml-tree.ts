@@ -758,6 +758,23 @@ function applyInstanceAttributes(
       continue;
     }
 
+    // Two narrow, evidence-based omission cases confirmed by comparing our export against a file
+    // Stormworks itself re-saved after loading it: xmlDelta-encoded properties (composite
+    // channel/offset) represent "unset" as an omitted XML attribute, and empty-string properties
+    // (e.g. PROPERTY_TOGGLE's label) are always omitted when empty, independent of other sibling
+    // properties (e.g. on_label/off_label) being customized. Non-empty, non-delta defaults (e.g.
+    // PROPERTY_TOGGLE's on_label="On", EQUAL's epsilon=0.0001) are NOT safe to omit this way:
+    // Stormworks keeps those explicit once written, so this check stays narrow to the two cases above.
+    const declaredDefault = instance.definition?.defaults?.[propertyDefinition.key];
+    const isOmittableDefault =
+      declaredDefault !== undefined &&
+      scalarValue === declaredDefault &&
+      (propertyDefinition.xmlDelta !== undefined || declaredDefault === "");
+
+    if (isOmittableDefault) {
+      continue;
+    }
+
     for (const target of targets) {
       applyXmlWriteTarget(componentElement, target, xmlValue);
     }
