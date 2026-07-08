@@ -32,6 +32,7 @@
   "license": "MIT",
   "packageManager": "pnpm@10.28.2",
   "dependencies": {
+    "elkjs": "^0.11.1",
     "fast-xml-parser": "^4.5.3"
   },
   "devDependencies": {
