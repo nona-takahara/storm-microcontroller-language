@@ -55,3 +55,13 @@ export function tryParseSwNetTrailingNumber(value: string): number | undefined {
   const parsed = Number.parseInt(match[1], 10);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
+
+// Build a stable lookup key for port names without occurrence numbers.
+export function formatPortNameKey(direction: "in" | "out", name: string): string {
+  return `${direction}:${name}`;
+}
+
+// Build a stable lookup key for one concrete port occurrence.
+export function formatPortOccurrenceKey(direction: "in" | "out", name: string, occurrence: number): string {
+  return `${direction}:${name}:${occurrence}`;
+}

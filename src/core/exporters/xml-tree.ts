@@ -17,6 +17,7 @@ import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement } f
 import { type ProjectJsonDocument, type ProjectJsonLinkDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
 import { addVector } from "../serializers/submodule-layout.js";
 import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
+import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule, type SwNetResolvedModuleKey } from "../resolvers/sw-net.js";
 
 export type StormworksXmlTreeScalar = string | number | boolean | null;
@@ -1250,20 +1251,6 @@ function expressionToScalarValue(expression: SwNetExpression): IrScalarValue | u
     default:
       return undefined;
   }
-}
-
-// Build a stable lookup key for port names without occurrence numbers.
-function formatPortNameKey(direction: "in" | "out", name: string): string {
-  return `${direction}:${name}`;
-}
-
-// Build a stable lookup key for one concrete port occurrence.
-function formatPortOccurrenceKey(
-  direction: "in" | "out",
-  name: string,
-  occurrence: number,
-): string {
-  return `${direction}:${name}:${occurrence}`;
 }
 
 // Build a stable lookup key for one resolved sw-net module.
