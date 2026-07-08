@@ -16,13 +16,22 @@ import {
 } from "./exporters/xml-tree.js";
 import { importStormworksXml } from "./importers/xml.js";
 import { type IrProgram } from "./ir.js";
-import { parseSwNetDocument, type SwNetDocument, type SwNetInstStatement } from "./parsers/sw-net.js";
+import {
+  parseSwNetDocument,
+  type SwNetAssignment,
+  type SwNetDocument,
+  type SwNetInstStatement,
+  type SwNetPort,
+} from "./parsers/sw-net.js";
 import { parseStormworksSwMclText } from "./parsers/sw-mcl.js";
 import {
   resolveSwNetDocumentGraph,
   type SwNetDocumentHandle,
   type SwNetDocumentResolver,
   type SwNetResolutionResult,
+  type SwNetResolvedModule,
+  type SwNetResolvedModuleKey,
+  type SwNetResolvedUse,
 } from "./resolvers/sw-net.js";
 import { buildProjectJsonDocument, type ProjectJsonDocument } from "./serializers/project-json.js";
 import { serializeSwNetDocument } from "./serializers/sw-net-document.js";
@@ -241,6 +250,30 @@ export async function resolveProjectSource(
     return { diagnostics };
   }
 
+  const resolvedGraph = await resolveSwNetGraphFromPreload(projectSource, preloadResult);
+  diagnostics.push(...resolvedGraph.diagnostics);
+
+  if (!resolvedGraph.value) {
+    return { diagnostics };
+  }
+
+  return {
+    value: {
+      projectSource,
+      documents: [...preloadResult.documentsById.values()].sort(compareSourceDocuments),
+      swNet: resolvedGraph.value,
+    },
+    diagnostics,
+  };
+}
+
+// Shared sw-net-graph resolution step used by both resolveProjectSource (public API) and
+// collectProjectSourceDiagnostics (validation + export path), so callers that already preloaded
+// documents don't pay for a second preload+resolve pass just to validate `use` statements.
+async function resolveSwNetGraphFromPreload(
+  projectSource: StormworksProjectSource,
+  preloadResult: { documentsById: Map<string, StormworksSourceDocument>; resolvedImports: Map<string, string> },
+): Promise<StormworksLibraryResult<SwNetResolutionResult>> {
   try {
     // The actual sw-net resolver stays file-system agnostic; this facade only adapts preloaded documents to it.
     const entryHandle: SwNetDocumentHandle = {
@@ -253,25 +286,18 @@ export async function resolveProjectSource(
     );
     const swNet = await resolveSwNetDocumentGraph(entryHandle, resolver);
 
-    return {
-      value: {
-        projectSource,
-        documents: [...preloadResult.documentsById.values()].sort(compareSourceDocuments),
-        swNet,
-      },
-      diagnostics,
-    };
+    return { value: swNet, diagnostics: [] };
   } catch (error) {
-    diagnostics.push(
-      createErrorDiagnostic(
-        "PROJECT_SOURCE_RESOLVE_FAILED",
-        error instanceof Error ? error.message : String(error),
-        "library",
-        projectSource.entryDocument.documentId,
-      ),
-    );
-
-    return { diagnostics };
+    return {
+      diagnostics: [
+        createErrorDiagnostic(
+          "PROJECT_SOURCE_RESOLVE_FAILED",
+          error instanceof Error ? error.message : String(error),
+          "library",
+          projectSource.entryDocument.documentId,
+        ),
+      ],
+    };
   }
 }
 
@@ -280,7 +306,7 @@ export async function validateProjectSource(
   projectSource: StormworksProjectSource,
   options: ValidateProjectSourceOptions,
 ): Promise<ValidateProjectSourceResult> {
-  const diagnostics = await collectProjectSourceDiagnostics(
+  const { diagnostics } = await collectProjectSourceDiagnostics(
     projectSource,
     options.definitions,
     options.loadImportedDocument,
@@ -297,22 +323,13 @@ export async function buildStormworksXmlTreeFromProjectSource(
   projectSource: StormworksProjectSource,
   options: BuildStormworksXmlTreeFromProjectSourceOptions,
 ): Promise<StormworksLibraryResult<BuildStormworksXmlTreeResult>> {
-  const diagnostics = await collectProjectSourceDiagnostics(
+  const { diagnostics, resolved } = await collectProjectSourceDiagnostics(
     projectSource,
     options.definitions,
     options.loadImportedDocument,
   );
 
-  if (hasErrorDiagnostics(diagnostics)) {
-    return { diagnostics };
-  }
-
-  const resolved = await resolveProjectSource(projectSource, {
-    loadImportedDocument: options.loadImportedDocument,
-  });
-  diagnostics.push(...resolved.diagnostics);
-
-  if (!resolved.value || hasErrorDiagnostics(diagnostics)) {
+  if (hasErrorDiagnostics(diagnostics) || !resolved) {
     return { diagnostics };
   }
 
@@ -320,14 +337,14 @@ export async function buildStormworksXmlTreeFromProjectSource(
     const result = buildStormworksXmlTree(
       {
         project: projectSource.project,
-        swNet: resolved.value.swNet,
-        swMcl: projectSource.entryDocument.swMcl,
+        swNet: resolved.swNet,
+        swMclByDocumentPath: buildSwMclByDocumentPath(resolved.documents),
       },
       {
         ...options,
         entryModuleId: projectSource.entryModuleId,
         resolveScriptText: (scriptRef, context) =>
-          resolved.value?.documents.find((document) => document.documentId === context.documentPath)?.scripts[scriptRef],
+          resolved.documents.find((document) => document.documentId === context.documentPath)?.scripts[scriptRef],
       },
     );
 
@@ -360,22 +377,13 @@ export async function buildStormworksXmlFromProjectSource(
   projectSource: StormworksProjectSource,
   options: BuildStormworksXmlFromProjectSourceOptions,
 ): Promise<StormworksLibraryResult<BuildStormworksXmlResult>> {
-  const diagnostics = await collectProjectSourceDiagnostics(
+  const { diagnostics, resolved } = await collectProjectSourceDiagnostics(
     projectSource,
     options.definitions,
     options.loadImportedDocument,
   );
 
-  if (hasErrorDiagnostics(diagnostics)) {
-    return { diagnostics };
-  }
-
-  const resolved = await resolveProjectSource(projectSource, {
-    loadImportedDocument: options.loadImportedDocument,
-  });
-  diagnostics.push(...resolved.diagnostics);
-
-  if (!resolved.value || hasErrorDiagnostics(diagnostics)) {
+  if (hasErrorDiagnostics(diagnostics) || !resolved) {
     return { diagnostics };
   }
 
@@ -383,14 +391,14 @@ export async function buildStormworksXmlFromProjectSource(
     const result = buildStormworksXml(
       {
         project: projectSource.project,
-        swNet: resolved.value.swNet,
-        swMcl: projectSource.entryDocument.swMcl,
+        swNet: resolved.swNet,
+        swMclByDocumentPath: buildSwMclByDocumentPath(resolved.documents),
       },
       {
         ...options,
         entryModuleId: projectSource.entryModuleId,
         resolveScriptText: (scriptRef, context) =>
-          resolved.value?.documents.find((document) => document.documentId === context.documentPath)?.scripts[scriptRef],
+          resolved.documents.find((document) => document.documentId === context.documentPath)?.scripts[scriptRef],
       },
     );
 
@@ -423,7 +431,7 @@ async function collectProjectSourceDiagnostics(
   projectSource: StormworksProjectSource,
   definitions: NodeDefinitionRegistry,
   loadImportedDocument: StormworksDocumentLoader["loadImportedDocument"] | undefined,
-): Promise<StormworksLibraryDiagnostic[]> {
+): Promise<{ diagnostics: StormworksLibraryDiagnostic[]; resolved?: ResolvedStormworksProjectSource }> {
   // Validation walks both the project surface and every reachable sw-net document.
   const preloadResult = await preloadProjectSourceDocuments(projectSource, loadImportedDocument);
   const diagnostics = [...preloadResult.diagnostics];
@@ -445,7 +453,29 @@ async function collectProjectSourceDiagnostics(
     );
   }
 
-  return diagnostics;
+  if (hasErrorDiagnostics(diagnostics)) {
+    return { diagnostics };
+  }
+
+  // `use` statements can only be checked against their target module's declared ports once the whole
+  // module graph is resolved; reuse the same preload pass so export callers don't resolve it twice.
+  const resolvedGraph = await resolveSwNetGraphFromPreload(projectSource, preloadResult);
+  diagnostics.push(...resolvedGraph.diagnostics);
+
+  if (!resolvedGraph.value) {
+    return { diagnostics };
+  }
+
+  validateUseStatements(resolvedGraph.value, diagnostics);
+
+  return {
+    diagnostics,
+    resolved: {
+      projectSource,
+      documents: [...preloadResult.documentsById.values()].sort(compareSourceDocuments),
+      swNet: resolvedGraph.value,
+    },
+  };
 }
 
 // Preload every imported document reachable from the entry document through the caller-provided loader.
@@ -652,6 +682,188 @@ function validateInstStatement(
   }
 }
 
+// Validate every resolved `use` statement in the module graph against its target module's declared ports.
+function validateUseStatements(swNet: SwNetResolutionResult, diagnostics: StormworksLibraryDiagnostic[]): void {
+  const moduleByKey = new Map(swNet.modules.map((module) => [formatResolvedModuleKey(module.key), module] as const));
+
+  for (const callerModule of swNet.modules) {
+    // The flatten pass' namespacing scheme depends on every inst/use statement in a module having a
+    // unique instance id; catch violations here instead of letting export silently alias nets.
+    const seenInstanceIds = new Set<string>();
+
+    for (const statement of callerModule.module.statements) {
+      if (seenInstanceIds.has(statement.instanceId)) {
+        diagnostics.push(
+          createErrorDiagnostic(
+            "USE_INSTANCE_ID_DUPLICATE",
+            `Instance id "${statement.instanceId}" is used more than once in module ${callerModule.key.moduleId}.`,
+            "sw-net",
+            callerModule.key.documentPath,
+            statement.instanceId,
+          ),
+        );
+      }
+
+      seenInstanceIds.add(statement.instanceId);
+    }
+  }
+
+  for (const use of swNet.uses) {
+    validateUseStatement(use, moduleByKey, diagnostics);
+  }
+}
+
+// Validate one resolved `use` statement's input/output bindings against its target module's ports.
+function validateUseStatement(
+  use: SwNetResolvedUse,
+  moduleByKey: Map<string, SwNetResolvedModule>,
+  diagnostics: StormworksLibraryDiagnostic[],
+): void {
+  const targetModule = moduleByKey.get(formatResolvedModuleKey(use.target));
+
+  if (!targetModule) {
+    // The resolver already raises a hard SwNetResolveError for a genuinely missing module/alias
+    // before validation runs; this branch is defensive only.
+    return;
+  }
+
+  const callerModule = moduleByKey.get(formatResolvedModuleKey(use.caller));
+  const callerPortsByName = new Map((callerModule?.module.ports ?? []).map((port) => [port.name, port] as const));
+  const targetInputPorts = new Map(
+    targetModule.module.ports.filter((port) => port.direction === "in").map((port) => [port.name, port] as const),
+  );
+  const targetOutputPorts = new Map(
+    targetModule.module.ports.filter((port) => port.direction === "out").map((port) => [port.name, port] as const),
+  );
+
+  const boundInputKeys = validateUsePortAssignments(
+    use,
+    use.statement.inputs,
+    targetInputPorts,
+    "USE_INPUT_PORT_NOT_FOUND",
+    callerPortsByName,
+    diagnostics,
+  );
+
+  for (const inputPort of targetInputPorts.values()) {
+    if (!boundInputKeys.has(inputPort.name)) {
+      diagnostics.push(
+        createWarningDiagnostic(
+          "USE_INPUT_PORT_UNBOUND",
+          `Input port "${inputPort.name}" of module ${use.target.moduleId} is not bound by ${use.statement.instanceId}.`,
+          "sw-net",
+          use.caller.documentPath,
+          use.statement.instanceId,
+        ),
+      );
+    }
+  }
+
+  // Unbound output ports are common and intentional (a submodule's output the caller simply doesn't
+  // need), so only input-side unbound ports are worth warning about.
+  validateUsePortAssignments(
+    use,
+    use.statement.outputs,
+    targetOutputPorts,
+    "USE_OUTPUT_PORT_NOT_FOUND",
+    callerPortsByName,
+    diagnostics,
+  );
+}
+
+// Shared logic for the input/output assignment halves of one `use` statement: reports assignments
+// that don't match a declared port, duplicate assignments to the same port, and (for string-literal
+// values only) a signal-kind mismatch against the caller's own forwarded port.
+function validateUsePortAssignments(
+  use: SwNetResolvedUse,
+  assignments: SwNetAssignment[],
+  targetPortsByName: Map<string, SwNetPort>,
+  missingPortCode: string,
+  callerPortsByName: Map<string, SwNetPort>,
+  diagnostics: StormworksLibraryDiagnostic[],
+): Set<string> {
+  const seenKeys = new Set<string>();
+
+  for (const assignment of assignments) {
+    if (seenKeys.has(assignment.key)) {
+      diagnostics.push(
+        createWarningDiagnostic(
+          "USE_PORT_ASSIGNED_MULTIPLE_TIMES",
+          `Port "${assignment.key}" is assigned more than once on ${use.statement.instanceId}.`,
+          "sw-net",
+          use.caller.documentPath,
+          use.statement.instanceId,
+        ),
+      );
+    }
+
+    seenKeys.add(assignment.key);
+
+    const targetPort = targetPortsByName.get(assignment.key);
+
+    if (!targetPort) {
+      diagnostics.push(
+        createErrorDiagnostic(
+          missingPortCode,
+          `Module ${use.target.moduleId} has no port "${assignment.key}" (referenced by ${use.statement.instanceId}).`,
+          "sw-net",
+          use.caller.documentPath,
+          use.statement.instanceId,
+        ),
+      );
+      continue;
+    }
+
+    checkUsePortSignalKind(use, assignment, targetPort, callerPortsByName, diagnostics);
+  }
+
+  return seenKeys;
+}
+
+// Compare a caller-own-port forwarding (string literal) binding's signal kind against the target
+// port's declared signal kind. Identifier (local-net) bindings are intentionally skipped: inferring a
+// local net's signal kind would need net-wide type inference, which does not exist in this codebase
+// yet (see the follow-up issue for README's broader, currently-unimplemented typecheck-dsl claim).
+function checkUsePortSignalKind(
+  use: SwNetResolvedUse,
+  assignment: SwNetAssignment,
+  targetPort: SwNetPort,
+  callerPortsByName: Map<string, SwNetPort>,
+  diagnostics: StormworksLibraryDiagnostic[],
+): void {
+  if (assignment.value.kind !== "string") {
+    return;
+  }
+
+  const callerPort = callerPortsByName.get(assignment.value.value);
+
+  if (!callerPort || callerPort.signal === "unknown" || targetPort.signal === "unknown") {
+    return;
+  }
+
+  if (callerPort.signal !== targetPort.signal) {
+    diagnostics.push(
+      createWarningDiagnostic(
+        "USE_PORT_SIGNAL_MISMATCH",
+        `Port "${assignment.key}" on ${use.statement.instanceId} binds ${targetPort.direction} port ${targetModuleLabel(use)}."${targetPort.name}" (${targetPort.signal}) to caller port "${callerPort.name}" (${callerPort.signal}).`,
+        "sw-net",
+        use.caller.documentPath,
+        use.statement.instanceId,
+      ),
+    );
+  }
+}
+
+// Human-readable label for the target module of a `use` statement, reused in diagnostic messages.
+function targetModuleLabel(use: SwNetResolvedUse): string {
+  return `${use.target.documentPath}#${use.target.moduleId}`;
+}
+
+// Build a stable lookup key for one resolved sw-net module (documentPath + moduleId).
+function formatResolvedModuleKey(key: SwNetResolvedModuleKey): string {
+  return `${key.documentPath}#${key.moduleId}`;
+}
+
 // Adapt preloaded project-source documents to the sw-net resolver interface.
 function createProjectSourceSwNetResolver(
   documentsById: Map<string, StormworksSourceDocument>,
@@ -727,6 +939,12 @@ function applyEntryDocumentPath(
 // Sort source documents by document id for stable diagnostics and export ordering.
 function compareSourceDocuments(left: StormworksSourceDocument, right: StormworksSourceDocument): number {
   return left.documentId.localeCompare(right.documentId);
+}
+
+// Give the XML tree exporter access to every resolved document's own sw-mcl, keyed by document path,
+// so `use` statements that pull in a module from another document can resolve its layout too.
+function buildSwMclByDocumentPath(documents: StormworksSourceDocument[]): Map<string, StormworksSwMclDocument> {
+  return new Map(documents.map((document) => [document.documentId, document.swMcl] as const));
 }
 
 // Check whether a diagnostic list already contains at least one build-blocking error.
