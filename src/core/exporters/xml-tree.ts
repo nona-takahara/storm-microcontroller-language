@@ -776,6 +776,15 @@ function applyInstanceAttributes(
     }
 
     for (const target of targets) {
+      // A third evidence-based case from the same comparison: paired text/value numeric targets
+      // (min/max/n/v/e-style properties) always keep @text, but Stormworks omits the numeric @value
+      // mirror specifically when the value is exactly 0 (any other value, including negatives and
+      // decimals, keeps @value). Confirmed across every zero-valued instance in the sample file with
+      // no counterexample, independent of whether 0 happens to be that property's declared default.
+      if (target.xmlPath.endsWith(".@value") && target.valueType === "number" && xmlValue === 0) {
+        continue;
+      }
+
       applyXmlWriteTarget(componentElement, target, xmlValue);
     }
   }
