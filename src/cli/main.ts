@@ -1,4 +1,5 @@
 // CLI entrypoint that exposes the standard xml2dsl/dsl2xml workflow and related validation commands.
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import {
@@ -727,7 +728,7 @@ function joinRelativeDisplayPath(baseDocumentPath: string, relativeAssetPath: st
   return `${baseDocumentPath.slice(0, slashIndex + 1)}${relativeAssetPath}`;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   main(process.argv.slice(2))
     .then((exitCode) => {
       process.exitCode = exitCode;

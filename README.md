@@ -63,20 +63,59 @@ pnpm cli typecheck-dsl <project.json>
 ノードのインスタンス化と配線を記述します。
 
 ```
+# ファイル先頭に import を書くことで別の .sw-net を参照できる
+import pid from "./pid.sw-net"
+
 module main
   port in "Speed Input" : number
   port in "Active"      : boolean
   port out "Throttle"   : number
 
+  # inst でゲートを配置し、: 入力 -> 出力 の形式で配線する
   inst CLAMP n1 (min=0, max=1) : value="Speed Input" -> out="Throttle"
   inst AND   n2 : a="Active", b=n1_out -> out=n2_out
+
+  # use で別モジュールをサブモジュールとして埋め込む
+  use pid.controller ctrl : input=n1_out -> output="Throttle"
 end
 ```
+
+**基本構文:**
 
 - `port in / out` — モジュールの外部ポート（Stormworks の入出力ノードに対応）
 - `inst <定義ID> <インスタンス名>` — ゲートを配置
 - `(key=value)` — ゲートのプロパティ
 - `: <入力> -> <出力>` — 配線（ポート名またはネット名で接続）
+- `# ...` — 行コメント（行頭・行末どちらでも使用可）
+
+**サブモジュール:**
+
+別の `.sw-net` ファイルに定義したモジュールを `use` で埋め込めます。
+
+```
+# ファイル先頭で import（エイリアス from "パス" の形式）
+import lib from "./lib.sw-net"
+
+module main
+  # use <エイリアス>.<モジュールID> <インスタンス名> : 入力 -> 出力
+  use lib.myModule sub1 : input=someNet -> output=resultNet
+end
+```
+
+同一ファイル内のモジュールはエイリアスなしで参照できます。
+
+```
+module helper
+  port in "x" : number
+  port out "y" : number
+  inst ADD a : a="x", b="x" -> out="y"
+end
+
+module main
+  port out "result" : number
+  use helper h : x=someValue -> y="result"
+end
+```
 
 ### 主な定義 ID
 
