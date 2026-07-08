@@ -56,6 +56,9 @@ export function serializeStormworksXmlTree(
     format: pretty,
     indentBy: options.indentBy ?? "\t",
     suppressEmptyNode: options.suppressEmptyNode ?? true,
+    // Stormworks always expects explicit attribute values (e.g. v="true"); the builder's default
+    // HTML-style minimization of string "true" values into bare attributes produces invalid saves.
+    suppressBooleanAttributes: false,
   });
   const rootDocument = includeDeclaration
     ? {

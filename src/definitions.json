@@ -408,7 +408,7 @@
           "key": "max",
           "valueType": "number",
           "required": true,
-          "source": { "xmlPath": "object.max.@value" },
+          "source": { "xmlPath": "object.max.@text" },
           "writeTargets": [
             { "xmlPath": "object.max.@text", "valueType": "string" },
             { "xmlPath": "object.max.@value", "valueType": "number" }
@@ -435,7 +435,7 @@
           "key": "reset_value",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.r.@value" },
+          "source": { "xmlPath": "object.r.@text" },
           "writeTargets": [
             { "xmlPath": "object.r.@text", "valueType": "string" },
             { "xmlPath": "object.r.@value", "valueType": "number" }
@@ -542,7 +542,7 @@
           "key": "kp",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.kp.@value" },
+          "source": { "xmlPath": "object.kp.@text" },
           "writeTargets": [
             { "xmlPath": "object.kp.@text", "valueType": "string" },
             { "xmlPath": "object.kp.@value", "valueType": "number" }
@@ -552,7 +552,7 @@
           "key": "ki",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.ki.@value" },
+          "source": { "xmlPath": "object.ki.@text" },
           "writeTargets": [
             { "xmlPath": "object.ki.@text", "valueType": "string" },
             { "xmlPath": "object.ki.@value", "valueType": "number" }
@@ -562,7 +562,7 @@
           "key": "kd",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.kd.@value" },
+          "source": { "xmlPath": "object.kd.@text" },
           "writeTargets": [
             { "xmlPath": "object.kd.@text", "valueType": "string" },
             { "xmlPath": "object.kd.@value", "valueType": "number" }
@@ -676,7 +676,7 @@
           "key": "reset_value",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.r.@value" },
+          "source": { "xmlPath": "object.r.@text" },
           "writeTargets": [
             { "xmlPath": "object.r.@text", "valueType": "string" },
             { "xmlPath": "object.r.@value", "valueType": "number" }
@@ -686,7 +686,7 @@
           "key": "increment",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.i.@value" },
+          "source": { "xmlPath": "object.i.@text" },
           "writeTargets": [
             { "xmlPath": "object.i.@text", "valueType": "string" },
             { "xmlPath": "object.i.@value", "valueType": "number" }
@@ -696,7 +696,7 @@
           "key": "min",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.min.@value" },
+          "source": { "xmlPath": "object.min.@text" },
           "writeTargets": [
             { "xmlPath": "object.min.@text", "valueType": "string" },
             { "xmlPath": "object.min.@value", "valueType": "number" }
@@ -706,7 +706,7 @@
           "key": "max",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.max.@value" },
+          "source": { "xmlPath": "object.max.@text" },
           "writeTargets": [
             { "xmlPath": "object.max.@text", "valueType": "string" },
             { "xmlPath": "object.max.@value", "valueType": "number" }
@@ -872,7 +872,7 @@
           "key": "min",
           "valueType": "number",
           "required": true,
-          "source": { "xmlPath": "object.min.@value" },
+          "source": { "xmlPath": "object.min.@text" },
           "writeTargets": [
             { "xmlPath": "object.min.@text", "valueType": "string" },
             { "xmlPath": "object.min.@value", "valueType": "number" }
@@ -882,7 +882,7 @@
           "key": "max",
           "valueType": "number",
           "required": true,
-          "source": { "xmlPath": "object.max.@value" },
+          "source": { "xmlPath": "object.max.@text" },
           "writeTargets": [
             { "xmlPath": "object.max.@text", "valueType": "string" },
             { "xmlPath": "object.max.@value", "valueType": "number" }
@@ -941,7 +941,7 @@
           "key": "epsilon",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.e.@value" },
+          "source": { "xmlPath": "object.e.@text" },
           "writeTargets": [
             { "xmlPath": "object.e.@text", "valueType": "string" },
             { "xmlPath": "object.e.@value", "valueType": "number" }
@@ -1060,7 +1060,7 @@
           "key": "value",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.v.@value" },
+          "source": { "xmlPath": "object.v.@text" },
           "writeTargets": [
             { "xmlPath": "object.v.@text", "valueType": "string" },
             { "xmlPath": "object.v.@value", "valueType": "number" }
@@ -1093,7 +1093,7 @@
           "key": "max",
           "valueType": "number",
           "required": false,
-          "source": { "xmlPath": "object.max.@value" },
+          "source": { "xmlPath": "object.max.@text" },
           "writeTargets": [
             { "xmlPath": "object.max.@text", "valueType": "string" },
             { "xmlPath": "object.max.@value", "valueType": "number" }

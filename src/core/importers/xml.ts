@@ -401,6 +401,15 @@ function collectLogicNodes(
     }
 
     const definition = findComponentDefinitionByStormworksType(definitions, componentType);
+    const definedProperties = extractDefinedProperties(
+      component,
+      definition,
+      warnings,
+      `microprocessor.group.components.c[${index}]`,
+    );
+
+    reconcileDynamicInputCount(objectRecord, definition, definedProperties);
+
     const importedNode: IrNode = {
       id: `logic:${rawId}`,
       layer: "logic",
@@ -411,7 +420,7 @@ function collectLogicNodes(
         stormworksType: componentType,
         layer: "logic",
         ...extractObjectAttributes(objectRecord, definition),
-        ...extractDefinedProperties(component, definition, warnings, `microprocessor.group.components.c[${index}]`),
+        ...definedProperties,
       },
       source: {
         format: "stormworks-xml",
@@ -900,6 +909,58 @@ function getBridgeInputBindings(
   }
 
   return bindings;
+}
+
+// Some Stormworks-authored saves omit a dynamic-input component's count attribute (e.g. after
+// legacy edits), even though wired inN entries extend past the schema default. Since links are
+// imported independently of the declared count (see importLogicLinks), a too-small count would
+// silently make dsl2xml re-export fewer <inN> slots than are actually wired, and Stormworks itself
+// discards any connection beyond the declared count when it next resaves the file. Raise count to
+// cover the highest wired dynamic input index actually present, matching what the source data implies.
+function reconcileDynamicInputCount(
+  objectRecord: Record<string, unknown>,
+  definition: ComponentDefinition | undefined,
+  properties: Record<string, IrScalarValue>,
+): void {
+  const dynamicInputs = definition?.stormworks.dynamicInputs;
+
+  if (!dynamicInputs) {
+    return;
+  }
+
+  const prefixPattern = new RegExp(`^${escapeRegExp(dynamicInputs.prefix)}(\\d+)$`);
+  let maxWiredIndex = 0;
+
+  for (const [childName, childValue] of Object.entries(objectRecord)) {
+    const match = prefixPattern.exec(childName);
+
+    if (!match?.[1]) {
+      continue;
+    }
+
+    const childRecord = asRecord(childValue);
+
+    if (!childRecord || getAttribute(childRecord, "component_id") === undefined) {
+      continue;
+    }
+
+    const wiredIndex = Number.parseInt(match[1], 10);
+
+    if (Number.isFinite(wiredIndex) && wiredIndex > maxWiredIndex) {
+      maxWiredIndex = wiredIndex;
+    }
+  }
+
+  if (maxWiredIndex === 0) {
+    return;
+  }
+
+  const declaredCount = properties[dynamicInputs.countProperty];
+  const numericDeclaredCount = typeof declaredCount === "number" ? declaredCount : 0;
+
+  if (maxWiredIndex > numericDeclaredCount) {
+    properties[dynamicInputs.countProperty] = maxWiredIndex;
+  }
 }
 
 // Extract definition-driven properties from XML into normalized IR scalar values.

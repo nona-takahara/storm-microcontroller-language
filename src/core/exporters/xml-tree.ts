@@ -629,13 +629,21 @@ function buildProjectOutputBindingIndex(
   return bindings;
 }
 
+// Stormworks omits type="0" (the default component/node/bridge type) from authored XML.
+function isDefaultComponentType(type: string): boolean {
+  return type === "0";
+}
+
 // Emit one <nodes><n> element for a project-facing pin.
 function buildProjectNodeElement(projectNode: ProjectNodeContext): StormworksXmlTreeElement {
   const nodeElement: StormworksXmlTreeElement = {
     "@_label": projectNode.document.label ?? projectNode.document.id,
-    "@_type": projectNode.definition.stormworks.type,
     "@_description": projectNode.document.description ?? "",
   };
+
+  if (!isDefaultComponentType(projectNode.definition.stormworks.type)) {
+    nodeElement["@_type"] = projectNode.definition.stormworks.type;
+  }
 
   if (projectNode.definition.stormworks.mode !== undefined) {
     nodeElement["@_mode"] = projectNode.definition.stormworks.mode;
@@ -664,11 +672,15 @@ function buildComponentElement(
   moduleId: string,
 ): StormworksXmlTreeElement {
   const componentElement: StormworksXmlTreeElement = {
-    "@_type": instance.stormworksType,
     object: {
       "@_id": String(instance.objectId),
     },
   };
+
+  if (!isDefaultComponentType(instance.stormworksType)) {
+    componentElement["@_type"] = instance.stormworksType;
+  }
+
   const objectElement = asTreeElement(componentElement.object);
 
   applyInstanceAttributes(componentElement, instance, warnings, options, documentPath, moduleId);
@@ -746,7 +758,33 @@ function applyInstanceAttributes(
       continue;
     }
 
+    // Two narrow, evidence-based omission cases confirmed by comparing our export against a file
+    // Stormworks itself re-saved after loading it: xmlDelta-encoded properties (composite
+    // channel/offset) represent "unset" as an omitted XML attribute, and empty-string properties
+    // (e.g. PROPERTY_TOGGLE's label) are always omitted when empty, independent of other sibling
+    // properties (e.g. on_label/off_label) being customized. Non-empty, non-delta defaults (e.g.
+    // PROPERTY_TOGGLE's on_label="On", EQUAL's epsilon=0.0001) are NOT safe to omit this way:
+    // Stormworks keeps those explicit once written, so this check stays narrow to the two cases above.
+    const declaredDefault = instance.definition?.defaults?.[propertyDefinition.key];
+    const isOmittableDefault =
+      declaredDefault !== undefined &&
+      scalarValue === declaredDefault &&
+      (propertyDefinition.xmlDelta !== undefined || declaredDefault === "");
+
+    if (isOmittableDefault) {
+      continue;
+    }
+
     for (const target of targets) {
+      // A third evidence-based case from the same comparison: paired text/value numeric targets
+      // (min/max/n/v/e-style properties) always keep @text, but Stormworks omits the numeric @value
+      // mirror specifically when the value is exactly 0 (any other value, including negatives and
+      // decimals, keeps @value). Confirmed across every zero-valued instance in the sample file with
+      // no counterexample, independent of whether 0 happens to be that property's declared default.
+      if (target.xmlPath.endsWith(".@value") && target.valueType === "number" && xmlValue === 0) {
+        continue;
+      }
+
       applyXmlWriteTarget(componentElement, target, xmlValue);
     }
   }
@@ -1005,10 +1043,15 @@ function buildBridgeComponentElement(
   projectOutputBindings: Map<string, NetProducer[]>,
   warnings: string[],
 ): StormworksXmlTreeElement {
-  return {
-    "@_type": projectNode.bridgeType,
+  const element: StormworksXmlTreeElement = {
     object: buildBridgeObjectElement(projectNode, portSlotsByProjectNodeId, projectOutputBindings, warnings),
   };
+
+  if (!isDefaultComponentType(projectNode.bridgeType)) {
+    element["@_type"] = projectNode.bridgeType;
+  }
+
+  return element;
 }
 
 // Emit the bridge object shared by both bridge components and bridge states.

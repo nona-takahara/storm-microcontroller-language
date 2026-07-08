@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // CLI entrypoint that exposes the standard xml2dsl/dsl2xml workflow and related validation commands.
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
