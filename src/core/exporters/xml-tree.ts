@@ -785,7 +785,7 @@ function applyInstanceAttributes(
         continue;
       }
 
-      applyXmlWriteTarget(componentElement, target, xmlValue);
+      applyXmlWriteTarget(componentElement, target, xmlValue, warnings);
     }
   }
 }
@@ -1196,6 +1196,7 @@ function createDefaultWriteTargets(propertyDefinition: NodePropertyDefinition): 
         {
           xmlPath: propertyDefinition.source.xmlPath,
           valueType: propertyDefinition.valueType,
+          itemList: propertyDefinition.source.itemList,
         },
       ]
     : [];
@@ -1206,6 +1207,7 @@ function applyXmlWriteTarget(
   componentElement: StormworksXmlTreeElement,
   writeTarget: NodePropertyWriteTarget,
   value: IrScalarValue,
+  warnings: string[],
 ): void {
   const segments = writeTarget.xmlPath.split(".").filter((segment) => segment.length > 0);
   let current: StormworksXmlTreeElement = componentElement;
@@ -1223,6 +1225,11 @@ function applyXmlWriteTarget(
       return;
     }
 
+    if (writeTarget.itemList && index === segments.length - 1) {
+      applyItemListWriteTarget(current, segment, value, warnings);
+      return;
+    }
+
     const existing = current[segment];
 
     if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
@@ -1234,6 +1241,59 @@ function applyXmlWriteTarget(
     current[segment] = next;
     current = next;
   }
+}
+
+// Reconstruct a Selector-style <items><i l=".."><v text=".." value=".."/></i></items> subtree from the
+// {l, value} JSON array produced by extractItemListValue; text and value are written back identically
+// since this property collapses them into a single field (see issue #15's known-limitations note).
+function applyItemListWriteTarget(
+  current: StormworksXmlTreeElement,
+  segment: string,
+  value: IrScalarValue,
+  warnings: string[],
+): void {
+  if (typeof value !== "string") {
+    warnings.push(`Expected a JSON string for item-list target ${segment}.`);
+    return;
+  }
+
+  let items: unknown;
+
+  try {
+    items = JSON.parse(value);
+  } catch {
+    warnings.push(`Failed to parse JSON for item-list target ${segment}; left unset.`);
+    return;
+  }
+
+  if (!Array.isArray(items)) {
+    warnings.push(`Expected a JSON array for item-list target ${segment}; left unset.`);
+    return;
+  }
+
+  current[segment] = {
+    i: items.map((item) => {
+      const record = item as { l?: unknown; value?: unknown };
+      const itemValue = toXmlTreeScalar(record.value);
+
+      return {
+        "@_l": toXmlTreeScalar(record.l),
+        v: {
+          "@_text": itemValue,
+          "@_value": itemValue,
+        },
+      };
+    }),
+  };
+}
+
+// Narrow an arbitrary JSON value down to the scalar shape the XML tree accepts.
+function toXmlTreeScalar(value: unknown): StormworksXmlTreeScalar {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null) {
+    return value;
+  }
+
+  return null;
 }
 
 // Map a DSL input key back to the XML-side in*/inc name expected by Stormworks.

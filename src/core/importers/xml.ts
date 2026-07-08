@@ -1063,6 +1063,10 @@ function extractPropertyValue(
     return undefined;
   }
 
+  if (source.itemList) {
+    return extractItemListValue(rawValue);
+  }
+
   const numericValue = coerceScalarValue(rawValue, "number");
 
   if (enumMapping !== undefined && typeof numericValue === "number") {
@@ -1114,6 +1118,36 @@ function coerceScalarValue(value: unknown, valueType: DefinitionValueType): IrSc
   }
 
   return undefined;
+}
+
+// Read a Selector-style <items><i l=".."><v text=".." value=".."/></i></items> list into a stable
+// {l, value} JSON array; attribute values are kept as raw strings to avoid numeric formatting drift.
+// A childless self-closing <items/> parses to "" (not an object) and is treated as "no items" here.
+function extractItemListValue(rawValue: unknown): IrScalarValue | undefined {
+  const record = asRecord(rawValue);
+
+  if (!record) {
+    return undefined;
+  }
+
+  const rawItems = record.i;
+  const itemRecords = rawItems === undefined ? [] : Array.isArray(rawItems) ? rawItems : [rawItems];
+
+  if (itemRecords.length === 0) {
+    return undefined;
+  }
+
+  const items = itemRecords.map((itemValue) => {
+    const itemRecord = asRecord(itemValue) ?? {};
+    const valueRecord = asRecord(itemRecord.v) ?? {};
+
+    return {
+      l: getAttribute(itemRecord, "l") ?? null,
+      value: getAttribute(valueRecord, "value") ?? getAttribute(valueRecord, "text") ?? null,
+    };
+  });
+
+  return JSON.stringify(items);
 }
 
 // Coerce unclaimed object attributes into best-effort scalar values for generic round-tripping.
