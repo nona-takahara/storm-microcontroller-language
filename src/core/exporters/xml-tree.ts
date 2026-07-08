@@ -629,13 +629,21 @@ function buildProjectOutputBindingIndex(
   return bindings;
 }
 
+// Stormworks omits type="0" (the default component/node/bridge type) from authored XML.
+function isDefaultComponentType(type: string): boolean {
+  return type === "0";
+}
+
 // Emit one <nodes><n> element for a project-facing pin.
 function buildProjectNodeElement(projectNode: ProjectNodeContext): StormworksXmlTreeElement {
   const nodeElement: StormworksXmlTreeElement = {
     "@_label": projectNode.document.label ?? projectNode.document.id,
-    "@_type": projectNode.definition.stormworks.type,
     "@_description": projectNode.document.description ?? "",
   };
+
+  if (!isDefaultComponentType(projectNode.definition.stormworks.type)) {
+    nodeElement["@_type"] = projectNode.definition.stormworks.type;
+  }
 
   if (projectNode.definition.stormworks.mode !== undefined) {
     nodeElement["@_mode"] = projectNode.definition.stormworks.mode;
@@ -664,11 +672,15 @@ function buildComponentElement(
   moduleId: string,
 ): StormworksXmlTreeElement {
   const componentElement: StormworksXmlTreeElement = {
-    "@_type": instance.stormworksType,
     object: {
       "@_id": String(instance.objectId),
     },
   };
+
+  if (!isDefaultComponentType(instance.stormworksType)) {
+    componentElement["@_type"] = instance.stormworksType;
+  }
+
   const objectElement = asTreeElement(componentElement.object);
 
   applyInstanceAttributes(componentElement, instance, warnings, options, documentPath, moduleId);
@@ -1005,10 +1017,15 @@ function buildBridgeComponentElement(
   projectOutputBindings: Map<string, NetProducer[]>,
   warnings: string[],
 ): StormworksXmlTreeElement {
-  return {
-    "@_type": projectNode.bridgeType,
+  const element: StormworksXmlTreeElement = {
     object: buildBridgeObjectElement(projectNode, portSlotsByProjectNodeId, projectOutputBindings, warnings),
   };
+
+  if (!isDefaultComponentType(projectNode.bridgeType)) {
+    element["@_type"] = projectNode.bridgeType;
+  }
+
+  return element;
 }
 
 // Emit the bridge object shared by both bridge components and bridge states.
