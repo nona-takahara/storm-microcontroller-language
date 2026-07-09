@@ -4,9 +4,12 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, "..");
-const sourcePath = resolve(projectRoot, "src", "definitions.json");
 const destinationDir = resolve(projectRoot, "dist");
-const destinationPath = resolve(destinationDir, "definitions.json");
+
+const bundledJsonFileNames = ["definitions.json", "node-behavior-notes.json", "stormworks-system-notes.json"];
 
 await mkdir(destinationDir, { recursive: true });
-await cp(sourcePath, destinationPath);
+
+for (const fileName of bundledJsonFileNames) {
+  await cp(resolve(projectRoot, "src", fileName), resolve(destinationDir, fileName));
+}

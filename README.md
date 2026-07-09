@@ -54,7 +54,15 @@ pnpm cli check-dsl <project.json>
 
 # DSL の型チェック（ポートの signal 種別の整合性確認）
 pnpm cli typecheck-dsl <project.json>
+
+# ゲート仕様・本ツールの挙動を引く（引数無しだとツール規約とStormworks全体仕様の概要）
+pnpm cli spec
+pnpm cli spec --list                 # 全ゲートID一覧
+pnpm cli spec SR_LATCH                # 指定ゲートの入出力・プロパティ・既知の挙動メモ
+pnpm cli spec SR_LATCH --json         # 機械可読なJSON出力
 ```
+
+`spec` は、ソースコードを読まなくても人間・AIエージェント双方がゲートやツールの挙動を把握できるようにするためのコマンドです（Issue #5）。ポート・プロパティの構造情報に加え、`src/node-behavior-notes.json` / `src/stormworks-system-notes.json` に記録された実機での既知の挙動（未確認の情報も確信度付きで隠さず表示）を返します。
 
 ## DSL 形式
 

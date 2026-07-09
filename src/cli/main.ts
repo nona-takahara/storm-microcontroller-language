@@ -4,13 +4,21 @@ import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import {
+  buildGateSpec,
+  buildSpecOverview,
   buildStormworksXmlFromProjectSource,
   buildStormworksXmlTreeFromProjectSource,
   compareSwNetIdentifier,
   createFileSystemProjectSourceDocumentLoader,
+  formatGateSpecListText,
+  formatGateSpecText,
   formatPortOccurrenceKey,
+  formatSpecOverviewText,
   importStormworksXmlToProjectSource,
+  listGateSpecSummaries,
+  loadBundledNodeBehaviorNotes,
   loadBundledNodeDefinitions,
+  loadBundledStormworksSystemNotes,
   loadProjectSourceFromProjectJsonFile,
   readSwNetAndOptionalSwMcl,
   readUtf8TextFile,
@@ -56,6 +64,8 @@ export async function main(argv: string[]): Promise<number> {
       return runImportXmlCommand(rest);
     case "layout-dsl":
       return runLayoutDslCommand(rest);
+    case "spec":
+      return runSpecCommand(rest);
     default:
       printUsage();
       return command ? 1 : 0;
@@ -277,6 +287,43 @@ async function runImportXmlCommand(args: string[]): Promise<number> {
   });
 
   console.log(JSON.stringify(result.program, null, 2));
+  return 0;
+}
+
+// Look up gate/tool behavior spec: no args prints the tool+system overview, --list enumerates
+// every definition id, and a bare id prints that gate's full port/property/behavior-notes spec.
+async function runSpecCommand(args: string[]): Promise<number> {
+  const parsedArgs = parseSpecArgs(args);
+
+  if (!parsedArgs) {
+    printUsage();
+    return 1;
+  }
+
+  const definitions = await loadBundledNodeDefinitions();
+
+  if (parsedArgs.list) {
+    const summaries = listGateSpecSummaries(definitions);
+    console.log(parsedArgs.json ? JSON.stringify(summaries, null, 2) : formatGateSpecListText(summaries));
+    return 0;
+  }
+
+  if (parsedArgs.gateId) {
+    const notesDoc = await loadBundledNodeBehaviorNotes();
+    const spec = buildGateSpec(parsedArgs.gateId, definitions, notesDoc);
+
+    if (!spec) {
+      console.error(`Unknown gate id: ${parsedArgs.gateId}. Run \`storm-mcl spec --list\` to see valid ids.`);
+      return 1;
+    }
+
+    console.log(parsedArgs.json ? JSON.stringify(spec, null, 2) : formatGateSpecText(spec));
+    return 0;
+  }
+
+  const systemNotes = await loadBundledStormworksSystemNotes();
+  const overview = buildSpecOverview(systemNotes);
+  console.log(parsedArgs.json ? JSON.stringify(overview, null, 2) : formatSpecOverviewText(overview));
   return 0;
 }
 
@@ -564,6 +611,44 @@ function parseLayoutDslArgs(args: string[]): LayoutDslArgs | undefined {
   };
 }
 
+interface SpecArgs {
+  gateId?: string;
+  list: boolean;
+  json: boolean;
+}
+
+// Parse spec-specific command-line arguments: at most one gate id, exclusive with --list.
+function parseSpecArgs(args: string[]): SpecArgs | undefined {
+  let gateId: string | undefined;
+  let list = false;
+  let json = false;
+
+  for (const arg of args) {
+    if (arg === "--list") {
+      list = true;
+      continue;
+    }
+
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+
+    if (!gateId) {
+      gateId = arg;
+      continue;
+    }
+
+    return undefined;
+  }
+
+  if (list && gateId !== undefined) {
+    return undefined;
+  }
+
+  return { gateId, list, json };
+}
+
 // Parse xml2dsl-specific command-line arguments.
 function parseXml2DslArgs(
   args: string[],
@@ -694,6 +779,7 @@ function printUsage(): void {
   console.log(
     "  storm-mcl layout-dsl <project.json> [--module <id>] [--document <path>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]",
   );
+  console.log("  storm-mcl spec [<definitionId>] [--list] [--json]");
   console.log("");
   console.log("Legacy / debug:");
   console.log("  storm-mcl import-xml <input.xml>");

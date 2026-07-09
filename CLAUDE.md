@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm build          # tsc compile + copy src/definitions.json to dist/
+pnpm build          # tsc compile + copy bundled JSON assets (definitions.json, node-behavior-notes.json, stormworks-system-notes.json) to dist/
 pnpm check          # type-check only (no emit)
 pnpm cli <args>     # run CLI directly via tsx (no build required)
 ```
@@ -19,6 +19,7 @@ pnpm cli xml2dsl <input.xml> --out-dir <output-dir>   # Stormworks XML → proje
 pnpm cli dsl2xml <project.json> --out <output.xml>    # project.json + sw-net + sw-mcl → XML
 pnpm cli check-dsl <project.json>
 pnpm cli typecheck-dsl <project.json>
+pnpm cli spec [<definitionId>] [--list] [--json]   # gate/tool behavior reference, see below
 ```
 
 ## Architecture
@@ -50,6 +51,9 @@ All formats pass through `IrProgram` (nodes + links + submodules + metadata). Th
 The single source of truth for all gate definitions. Maps Stormworks XML `type` numbers to DSL `definitionId`s, including port signals and property XML paths. `scripts/copy-definitions.mjs` copies this file to `dist/` at build time. Schema version is enforced (`NODE_DEFINITIONS_SCHEMA_VERSION = "10"`). `definitions/sample/` is intentionally empty (the directory exists for historical reasons).
 
 Gate coverage as of the current definitions: all known boolean logic, arithmetic, comparison, control (PID/timer/counter), composite signal, property, debug, and Lua gates are defined. Unknown XML types pass through as `LOGIC_COMPONENT:<type>` with a warning.
+
+**Behavior-notes knowledge base & `spec` command** — `src/node-behavior-notes.json`, `src/stormworks-system-notes.json`  
+`definitions.json` only covers structure (ports/properties/XML mapping); it says nothing about *actual* in-game behavior. These two hand-curated JSON files hold that knowledge: `node-behavior-notes.json` has per-gate notes keyed by `definitionId` (each with `category`/`confidence`/`source`, confidence being `"verified" | "inferred" | "unconfirmed"`), `stormworks-system-notes.json` has platform-wide notes not tied to one gate (tick rate, execution order, composite channel layout, etc.). Both are parsed by `src/core/behavior-notes/schema.ts` and loaded via `src/infra/fs/bundled-behavior-notes-loader.ts` (same bundling pattern as `bundled-definitions-loader.ts` — copied to `dist/` by `scripts/copy-definitions.mjs`). `src/core/spec/gate-spec.ts` merges definitions + behavior notes + a hardcoded `src/core/spec/tool-conventions.ts` list (this tool's own non-obvious conventions, e.g. `.sw-net` quoting rules) into the `storm-mcl spec` CLI command's output. Editing content: the human-authoring surface is `notes/gate-behavior/*.md` (free-form Japanese, one file per gate category); `NODE_BEHAVIOR_NOTES_GUIDE.md` explains the workflow. About 24 of 66 gates currently have empty `notes` (textbook-obvious gates and the `PROPERTY_*` widgets) — this is an intentional, current gap, and `spec` reports it honestly rather than staying silent.
 
 **Public API split:**
 - `src/index.ts` — browser-safe, pure logic only (no Node.js I/O)
