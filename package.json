@@ -5,6 +5,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -20,10 +23,11 @@
     "storm-mcl-mcp": "./dist/mcp/server.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node ./scripts/copy-definitions.mjs",
+    "build": "tsc -p tsconfig.json && node ./scripts/postbuild.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
     "cli": "node --import tsx ./src/cli/main.ts",
-    "mcp": "node --import tsx ./src/mcp/server.ts"
+    "mcp": "node --import tsx ./src/mcp/server.ts",
+    "prepack": "npm run build"
   },
   "keywords": [
     "stormworks",

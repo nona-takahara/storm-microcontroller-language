@@ -40,6 +40,7 @@ export interface GateSpec {
   properties: GateSpecProperty[];
   notes: BehaviorNote[];
   relatedIssues: number[];
+  usageExample: string;
 }
 
 // Look up one gate/project-node definition by id and merge in its behavior notes, if any.
@@ -68,18 +69,81 @@ export function buildGateSpec(
   }));
 
   const behaviorEntry = notesDoc.entries[definition.id];
+  const inputs = definition.ports.inputs.map(toGateSpecPort);
+  const outputs = definition.ports.outputs.map(toGateSpecPort);
 
   return {
     id: definition.id,
     displayName: definition.displayName,
     category: definition.category,
     stormworksBinding,
-    inputs: definition.ports.inputs.map(toGateSpecPort),
-    outputs: definition.ports.outputs.map(toGateSpecPort),
+    inputs,
+    outputs,
     properties,
     notes: behaviorEntry?.notes ?? [],
     relatedIssues: behaviorEntry?.relatedIssues ?? [],
+    usageExample: buildUsageExample(definition.id, definition.category, definition.displayName, inputs, outputs, properties),
   };
+}
+
+// Build a minimal, syntactically valid .sw-net snippet showing how to instantiate this gate.
+// "project" category ids are project I/O pins (declared via `port in/out`, not `inst`); every
+// other category is a logic component/gate (declared via `inst`).
+function buildUsageExample(
+  id: string,
+  category: string,
+  displayName: string,
+  inputs: GateSpecPort[],
+  outputs: GateSpecPort[],
+  properties: GateSpecProperty[],
+): string {
+  if (category === "project") {
+    // Project pins have exactly one port total: an output means it's an external input into the
+    // module (`port in`), an input means it's an external output out of the module (`port out`).
+    const direction = outputs.length > 0 ? "in" : "out";
+    const signal = (outputs[0] ?? inputs[0])?.signal ?? "unknown";
+    return `port ${direction} "${displayName}" : ${signal}`;
+  }
+
+  const propertyAssignments = properties
+    .filter((property) => property.required || property.default !== undefined)
+    .map((property) => `${property.key}=${formatExamplePropertyValue(property)}`)
+    .join(", ");
+  const propertiesSuffix = propertyAssignments.length > 0 ? ` (${propertyAssignments})` : "";
+
+  const inputAssignments = inputs.map((port) => `${port.key}=${toNetPlaceholder(port.key)}`).join(", ");
+  const outputAssignments = outputs.map((port) => `${port.key}=${toNetPlaceholder(port.key)}`).join(", ");
+
+  return `inst ${id} ${toInstanceNamePlaceholder(id)}${propertiesSuffix} : ${inputAssignments} -> ${outputAssignments}`;
+}
+
+function formatExamplePropertyValue(property: GateSpecProperty): string {
+  if (property.default !== undefined) {
+    return property.valueType === "string" ? JSON.stringify(String(property.default)) : String(property.default);
+  }
+
+  if (property.enumOptions && property.enumOptions.length > 0) {
+    return JSON.stringify(property.enumOptions[0]);
+  }
+
+  if (property.valueType === "string") {
+    return '"..."';
+  }
+
+  return property.valueType === "boolean" ? "false" : "0";
+}
+
+function toNetPlaceholder(portKey: string): string {
+  return `${toCamelCase(portKey)}Net`;
+}
+
+function toInstanceNamePlaceholder(id: string): string {
+  return `${toCamelCase(id)}1`;
+}
+
+function toCamelCase(snakeOrLowerCaseKey: string): string {
+  const [first, ...rest] = snakeOrLowerCaseKey.toLowerCase().split("_");
+  return [first, ...rest.map((part) => (part ? part[0]!.toUpperCase() + part.slice(1) : part))].join("");
 }
 
 // Render one gate spec as self-contained human/AI-readable text.
@@ -102,6 +166,10 @@ export function formatGateSpecText(spec: GateSpec): string {
       lines.push(formatPropertyLine(property));
     }
   }
+
+  lines.push("");
+  lines.push("Minimal .sw-net usage example:");
+  lines.push(`  ${spec.usageExample}`);
 
   lines.push("");
   lines.push("Known behavior notes:");

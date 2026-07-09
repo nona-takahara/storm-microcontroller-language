@@ -13,7 +13,7 @@
         {
           "text": "Stormworksの内部処理は60Hzで動作する。",
           "confidence": "verified",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         }
       ]
     },
@@ -28,17 +28,17 @@
         {
           "text": "Video/Audio以外のコンポーネントは各tickで1回だけ全体が評価される。前tickの出力値が今tickの入力として使われる(フィードバックループを組むと値は1tick遅れて伝播する)。",
           "confidence": "verified",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         },
         {
           "text": "モニタが接続されている場合、Video系コンポーネントは毎フレームごとに走査される。",
           "confidence": "verified",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         },
         {
           "text": "Audio系もVideoと同様に毎フレーム走査される可能性が高いが未調査。",
           "confidence": "unconfirmed",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         }
       ]
     },
@@ -56,7 +56,7 @@
         {
           "text": "DSL側のchannel番号はUIやLuaのAPIと同じ1-originで揃えられている。",
           "confidence": "verified",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         }
       ]
     },
@@ -71,17 +71,17 @@
         {
           "text": "Luaスクリプトはビークルがロードされたタイミングで1度実行(初期化)され、以降はtickごとにonTickが呼び出される。",
           "confidence": "verified",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         },
         {
           "text": "モニタに接続されている場合のみ、描画タイミングごとにonDrawが呼び出される。onDrawとonTickは必ずしも同期しない。",
           "confidence": "verified",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         },
         {
           "text": "Luaによる描画コンポーネントのチェーンが一定数(32個程度以上?)連結されると「ループ」と判定される。正確な閾値は未確認。",
           "confidence": "unconfirmed",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         }
       ]
     },
@@ -96,7 +96,7 @@
         {
           "text": "レイアウターは6x6のピン配置までしか対応しないため、実質36ピンが上限。Composite / (On-OffとNumber) がそれぞれ別グループとして扱われ、グループごとに36ピンとなる。",
           "confidence": "verified",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（プレイ経験に基づく記入、2026-07-09）"
         }
       ]
     },
@@ -115,7 +115,7 @@
         {
           "text": "storm-mcl(本ツール)はプロパティのデフォルト値を明示的にXML出力する設計であり、明示的に値を与えないとXML化できない仕様になっている。デフォルト値を明示指定した場合にXML上でその属性を消去するか維持するかはツールの内部実装の都合で決まるため一見一貫性がないように見えるが、挙動上の問題はない。",
           "confidence": "verified",
-          "source": "ユーザーによるツール設計の説明（ターン2、2026-07-09）"
+          "source": "notes/gate-behavior/system.md（ツール設計者本人による説明、2026-07-09）"
         }
       ]
     }
