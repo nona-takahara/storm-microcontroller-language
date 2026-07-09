@@ -4,25 +4,47 @@
   "entries": {
     "tick-rate": {
       "title": "マイコンの実行周期（tick rate）",
-      "status": "todo",
+      "status": "done",
       "relatedIssues": [],
       "focusHints": [
         "TIMER/CAPACITOR等のプロパティに秒数を書いた場合、実機の時間感覚とズレないか（tick周期との換算）"
       ],
-      "notes": []
+      "notes": [
+        {
+          "text": "Stormworksの内部処理は60Hzで動作する。",
+          "confidence": "verified",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        }
+      ]
     },
     "execution-order": {
       "title": "コンポーネント間の評価順序",
-      "status": "todo",
+      "status": "done",
       "relatedIssues": [],
       "focusHints": [
         "フィードバックループ（自己参照的な配線）を組んだ場合、DSLの見た目通りに値が伝播するか、1tick遅れる境界がどこか"
       ],
-      "notes": []
+      "notes": [
+        {
+          "text": "Video/Audio以外のコンポーネントは各tickで1回だけ全体が評価される。前tickの出力値が今tickの入力として使われる(フィードバックループを組むと値は1tick遅れて伝播する)。",
+          "confidence": "verified",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        },
+        {
+          "text": "モニタが接続されている場合、Video系コンポーネントは毎フレームごとに走査される。",
+          "confidence": "verified",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        },
+        {
+          "text": "Audio系もVideoと同様に毎フレーム走査される可能性が高いが未調査。",
+          "confidence": "unconfirmed",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        }
+      ]
     },
     "composite-signal-layout": {
       "title": "Composite信号のチャンネル数・レイアウト",
-      "status": "todo",
+      "status": "done",
       "relatedIssues": [
         3,
         4
@@ -30,29 +52,57 @@
       "focusHints": [
         "COMPOSITE_READ/WRITE系のchannelプロパティが0始まりか1始まりか（DSLに書いた番号と実機のチャンネル表示がズレないか。#3）"
       ],
-      "notes": []
+      "notes": [
+        {
+          "text": "DSL側のchannel番号はUIやLuaのAPIと同じ1-originで揃えられている。",
+          "confidence": "verified",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        }
+      ]
     },
     "lua-script-api": {
       "title": "LUAコンポーネントのスクリプトAPI",
-      "status": "todo",
+      "status": "done",
       "relatedIssues": [],
       "focusHints": [
         "DSLからscript_refで参照したLuaファイルが、実機でどのタイミング・引数で呼ばれるか"
       ],
-      "notes": []
+      "notes": [
+        {
+          "text": "Luaスクリプトはビークルがロードされたタイミングで1度実行(初期化)され、以降はtickごとにonTickが呼び出される。",
+          "confidence": "verified",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        },
+        {
+          "text": "モニタに接続されている場合のみ、描画タイミングごとにonDrawが呼び出される。onDrawとonTickは必ずしも同期しない。",
+          "confidence": "verified",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        },
+        {
+          "text": "Luaによる描画コンポーネントのチェーンが一定数(32個程度以上?)連結されると「ループ」と判定される。正確な閾値は未確認。",
+          "confidence": "unconfirmed",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        }
+      ]
     },
     "project-io-limits": {
       "title": "マイコンの入出力ピン数・種別ごとの上限",
-      "status": "todo",
+      "status": "done",
       "relatedIssues": [],
       "focusHints": [
         "DSLでピンを増やしすぎた場合、実機側で上限に達して読み込めない等の事態が起きないか"
       ],
-      "notes": []
+      "notes": [
+        {
+          "text": "レイアウターは6x6のピン配置までしか対応しないため、実質36ピンが上限。Composite / (On-OffとNumber) がそれぞれ別グループとして扱われ、グループごとに36ピンとなる。",
+          "confidence": "verified",
+          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+        }
+      ]
     },
     "xml-serialization-conventions": {
       "title": "XML保存時の一般的な省略規則",
-      "status": "todo",
+      "status": "done",
       "relatedIssues": [
         1,
         11,
@@ -61,7 +111,13 @@
       "focusHints": [
         "デフォルト値のままXML化した場合に、実機で読み込み直しても本当に同じ状態が再現されるか（#1, #11, #13）"
       ],
-      "notes": []
+      "notes": [
+        {
+          "text": "storm-mcl(本ツール)はプロパティのデフォルト値を明示的にXML出力する設計であり、明示的に値を与えないとXML化できない仕様になっている。デフォルト値を明示指定した場合にXML上でその属性を消去するか維持するかはツールの内部実装の都合で決まるため一見一貫性がないように見えるが、挙動上の問題はない。",
+          "confidence": "verified",
+          "source": "ユーザーによるツール設計の説明（ターン2、2026-07-09）"
+        }
+      ]
     }
   }
 }
