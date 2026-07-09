@@ -806,6 +806,12 @@
           "text": "Set/Resetが同時に真になった場合、Q=falseになる(NOR型SRラッチの挙動)。",
           "confidence": "verified",
           "source": "ユーザーによる実機動作確認（2026-07-09）"
+        },
+        {
+          "category": "edge-case",
+          "text": "SR_LATCHには q(Q) と not_q(not Q) の2つの出力ポートがある。S=R=trueのとき、Q=falseだけでなくnot_Qもfalseになる(=not_Qは¬Qと一致しなくなり、通常の相補関係が崩れる)。",
+          "confidence": "inferred",
+          "source": "ユーザーの記憶に基づく記述、要再確認（2026-07-09）"
         }
       ]
     },
