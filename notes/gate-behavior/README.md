@@ -21,20 +21,20 @@ Issue #5 / #4 向けの記入作業用ファイル一式です。書き方の詳
 
 ## チェックリスト
 
-- [ ] [`system.md`](./system.md) — Stormworks全体の仕様（6件）
-- [ ] [`logic-flip-flop.md`](./logic-flip-flop.md) — ラッチ・フリップフロップ系（logic-flip-flop）（2件）（優先度高: issue #4で名指しされたゲートを含む）
-- [ ] [`control.md`](./control.md) — 制御系（control）— タイマー・PID・カウンター・容量など（12件）（優先度高: issue #4で名指しされたゲートを含む）
-- [ ] [`composite.md`](./composite.md) — Composite信号の合成・分岐系（composite）（5件）（優先度高: issue #4で名指しされたゲートを含む）
-- [ ] [`composite-read.md`](./composite-read.md) — Composite信号の読み取り系（composite-read）（2件）（優先度高: issue #3で名指しされたゲートを含む）
-- [ ] [`comparison.md`](./comparison.md) — 比較系（comparison）（3件）
-- [ ] [`arithmetic.md`](./arithmetic.md) — 算術・関数系（arithmetic）（12件）
-- [ ] [`logic-bool.md`](./logic-bool.md) — 論理ゲート系（logic-bool）（10件）
-- [ ] [`value.md`](./value.md) — 定数系（value）（2件）
-- [ ] [`property.md`](./property.md) — プロパティ系（property）— マイコンの外部UI要素（5件）
-- [ ] [`composite-write.md`](./composite-write.md) — Composite信号の書き込み系（composite-write）（2件）
-- [ ] [`debug.md`](./debug.md) — デバッグ表示系（debug）（2件）
-- [ ] [`script.md`](./script.md) — スクリプト系（script）（1件）
-- [ ] [`project.md`](./project.md) — プロジェクト入出力ピン系（project）（8件）
+- [x] [`system.md`](./system.md) — Stormworks全体の仕様（6件）
+- [x] [`logic-flip-flop.md`](./logic-flip-flop.md) — ラッチ・フリップフロップ系（logic-flip-flop）（2件）（優先度高: issue #4で名指しされたゲートを含む）
+- [x] [`control.md`](./control.md) — 制御系（control）— タイマー・PID・カウンター・容量など（12件）（優先度高: issue #4で名指しされたゲートを含む）
+- [x] [`composite.md`](./composite.md) — Composite信号の合成・分岐系（composite）（5件）（優先度高: issue #4で名指しされたゲートを含む）
+- [x] [`composite-read.md`](./composite-read.md) — Composite信号の読み取り系（composite-read）（2件）（優先度高: issue #3で名指しされたゲートを含む）
+- [x] [`comparison.md`](./comparison.md) — 比較系（comparison）（3件）
+- [x] [`arithmetic.md`](./arithmetic.md) — 算術・関数系（arithmetic）（12件）
+- [x] [`logic-bool.md`](./logic-bool.md) — 論理ゲート系（logic-bool）（10件）
+- [x] [`value.md`](./value.md) — 定数系（value）（2件）
+- [x] [`property.md`](./property.md) — プロパティ系（property）— マイコンの外部UI要素（5件）
+- [x] [`composite-write.md`](./composite-write.md) — Composite信号の書き込み系（composite-write）（2件）
+- [x] [`debug.md`](./debug.md) — デバッグ表示系（debug）（2件）
+- [x] [`script.md`](./script.md) — スクリプト系（script）（1件）
+- [x] [`project.md`](./project.md) — プロジェクト入出力ピン系（project）（8件）
 
 ---
 
