@@ -3,11 +3,12 @@
 Issue #5（仕様引きCLIサブコマンド）・Issue #4（未文書化のゲート挙動）向けの3ターン作業のうち、
 このガイドは **ターン1の成果物** です。
 
-- `src/node-behavior-notes.json` — 個々のゲート/ノード（66種類）ごとの挙動メモのひな形
-- `src/stormworks-system-notes.json` — 特定のゲートに紐づかない、Stormworks全体に共通する仕様のひな形（tick周期・composite信号のレイアウト等）
+- `notes/gate-behavior/*.md` — **ターン2であなたが実際に書き込むファイル。** カテゴリ別に分割されたMarkdown。自由な日本語で記入します（JSON編集は不要）。まずは [`notes/gate-behavior/README.md`](./notes/gate-behavior/README.md) を開いてください。
+- `src/node-behavior-notes.json` / `src/stormworks-system-notes.json` — 内部的な構造化データのひな形。Markdownに書いた内容をターン3でClaudeがここへ変換します。**直接編集する必要はありません**（対応関係を知りたい場合の参考として後述します）。
 
-このガイドを読んだ上で、**ターン2ではこの2つのJSONファイルの `notes` 配列を日本語で埋めてください。**
-ターン3でClaudeが内容を整形し、`storm-mcl spec` コマンド（Issue #5）としてAIエージェントが直接参照できる形にします。
+**ターン2でやることは1つだけです: `notes/gate-behavior/` 以下のMarkdownファイルに、知っているゲートの挙動を自由な日本語で書く。**
+ターン3でClaudeが内容を構造化データへ変換し、`docs/gate-spec/` にゲートごとの仕様文書を生成した上で、
+それを返すだけのCLIコマンド（`storm-mcl spec <ID>`, Issue #5）を実装します。
 
 ---
 
@@ -28,8 +29,9 @@ AIが二度と同じ調査をしなくて済むようにするためのもので
 ## AIが特に調べがちな情報カテゴリ
 
 過去のIssueで実際に発生した「AIが調べざるを得なかった情報」を、カテゴリとして整理しました。
-`focusHints` フィールドには、各ゲートについてこのカテゴリのうち関連しそうなものを自動生成で
-事前に書き込んであります（ターン2で記入する際の出発点として使ってください。的外れなら無視してOKです）。
+`notes/gate-behavior/*.md` の各ゲート見出しの下には、このカテゴリのうち関連しそうなものが
+「ヒント」として引用ブロックで事前に書き込んであります（記入時の呼び水として使ってください。
+全部に答える必要はなく、的外れなら無視してOKです）。
 
 | カテゴリ | 内容 | 実例（Issue） |
 |---|---|---|
@@ -43,14 +45,53 @@ AIが二度と同じ調査をしなくて済むようにするためのもので
 | UI状態と実挙動の区別 (ui-only-state) | ゲーム内エディタの見た目だけに影響し、機能的な挙動には影響しない差分かどうか | #11 |
 | 境界値・エッジケース (edge-case) | 0除算、オーバーフロー、NaN、未接続ポート等の扱い | — |
 
-これらのカテゴリはあくまで目安です。`notes` に書き込む際、`category` フィールドに上記の英語タグ
-（`initial-state` / `priority` / `timing` / `truth-table` / `channel-semantics` /
-`serialization-omission` / `round-trip-loss` / `ui-only-state` / `edge-case` / `other`）
-を使うと、ターン3での自動整形がしやすくなります（必須ではありません）。
+これらのカテゴリはあくまで目安です。Markdownに書く際にタグを意識する必要はありません。
+「実機で確認した」「たぶん」「wikiによると」といった自然な言い回しから、ターン3でClaudeが
+確信度（verified/inferred/unconfirmed）やカテゴリを推定します。曖昧で判断できない箇所は、
+ターン3で改めて質問します。
 
 ---
 
-## `src/node-behavior-notes.json` の構造
+## Markdownファイルの書き方
+
+[`notes/gate-behavior/README.md`](./notes/gate-behavior/README.md) にあるチェックリストから、
+好きなファイルを開いてください。各ファイルはこういう構造になっています。
+
+```markdown
+## SR_LATCH（SR Latch）
+（関連: #4）
+
+> ヒント（答えられるものだけで可。分からなければ本文は空欄のままでOK）:
+> - マイコン起動直後（電源投入直後）の初期出力状態
+> - Set/Reset（またはJ/K）が同時に真になった場合の優先順位
+> - 1tick内で入力が複数回変化した場合の扱い
+> - issue #4 で明示的に指摘: リセット/セット優先順位と電源投入直後の初期状態が未確認
+```
+
+ヒントの下の空いている行に、自由な日本語で書いてください。例えば：
+
+```markdown
+> ヒント（答えられるものだけで可。分からなければ本文は空欄のままでOK）:
+> - マイコン起動直後（電源投入直後）の初期出力状態
+> - Set/Reset（またはJ/K）が同時に真になった場合の優先順位
+> - 1tick内で入力が複数回変化した場合の扱い
+> - issue #4 で明示的に指摘: リセット/セット優先順位と電源投入直後の初期状態が未確認
+
+実機で確認したところ、set/resetが同時にtrueだとresetが勝つ。起動直後はfalse固定っぽい
+（CHUSO1800で確認、v1.x系）。
+```
+
+- 箇条書きでも、走り書きの文章でも構いません。「こう配線したらこうなった」という体験談を歓迎します。
+- 分からないゲートは見出しごと空欄のまま残してください（スキップ扱いになります）。全部埋める必要はありません。
+- 各ファイルの先頭にある `<!-- 確認環境: ... -->` の行に、プレイしているバージョンや確認時期を1回書いておくと、
+  挙動がバージョンで変わった場合の手がかりになります（省略可）。
+
+---
+
+## （参考）内部データの構造 — `src/node-behavior-notes.json`
+
+以下は、あなたが書いたMarkdownをターン3でClaudeがどう構造化するかの参考情報です。
+**この節の内容を自分で編集する必要はありません。**
 
 ```jsonc
 {
@@ -62,14 +103,14 @@ AIが二度と同じ調査をしなくて済むようにするためのもので
       "category": "logic-flip-flop",   // 参考情報。編集不要
       "status": "todo",                // 記入したら "done" に変更してください（未確認事項が残るなら "todo" のまま）
       "relatedIssues": [4],            // 参考情報。関連する既知のIssue番号
-      "focusHints": ["..."],           // 参考情報。記入時に確認してほしい観点（自動生成の下書き）
-      "notes": []                      // ★ここにターン2で日本語の情報を追記する
+      "focusHints": ["..."],           // 参考情報。Markdownのヒント引用ブロックの元データ
+      "notes": []                      // ターン3でMarkdownの内容から自動的に埋まる
     }
   }
 }
 ```
 
-### `notes` 配列に追記する1件の形式
+### `notes` 配列の1件の形式（ターン3でClaudeが生成するイメージ）
 
 ```jsonc
 {
@@ -80,28 +121,31 @@ AIが二度と同じ調査をしなくて済むようにするためのもので
 }
 ```
 
-- `text` 以外のフィールドは省略可能です。分かる範囲で構いません。
-- 1つのゲートに対して複数の `notes` エントリを追加してもOKです（カテゴリごとに分ける等）。
-- 分からない・確認できなかった項目は無理に埋めず、`status: "todo"` のままで構いません。空欄のまま残すことも情報です（「未確認」という記録になります）。
+この構造化・確信度の推定は**すべてターン3でClaude側が行います**。あなたがMarkdownに
+自然な日本語で書いた内容から、Claudeがこの形へ変換します。曖昧で自動判定できない箇所があれば、
+ターン3で個別に質問します。
 
 ---
 
-## `src/stormworks-system-notes.json` の構造
+## （参考）`src/stormworks-system-notes.json` の構造
 
 個々のゲートではなく、Stormworksマイコン全体に関わる仕様（tick周期、composite信号のチャンネル数、
-コンポーネント間の実行順序、LUAスクリプトAPIなど）をここに書きます。構造は `node-behavior-notes.json`
+コンポーネント間の実行順序、LUAスクリプトAPIなど）の変換先です。構造は `node-behavior-notes.json`
 とほぼ同じで、`entries` のキーがゲートIDではなくトピックID（`tick-rate`, `execution-order` 等）になっています。
+対応するMarkdownは `notes/gate-behavior/system.md` です。
 
 これは今回の指摘（「Stormworks特有の仕様もコマンドで引けるようにすべき」）を反映したもので、
-ターン3の `spec` コマンドはゲート個別の情報とこの全体仕様の両方を検索・出力できるようにする予定です。
+ターン3の `spec` コマンドはゲート個別の情報とこの全体仕様の両方を出力できるようにする予定です。
 
 ---
 
 ## ターン2でやること（あなた向け）
 
-1. `src/node-behavior-notes.json` を開き、各ゲートの `focusHints` を参考にしながら分かる範囲で `notes` を埋める。
-2. `src/stormworks-system-notes.json` も同様に埋める。
-3. 特にIssue #4で名指しされている4つのゲート（`SR_LATCH`, `CAPACITOR`, `MEMORY_REGISTER`, `COMPOSITE_SWITCHBOX`）と、
-   Issue #3の `COMPOSITE_READ_NUMBER` / `COMPOSITE_READ_BOOLEAN` の channel=null挙動は優先度高めです。
-4. 全ゲートを埋めきる必要はありません。分かるものから、分かる範囲で構いません。JSON構文（カンマ・引用符）だけ壊さないよう注意してください。
-5. 埋め終わったら教えてください。ターン3でClaudeが内容を検証・整形し、`storm-mcl spec` コマンドを実装します。
+1. [`notes/gate-behavior/README.md`](./notes/gate-behavior/README.md) のチェックリストから、好きなファイルを開く。
+2. ヒントを参考にしながら、知っているゲートの挙動を自由な日本語で書く。JSON構文は気にしなくてOK。
+3. 特にIssue #4で名指しされている4つのゲート（`SR_LATCH`, `CAPACITOR`, `MEMORY_REGISTER`, `COMPOSITE_SWITCHBOX`。
+   `logic-flip-flop.md` / `control.md` / `composite.md` に含まれます）と、Issue #3の
+   `COMPOSITE_READ_NUMBER` / `COMPOSITE_READ_BOOLEAN` の channel=null挙動（`composite-read.md`）は優先度高めです。
+4. 全ゲートを埋めきる必要はありません。分かるものから、分かる範囲で構いません。空欄のゲートはそのままでOKです。
+5. 埋め終わったら教えてください。ターン3でClaudeが内容を構造化データへ変換し、
+   `docs/gate-spec/` にゲートごとの仕様文書を生成した上で、それを返すだけの `storm-mcl spec` コマンドを実装します。
