@@ -148,9 +148,9 @@
         },
         {
           "category": "timing",
-          "text": "充電・放電途中(設定時間に満たない間)の出力値の詳細な変化カーブは未確認。",
-          "confidence": "unconfirmed",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "text": "名前は「キャパシタ」だが、アナログ的な充放電カーブは持たない。単なるターンオン・ターンオフディレイ付きのOn/Off入出力バッファーである。",
+          "confidence": "verified",
+          "source": "ユーザーによる実機動作確認（2026-07-09）"
         }
       ]
     },
@@ -803,9 +803,9 @@
         },
         {
           "category": "priority",
-          "text": "Set/Resetが同時に真になった場合、Q=falseになる(NOR型SRラッチの挙動)と思われる。ただし反転出力ポート(Q_B相当)の有無を含め未確認。",
-          "confidence": "unconfirmed",
-          "source": "ユーザーの実プレイ経験に基づく記述（ターン2、2026-07-09）"
+          "text": "Set/Resetが同時に真になった場合、Q=falseになる(NOR型SRラッチの挙動)。",
+          "confidence": "verified",
+          "source": "ユーザーによる実機動作確認（2026-07-09）"
         }
       ]
     },
