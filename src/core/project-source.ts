@@ -84,7 +84,7 @@ export interface StormworksSourceDocumentTexts {
 }
 
 export interface StormworksLibraryDiagnostic {
-  severity: "error" | "warning";
+  severity: "error" | "warning" | "info";
   code: string;
   message: string;
   documentId?: string;
@@ -210,7 +210,9 @@ export function importStormworksXmlToProjectSource(
 
     diagnostics.push(
       ...imported.warnings.map((warning) =>
-        createWarningDiagnostic(warning.code, warning.message, "xml", options.sourceName, warning.path),
+        warning.severity === "info"
+          ? createInfoDiagnostic(warning.code, warning.message, "xml", options.sourceName, warning.path)
+          : createWarningDiagnostic(warning.code, warning.message, "xml", options.sourceName, warning.path),
       ),
     );
     diagnostics.push(...parsedSourceDocument.diagnostics);
@@ -1169,6 +1171,24 @@ function createWarningDiagnostic(
 ): StormworksLibraryDiagnostic {
   return {
     severity: "warning",
+    code,
+    message,
+    source,
+    documentId,
+    path,
+  };
+}
+
+// Build an informational diagnostic (status reporting, not an actionable problem) in the public library result format.
+function createInfoDiagnostic(
+  code: string,
+  message: string,
+  source: StormworksLibraryDiagnostic["source"],
+  documentId?: string,
+  path?: string,
+): StormworksLibraryDiagnostic {
+  return {
+    severity: "info",
     code,
     message,
     source,
