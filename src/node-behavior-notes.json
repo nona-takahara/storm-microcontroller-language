@@ -8,8 +8,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -19,8 +18,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -29,10 +27,7 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
-        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "AUDIO_SWITCHBOX": {
@@ -41,8 +36,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "switch入力による切替の真理値表",
-        "一部入力（bなど）が未接続の場合の挙動（#4）"
+        "switch入力による切替の対応（aとbどちらが出力されるか）",
+        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
       ],
       "notes": []
     },
@@ -52,9 +47,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -64,8 +58,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "4ビット入力の組み合わせ→出力の対応表（プロパティでどう指定されるか）",
-        "未使用ビット・未接続ビットの扱い"
+        "プロパティの値と入出力の対応関係が、DSLに書いた設定通りに実機へ反映されるか"
       ],
       "notes": []
     },
@@ -75,8 +68,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "8ビット入力の組み合わせ→出力の対応表（プロパティでどう指定されるか）",
-        "未使用ビット・未接続ビットの扱い"
+        "プロパティの値と入出力の対応関係が、DSLに書いた設定通りに実機へ反映されるか"
       ],
       "notes": []
     },
@@ -86,8 +78,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "未接続時の外部入出力のデフォルト値",
-        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": []
     },
@@ -97,8 +88,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "未接続時の外部入出力のデフォルト値",
-        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": []
     },
@@ -110,9 +100,8 @@
         4
       ],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態",
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）",
         "issue #4 で明示的に指摘: charge_time/discharge_timeの詳細挙動、充電途中の出力値が未確認"
       ],
       "notes": []
@@ -123,8 +112,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -134,8 +122,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "未接続時の外部入出力のデフォルト値",
-        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": []
     },
@@ -145,8 +132,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "未接続時の外部入出力のデフォルト値",
-        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": []
     },
@@ -158,8 +144,7 @@
         3
       ],
       "focusHints": [
-        "channelプロパティが未設定(null / XMLの@i属性欠落)の場合に実際どのチャンネルとして扱われるか（#3）",
-        "範囲外のchannelを指定した場合の挙動",
+        "channelプロパティが未設定(null / XMLの@i属性欠落)の場合、実際どのチャンネル扱いになるか（#3）",
         "issue #3 で指摘: channel=null（XMLの@i属性欠落）時の実際の挙動が未確認"
       ],
       "notes": []
@@ -172,8 +157,7 @@
         3
       ],
       "focusHints": [
-        "channelプロパティが未設定(null / XMLの@i属性欠落)の場合に実際どのチャンネルとして扱われるか（#3）",
-        "範囲外のchannelを指定した場合の挙動",
+        "channelプロパティが未設定(null / XMLの@i属性欠落)の場合、実際どのチャンネル扱いになるか（#3）",
         "issue #3 で指摘: channel=null（XMLの@i属性欠落）時の実際の挙動が未確認"
       ],
       "notes": []
@@ -186,8 +170,8 @@
         4
       ],
       "focusHints": [
-        "switch入力による切替の真理値表",
-        "一部入力（bなど）が未接続の場合の挙動（#4）",
+        "switch入力による切替の対応（aとbどちらが出力されるか）",
+        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）",
         "issue #4 で明示的に指摘: a/b/switch→outの真理値表、およびb未接続時の挙動が未確認"
       ],
       "notes": []
@@ -198,8 +182,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "switch入力による切替の真理値表",
-        "一部入力（bなど）が未接続の場合の挙動（#4）"
+        "switch入力による切替の対応（aとbどちらが出力されるか）",
+        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
       ],
       "notes": []
     },
@@ -209,8 +193,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "count属性が欠落した場合、ラウンドトリップでチャンネル数がどう扱われるか（#14関連）",
-        "書き込み先チャンネルが範囲外の場合の挙動"
+        "count（書き込みチャンネル数）を指定し忘れた場合、ラウンドトリップで配線が消えないか（#14）"
       ],
       "notes": []
     },
@@ -220,8 +203,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "count属性が欠落した場合、ラウンドトリップでチャンネル数がどう扱われるか（#14関連）",
-        "書き込み先チャンネルが範囲外の場合の挙動"
+        "count（書き込みチャンネル数）を指定し忘れた場合、ラウンドトリップで配線が消えないか（#14）"
       ],
       "notes": []
     },
@@ -230,10 +212,7 @@
       "category": "value",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "プロパティ未設定時のデフォルト値",
-        "マイコン起動直後から即座にこの値が出力されるか、1tick遅れるか"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "CONST_BOOL": {
@@ -241,10 +220,7 @@
       "category": "value",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "プロパティ未設定時のデフォルト値",
-        "マイコン起動直後から即座にこの値が出力されるか、1tick遅れるか"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "COUNTER": {
@@ -253,9 +229,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -265,8 +240,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -276,8 +250,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -289,8 +262,7 @@
         11
       ],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）",
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか",
         "issue #11 で指摘: epsilonはデフォルト値でもXML上に常時出力される反例。省略規則の一般化に注意"
       ],
       "notes": []
@@ -301,8 +273,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -312,8 +283,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -323,8 +293,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -333,9 +302,7 @@
       "category": "comparison",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "境界値（a=bちょうど等）での出力"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "JK_FF": {
@@ -345,8 +312,7 @@
       "relatedIssues": [],
       "focusHints": [
         "マイコン起動直後（電源投入直後）の初期出力状態",
-        "Set/Reset（またはJ/K）が同時に真になった場合の優先順位",
-        "1tick内で入力が複数回変化した場合の扱い"
+        "Set/Reset（またはJ/K）が同時に真になった場合の優先順位"
       ],
       "notes": []
     },
@@ -355,9 +321,7 @@
       "category": "comparison",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "境界値（a=bちょうど等）での出力"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "LUA": {
@@ -366,8 +330,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "スクリプトの実行タイミング（1tickに1回呼ばれるか等）",
-        "onTick以外の特殊な引数・グローバル関数の有無"
+        "スクリプトが呼ばれるタイミング（1tickに1回か）— Luaコード側で前提にしてよいか"
       ],
       "notes": []
     },
@@ -379,9 +342,8 @@
         4
       ],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態",
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）",
         "issue #4 で明示的に指摘: set/reset同時入力時の優先順位が未確認"
       ],
       "notes": []
@@ -392,8 +354,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -403,8 +364,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -413,10 +373,7 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
-        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "NOR": {
@@ -424,10 +381,7 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
-        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "NOT": {
@@ -435,10 +389,7 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "入力がunknown/未接続の場合の出力",
-        "他の1入力ノードと同様、tick遅延の有無"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "NUM_JUNCTION": {
@@ -447,9 +398,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -459,9 +409,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -471,8 +420,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "未接続時の外部入出力のデフォルト値",
-        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": []
     },
@@ -482,8 +430,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "未接続時の外部入出力のデフォルト値",
-        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": []
     },
@@ -493,8 +440,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "switch入力による切替の真理値表",
-        "一部入力（bなど）が未接続の場合の挙動（#4）"
+        "switch入力による切替の対応（aとbどちらが出力されるか）",
+        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
       ],
       "notes": []
     },
@@ -503,10 +450,7 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
-        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "PID": {
@@ -515,9 +459,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -527,9 +470,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -539,8 +481,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
-        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
       ],
       "notes": []
     },
@@ -550,8 +491,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
-        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
       ],
       "notes": []
     },
@@ -561,8 +501,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
-        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
       ],
       "notes": []
     },
@@ -572,8 +511,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
-        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
       ],
       "notes": []
     },
@@ -583,8 +521,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
-        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
       ],
       "notes": []
     },
@@ -594,8 +531,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "出力パルスの幅（1tickのみか、複数tickか）",
-        "エッジ検出のタイミング（立ち上がり/立ち下がり）"
+        "出力パルスの幅（1tickのみか、複数tickか）— 後段のタイマー等の設計に影響する"
       ],
       "notes": []
     },
@@ -609,7 +545,6 @@
       "focusHints": [
         "マイコン起動直後（電源投入直後）の初期出力状態",
         "Set/Reset（またはJ/K）が同時に真になった場合の優先順位",
-        "1tick内で入力が複数回変化した場合の扱い",
         "issue #4 で明示的に指摘: リセット/セット優先順位と電源投入直後の初期状態が未確認"
       ],
       "notes": []
@@ -620,8 +555,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "0除算・オーバーフロー・NaN等の境界値での挙動",
-        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
       ],
       "notes": []
     },
@@ -633,7 +567,6 @@
         1
       ],
       "focusHints": [
-        "境界値（a=bちょうど等）での出力",
         "issue #1 で指摘: min/maxのtext/value読み取り元が非対称。実機での影響有無を確認"
       ],
       "notes": []
@@ -644,9 +577,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -656,9 +588,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -668,9 +599,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -680,9 +610,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "reset系入力があるノードは、reset時の内部状態の扱い",
-        "interval/charge_time等パラメータのデフォルト値と単位",
-        "マイコン起動直後の初期状態"
+        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
+        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": []
     },
@@ -692,8 +621,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "エッジ検出のタイミング（立ち上がりのみか、両エッジか）",
-        "マイコン起動直後の初期出力状態"
+        "エッジ検出のタイミング（立ち上がりのみか、両エッジか）— DSLで期待した反転回数と実機がズレないか"
       ],
       "notes": []
     },
@@ -702,10 +630,7 @@
       "category": "debug",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "出力ポートを持つかどうか（TOOLTIP_BOOLEANは出力なしと確認済み。#4備考）",
-        "表示専用（cosmetic-only）で他ノードの挙動に影響しないか"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "TOOLTIP_NUMBER": {
@@ -713,10 +638,7 @@
       "category": "debug",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "出力ポートを持つかどうか（TOOLTIP_BOOLEANは出力なしと確認済み。#4備考）",
-        "表示専用（cosmetic-only）で他ノードの挙動に影響しないか"
-      ],
+      "focusHints": [],
       "notes": []
     },
     "video_in": {
@@ -725,8 +647,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "未接続時の外部入出力のデフォルト値",
-        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": []
     },
@@ -736,8 +657,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "未接続時の外部入出力のデフォルト値",
-        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": []
     },
@@ -747,8 +667,8 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "switch入力による切替の真理値表",
-        "一部入力（bなど）が未接続の場合の挙動（#4）"
+        "switch入力による切替の対応（aとbどちらが出力されるか）",
+        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
       ],
       "notes": []
     },
@@ -757,10 +677,7 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
-        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
-      ],
+      "focusHints": [],
       "notes": []
     }
   }

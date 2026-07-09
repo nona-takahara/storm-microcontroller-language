@@ -7,8 +7,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "1秒あたりのtick数（想定: 60Hz）と、DELTA/CAPACITOR/TIMER系ノードの時間パラメータとの単位換算",
-        "ゲーム内のポーズ・スロー再生時にtickがどう扱われるか"
+        "TIMER/CAPACITOR等のプロパティに秒数を書いた場合、実機の時間感覚とズレないか（tick周期との換算）"
       ],
       "notes": []
     },
@@ -17,8 +16,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "1tick内でノードがどの順序で評価されるか（依存関係によるトポロジカル順か、固定順か）",
-        "フィードバックループ（自己参照的な配線）がある場合、値が1tick遅れる境界はどこか"
+        "フィードバックループ（自己参照的な配線）を組んだ場合、DSLの見た目通りに値が伝播するか、1tick遅れる境界がどこか"
       ],
       "notes": []
     },
@@ -30,18 +28,7 @@
         4
       ],
       "focusHints": [
-        "1つのcomposite信号が持つnumber/booleanチャンネル数の上限",
-        "COMPOSITE_READ/WRITE系のchannelインデックスが0始まりか1始まりか（#3のchannel=null調査と合わせて確認）"
-      ],
-      "notes": []
-    },
-    "number-precision": {
-      "title": "数値信号の型・精度・範囲",
-      "status": "todo",
-      "relatedIssues": [],
-      "focusHints": [
-        "number信号の内部表現（float32/double等）と有効範囲",
-        "オーバーフロー・Infinity・NaNがゲーム内でどう扱われるか"
+        "COMPOSITE_READ/WRITE系のchannelプロパティが0始まりか1始まりか（DSLに書いた番号と実機のチャンネル表示がズレないか。#3）"
       ],
       "notes": []
     },
@@ -50,8 +37,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "onTick等のエントリポイント関数名・呼び出しタイミング",
-        "input/output/property/screen等、スクリプトから参照できるグローバルAPIの一覧"
+        "DSLからscript_refで参照したLuaファイルが、実機でどのタイミング・引数で呼ばれるか"
       ],
       "notes": []
     },
@@ -60,8 +46,7 @@
       "status": "todo",
       "relatedIssues": [],
       "focusHints": [
-        "number/boolean/composite/video/audio各signal種別の入出力ピン数上限",
-        "上限を超えた場合にエディタ・実機でどう扱われるか"
+        "DSLでピンを増やしすぎた場合、実機側で上限に達して読み込めない等の事態が起きないか"
       ],
       "notes": []
     },
@@ -74,8 +59,7 @@
         13
       ],
       "focusHints": [
-        "デフォルト値のプロパティがXML上で省略されるかどうかの一般規則（#1, #11, #13で個別ケースを確認済み。共通パターン化できるか）",
-        "position(x/y/z)が0の場合に軸ごと省略されるルール（#13）"
+        "デフォルト値のままXML化した場合に、実機で読み込み直しても本当に同じ状態が再現されるか（#1, #11, #13）"
       ],
       "notes": []
     }

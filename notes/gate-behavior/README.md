@@ -21,7 +21,7 @@ Issue #5 / #4 向けの記入作業用ファイル一式です。書き方の詳
 
 ## チェックリスト
 
-- [ ] [`system.md`](./system.md) — Stormworks全体の仕様（7件）
+- [ ] [`system.md`](./system.md) — Stormworks全体の仕様（6件）
 - [ ] [`logic-flip-flop.md`](./logic-flip-flop.md) — ラッチ・フリップフロップ系（logic-flip-flop）（2件）（優先度高: issue #4で名指しされたゲートを含む）
 - [ ] [`control.md`](./control.md) — 制御系（control）— タイマー・PID・カウンター・容量など（12件）（優先度高: issue #4で名指しされたゲートを含む）
 - [ ] [`composite.md`](./composite.md) — Composite信号の合成・分岐系（composite）（5件）（優先度高: issue #4で名指しされたゲートを含む）
