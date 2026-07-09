@@ -64,14 +64,14 @@ export async function loadProjectSourceFromProjectJsonFile(
     const entrySwNetPath = resolve(filePaths.directoryPath, ...entryRelativePath.split("/"));
     const entrySwMclPath = replaceSwNetExtension(entrySwNetPath, ".sw-mcl");
     const entryModuleId = basename(entrySwNetPath, ".sw-net");
-    const [swNetText, swMclText] = await Promise.all([
+    const [swNetText, swMcl] = await Promise.all([
       readUtf8TextFile(entrySwNetPath),
       readSwMclTextOrStub(entrySwMclPath, entryModuleId),
     ]);
     const parsedEntry = parseSourceDocumentTexts({
       documentId: entrySwNetPath,
       swNetText,
-      swMclText,
+      swMclText: swMcl.text,
     });
 
     diagnostics.push(...parsedEntry.diagnostics);
@@ -84,6 +84,7 @@ export async function loadProjectSourceFromProjectJsonFile(
     const entryDocument: StormworksSourceDocument = {
       ...parsedEntry.value,
       scripts,
+      swMclOrigin: swMcl.isGenerated ? "generated" : "file",
     };
 
     return {
@@ -129,14 +130,14 @@ export async function loadSourceDocumentFromSwNetFile(
   const resolvedSwNetPath = resolve(swNetPath);
   const swMclPath = replaceSwNetExtension(resolvedSwNetPath, ".sw-mcl");
   const moduleId = basename(resolvedSwNetPath, ".sw-net");
-  const [swNetText, swMclText] = await Promise.all([
+  const [swNetText, swMcl] = await Promise.all([
     readUtf8TextFile(resolvedSwNetPath),
     readSwMclTextOrStub(swMclPath, moduleId),
   ]);
   const parsed = parseSourceDocumentTexts({
     documentId: resolvedSwNetPath,
     swNetText,
-    swMclText,
+    swMclText: swMcl.text,
   });
 
   if (!parsed.value) {
@@ -146,6 +147,7 @@ export async function loadSourceDocumentFromSwNetFile(
   return {
     ...parsed.value,
     scripts: await loadReferencedScriptsFromDocument(resolvedSwNetPath, parsed.value.swNet),
+    swMclOrigin: swMcl.isGenerated ? "generated" : "file",
   };
 }
 
@@ -238,13 +240,23 @@ export function replaceSwNetExtension(filePath: string, nextExtension: string): 
   return filePath.slice(0, -".sw-net".length) + nextExtension;
 }
 
+interface SwMclReadResult {
+  text: string;
+  // True when no .sw-mcl file exists on disk and this text is a synthesized placeholder;
+  // callers use this to distinguish "no layout data" from "layout data exists but is wrong".
+  isGenerated: boolean;
+}
+
 // Read a sw-mcl file, returning a minimal stub if the file does not exist.
-async function readSwMclTextOrStub(swMclPath: string, moduleId: string): Promise<string> {
+async function readSwMclTextOrStub(swMclPath: string, moduleId: string): Promise<SwMclReadResult> {
   try {
-    return await readUtf8TextFile(swMclPath);
+    return { text: await readUtf8TextFile(swMclPath), isGenerated: false };
   } catch (error: unknown) {
     if (typeof error === "object" && error !== null && (error as NodeJS.ErrnoException).code === "ENOENT") {
-      return JSON.stringify({ formatVersion: STORMWORKS_SW_MCL_FORMAT_VERSION, moduleId, ports: [], instances: [], warnings: [] });
+      return {
+        text: JSON.stringify({ formatVersion: STORMWORKS_SW_MCL_FORMAT_VERSION, moduleId, ports: [], instances: [], warnings: [] }),
+        isGenerated: true,
+      };
     }
 
     throw error;

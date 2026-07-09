@@ -129,14 +129,21 @@ export function buildStormworksXmlTree(
   // Resolve every view of the same module before lowering:
   // sw-net for structure, sw-mcl for inner layout, and project.json for outer placement.
   const entrySwMcl = input.swMclByDocumentPath.get(entryModule.key.documentPath);
+  const submoduleCanvasOrigin = resolveSubmoduleCanvasOrigin(input.project, entryModule.key.moduleId, warnings);
 
   if (!entrySwMcl) {
-    throw new Error(`No sw-mcl document was provided for entry document ${entryModule.key.documentPath}.`);
+    warnings.push(
+      `sw-mcl for entry module ${entryModule.key.moduleId} was not found; instances will share the module canvas anchor position.`,
+    );
   }
 
-  const swMclModule = resolveSwMclModule(entrySwMcl, entryModule.key.moduleId);
-  const submoduleCanvasOrigin = resolveSubmoduleCanvasOrigin(input.project, entryModule.key.moduleId, warnings);
-  const entryLayout = buildFlattenLayoutContext(swMclModule, submoduleCanvasOrigin, undefined);
+  const swMclModule = entrySwMcl ? resolveSwMclModule(entrySwMcl, entryModule.key.moduleId) : null;
+  const entryAnchorFallback = submoduleCanvasOrigin ?? { x: 0, y: 0 };
+  const entryLayout = buildFlattenLayoutContext(
+    swMclModule,
+    submoduleCanvasOrigin,
+    swMclModule ? undefined : entryAnchorFallback,
+  );
   const moduleByKey = buildModuleByKeyIndex(input.swNet.modules);
   const flattenedInstances: FlattenedInstance[] = [];
 
@@ -354,13 +361,13 @@ function buildProjectNodeContexts(
 // Merge sw-net port declarations with sw-mcl positions into concrete export-time module port slots.
 function buildModulePortSlots(
   entryModule: SwNetResolvedModule["module"],
-  swMclModule: StormworksSwMclDocument,
+  swMclModule: StormworksSwMclDocument | null,
   submoduleCanvasOrigin: IrVector2 | null,
   warnings: string[],
 ): ModulePortSlot[] {
   const occurrenceByKey = new Map<string, number>();
   const positionByKey = new Map(
-    swMclModule.ports.map((port) => [
+    (swMclModule?.ports ?? []).map((port) => [
       formatPortOccurrenceKey(port.direction, port.name, port.occurrence),
       addVector(port.position, submoduleCanvasOrigin),
     ] as const),
