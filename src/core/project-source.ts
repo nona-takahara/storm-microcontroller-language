@@ -49,6 +49,9 @@ export interface StormworksSourceDocument {
   swNet: SwNetDocument;
   swMcl: StormworksSwMclDocument;
   scripts: Record<string, string>;
+  // "generated" means no .sw-mcl file existed on disk and swMcl is a placeholder stub; undefined/"file"
+  // means swMcl reflects real (possibly hand-authored) layout data. Only file loaders set this.
+  swMclOrigin?: "file" | "generated";
 }
 
 export interface StormworksProjectSource {
@@ -445,7 +448,10 @@ async function collectProjectSourceDiagnostics(
     validateSourceDocument(document, definitions, diagnostics, projectSource);
   }
 
-  if (projectSource.entryDocument.swMcl.moduleId !== projectSource.entryModuleId) {
+  if (
+    projectSource.entryDocument.swMclOrigin !== "generated" &&
+    projectSource.entryDocument.swMcl.moduleId !== projectSource.entryModuleId
+  ) {
     diagnostics.push(
       createErrorDiagnostic(
         "ENTRY_MODULE_LAYOUT_MISMATCH",
@@ -612,7 +618,9 @@ function validateSourceDocument(
     (module) => module.id === sourceDocument.swMcl.moduleId,
   );
 
-  if (!hasLayoutModule) {
+  // A missing .sw-mcl file is not an error: export falls back to a degraded shared-anchor layout.
+  // Only a real, hand-authored .sw-mcl that names a module that doesn't exist is a genuine bug.
+  if (!hasLayoutModule && sourceDocument.swMclOrigin !== "generated") {
     diagnostics.push(
       createErrorDiagnostic(
         "SW_MCL_MODULE_MISSING",
@@ -1136,8 +1144,14 @@ function compareSourceDocuments(left: StormworksSourceDocument, right: Stormwork
 
 // Give the XML tree exporter access to every resolved document's own sw-mcl, keyed by document path,
 // so `use` statements that pull in a module from another document can resolve its layout too.
+// Documents whose sw-mcl was auto-generated (no real file on disk) are omitted so the exporter treats
+// them as "no layout data" and falls back to its existing degraded shared-anchor placement.
 function buildSwMclByDocumentPath(documents: StormworksSourceDocument[]): Map<string, StormworksSwMclDocument> {
-  return new Map(documents.map((document) => [document.documentId, document.swMcl] as const));
+  return new Map(
+    documents
+      .filter((document) => document.swMclOrigin !== "generated")
+      .map((document) => [document.documentId, document.swMcl] as const),
+  );
 }
 
 // Check whether a diagnostic list already contains at least one build-blocking error.

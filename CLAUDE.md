@@ -43,8 +43,8 @@ All formats pass through `IrProgram` (nodes + links + submodules + metadata). Th
 
 **DSL formats:**
 - `.sw-net` — graph DSL: declares modules with typed ports, instantiates nodes (`inst`), wires them with `->` assignments, and composes submodules with `use`
-- `.sw-mcl` — Lua script attachments for logic nodes
-- `project.json` — metadata + layout (node positions)
+- `.sw-mcl` — module-internal layout: port and instance positions for one `.sw-net` module (1:1 with a single module). Not required — a missing `.sw-mcl` degrades to a shared-anchor layout on export instead of erroring; `pnpm cli layout-dsl` can generate a real one via auto-layout.
+- `project.json` — metadata + project-surface layout (external pin/submodule anchor positions); Lua scripts referenced by `script_ref` live in separate `.lua` files
 
 **Node definitions** — `src/definitions.json`  
 The single source of truth for all gate definitions. Maps Stormworks XML `type` numbers to DSL `definitionId`s, including port signals and property XML paths. `scripts/copy-definitions.mjs` copies this file to `dist/` at build time. Schema version is enforced (`NODE_DEFINITIONS_SCHEMA_VERSION = "9"`). `definitions/sample/` is intentionally empty (the directory exists for historical reasons).
