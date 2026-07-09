@@ -9,19 +9,22 @@ import {
   type BuildStormworksXmlOptions,
   type BuildStormworksXmlResult,
 } from "./exporters/xml.js";
+import { type ComponentDefinition } from "./definitions/schema.js";
 import {
   buildStormworksXmlTree,
+  resolveDynamicInputCount,
   type BuildStormworksXmlTreeOptions,
   type BuildStormworksXmlTreeResult,
 } from "./exporters/xml-tree.js";
 import { importStormworksXml } from "./importers/xml.js";
-import { type IrProgram } from "./ir.js";
+import { type IrProgram, type IrSignalKind } from "./ir.js";
 import {
   parseSwNetDocument,
   type SwNetAssignment,
   type SwNetDocument,
   type SwNetInstStatement,
   type SwNetPort,
+  type SwNetUseStatement,
 } from "./parsers/sw-net.js";
 import { parseStormworksSwMclText } from "./parsers/sw-mcl.js";
 import {
@@ -467,6 +470,7 @@ async function collectProjectSourceDiagnostics(
   }
 
   validateUseStatements(resolvedGraph.value, diagnostics);
+  validateNetSignalConsistency(resolvedGraph.value, definitions, diagnostics);
 
   return {
     diagnostics,
@@ -727,8 +731,6 @@ function validateUseStatement(
     return;
   }
 
-  const callerModule = moduleByKey.get(formatResolvedModuleKey(use.caller));
-  const callerPortsByName = new Map((callerModule?.module.ports ?? []).map((port) => [port.name, port] as const));
   const targetInputPorts = new Map(
     targetModule.module.ports.filter((port) => port.direction === "in").map((port) => [port.name, port] as const),
   );
@@ -741,7 +743,6 @@ function validateUseStatement(
     use.statement.inputs,
     targetInputPorts,
     "USE_INPUT_PORT_NOT_FOUND",
-    callerPortsByName,
     diagnostics,
   );
 
@@ -766,20 +767,18 @@ function validateUseStatement(
     use.statement.outputs,
     targetOutputPorts,
     "USE_OUTPUT_PORT_NOT_FOUND",
-    callerPortsByName,
     diagnostics,
   );
 }
 
 // Shared logic for the input/output assignment halves of one `use` statement: reports assignments
-// that don't match a declared port, duplicate assignments to the same port, and (for string-literal
-// values only) a signal-kind mismatch against the caller's own forwarded port.
+// that don't match a declared port and duplicate assignments to the same port. Signal-kind
+// consistency is handled separately, net-wide, by validateNetSignalConsistency.
 function validateUsePortAssignments(
   use: SwNetResolvedUse,
   assignments: SwNetAssignment[],
   targetPortsByName: Map<string, SwNetPort>,
   missingPortCode: string,
-  callerPortsByName: Map<string, SwNetPort>,
   diagnostics: StormworksLibraryDiagnostic[],
 ): Set<string> {
   const seenKeys = new Set<string>();
@@ -811,47 +810,241 @@ function validateUsePortAssignments(
           use.statement.instanceId,
         ),
       );
-      continue;
     }
-
-    checkUsePortSignalKind(use, assignment, targetPort, callerPortsByName, diagnostics);
   }
 
   return seenKeys;
 }
 
-// Compare a caller-own-port forwarding (string literal) binding's signal kind against the target
-// port's declared signal kind. Identifier (local-net) bindings are intentionally skipped: inferring a
-// local net's signal kind would need net-wide type inference, which does not exist in this codebase
-// yet (see the follow-up issue for README's broader, currently-unimplemented typecheck-dsl claim).
-function checkUsePortSignalKind(
-  use: SwNetResolvedUse,
-  assignment: SwNetAssignment,
-  targetPort: SwNetPort,
-  callerPortsByName: Map<string, SwNetPort>,
+type NetSignalRole = "producer" | "consumer";
+
+interface NetSignalEdge {
+  signal: IrSignalKind;
+  role: NetSignalRole;
+  label: string;
+}
+
+// Validate signal-kind consistency across the whole net graph formed by inst/use port wiring in every
+// resolved module (local nets plus the module's own boundary ports). Supersedes the narrower
+// USE_PORT_SIGNAL_MISMATCH check that used to live here, which only covered the caller-forwarding
+// (string-literal) case and never inferred a local net's signal kind across its producers/consumers.
+function validateNetSignalConsistency(
+  swNet: SwNetResolutionResult,
+  definitions: NodeDefinitionRegistry,
   diagnostics: StormworksLibraryDiagnostic[],
 ): void {
-  if (assignment.value.kind !== "string") {
+  const moduleByKey = new Map(swNet.modules.map((module) => [formatResolvedModuleKey(module.key), module] as const));
+
+  for (const resolvedModule of swNet.modules) {
+    const nets = collectModuleNetSignalEdges(resolvedModule, moduleByKey, definitions);
+
+    for (const [netKey, edges] of nets) {
+      reportNetSignalMismatch(resolvedModule, netKey, edges, diagnostics);
+    }
+  }
+}
+
+// Build a net-name -> contributing-edges map for one module: the module's own boundary port
+// declarations, plus every inst/use statement's input/output assignments. Local nets (identifier
+// bindings) and boundary-port nets (string-literal bindings, keyed by direction + name since a module
+// may legally declare `port in "x"` and `port out "x"` with the same name but different signals) are
+// kept in disjoint key namespaces.
+function collectModuleNetSignalEdges(
+  resolvedModule: SwNetResolvedModule,
+  moduleByKey: Map<string, SwNetResolvedModule>,
+  definitions: NodeDefinitionRegistry,
+): Map<string, NetSignalEdge[]> {
+  const nets = new Map<string, NetSignalEdge[]>();
+  const addEdge = (netKey: string | undefined, edge: NetSignalEdge): void => {
+    if (!netKey) {
+      // Number/boolean/null literal bindings have no net identity to track (see follow-up issue).
+      return;
+    }
+
+    const existing = nets.get(netKey);
+
+    if (existing) {
+      existing.push(edge);
+    } else {
+      nets.set(netKey, [edge]);
+    }
+  };
+
+  for (const port of resolvedModule.module.ports) {
+    addEdge(`boundary:${port.direction}:${port.name}`, {
+      signal: port.signal,
+      role: port.direction === "in" ? "producer" : "consumer",
+      label: `module's own ${port.direction} port "${port.name}"`,
+    });
+  }
+
+  const useByStatement = new Map(resolvedModule.uses.map((use) => [use.statement, use] as const));
+
+  for (const statement of resolvedModule.module.statements) {
+    if (statement.kind === "inst") {
+      collectInstNetEdges(statement, definitions, addEdge);
+    } else {
+      collectUseNetEdges(statement, useByStatement.get(statement), moduleByKey, addEdge);
+    }
+  }
+
+  return nets;
+}
+
+// Resolve one assignment's net identity: identifiers join the local-net bucket, string literals join
+// the boundary-port bucket for the module's own port with that name in the given direction.
+function netKeyForAssignment(assignment: SwNetAssignment, boundaryDirection: "in" | "out"): string | undefined {
+  if (assignment.value.kind === "identifier") {
+    return `local:${assignment.value.value}`;
+  }
+
+  if (assignment.value.kind === "string") {
+    return `boundary:${boundaryDirection}:${assignment.value.value}`;
+  }
+
+  return undefined;
+}
+
+// Collect net edges contributed by one `inst` statement: inputs are consumer edges (reading from a
+// net), outputs are producer edges (writing to a net).
+function collectInstNetEdges(
+  statement: SwNetInstStatement,
+  definitions: NodeDefinitionRegistry,
+  addEdge: (netKey: string | undefined, edge: NetSignalEdge) => void,
+): void {
+  const definition = findCompatibleComponentDefinition(definitions, statement.typeId);
+
+  for (const assignment of statement.inputs) {
+    addEdge(netKeyForAssignment(assignment, "in"), {
+      signal: resolveInstPortSignal(definition, statement, assignment.key, "input"),
+      role: "consumer",
+      label: `input "${assignment.key}" of ${statement.instanceId}`,
+    });
+  }
+
+  for (const assignment of statement.outputs) {
+    addEdge(netKeyForAssignment(assignment, "out"), {
+      signal: resolveInstPortSignal(definition, statement, assignment.key, "output"),
+      role: "producer",
+      label: `output "${assignment.key}" of ${statement.instanceId}`,
+    });
+  }
+}
+
+// Resolve one inst statement's port key to its declared signal kind, covering both static ports and
+// dynamic-input components (e.g. composite writers with a variable in1..inN). Falls back to "unknown"
+// whenever the definition, port, or dynamic-input signal isn't available, matching the existing
+// unknown-as-escape-hatch precedent used elsewhere in this module.
+function resolveInstPortSignal(
+  definition: ComponentDefinition | undefined,
+  statement: SwNetInstStatement,
+  key: string,
+  direction: "input" | "output",
+): IrSignalKind {
+  if (!definition) {
+    return "unknown";
+  }
+
+  const staticPorts = direction === "input" ? definition.ports.inputs : definition.ports.outputs;
+  const staticPort = staticPorts.find((port) => port.key === key);
+
+  if (staticPort) {
+    return staticPort.signal;
+  }
+
+  const dynamicInputs = definition.stormworks.dynamicInputs;
+
+  if (direction === "input" && dynamicInputs && key.startsWith(dynamicInputs.prefix)) {
+    const index = Number(key.slice(dynamicInputs.prefix.length));
+    const startIndex = dynamicInputs.startIndex ?? 1;
+    const count = resolveDynamicInputCount(statement, dynamicInputs);
+
+    if (Number.isInteger(index) && index >= startIndex && (count === undefined || index <= count)) {
+      return dynamicInputs.signal ?? "unknown";
+    }
+  }
+
+  return "unknown";
+}
+
+// Collect net edges contributed by one `use` statement against its resolved target module's declared
+// ports: inputs are consumer edges, outputs are producer edges (from the caller module's perspective).
+function collectUseNetEdges(
+  statement: SwNetUseStatement,
+  use: SwNetResolvedUse | undefined,
+  moduleByKey: Map<string, SwNetResolvedModule>,
+  addEdge: (netKey: string | undefined, edge: NetSignalEdge) => void,
+): void {
+  if (!use) {
+    // The resolver already raises a hard SwNetResolveError for a genuinely-unresolvable target;
+    // this branch is defensive only (mirrors validateUseStatement above).
     return;
   }
 
-  const callerPort = callerPortsByName.get(assignment.value.value);
+  const targetModule = moduleByKey.get(formatResolvedModuleKey(use.target));
 
-  if (!callerPort || callerPort.signal === "unknown" || targetPort.signal === "unknown") {
+  if (!targetModule) {
     return;
   }
 
-  if (callerPort.signal !== targetPort.signal) {
-    diagnostics.push(
-      createWarningDiagnostic(
-        "USE_PORT_SIGNAL_MISMATCH",
-        `Port "${assignment.key}" on ${use.statement.instanceId} binds ${targetPort.direction} port ${targetModuleLabel(use)}."${targetPort.name}" (${targetPort.signal}) to caller port "${callerPort.name}" (${callerPort.signal}).`,
-        "sw-net",
-        use.caller.documentPath,
-        use.statement.instanceId,
-      ),
-    );
+  const targetInputs = new Map(
+    targetModule.module.ports.filter((port) => port.direction === "in").map((port) => [port.name, port] as const),
+  );
+  const targetOutputs = new Map(
+    targetModule.module.ports.filter((port) => port.direction === "out").map((port) => [port.name, port] as const),
+  );
+
+  for (const assignment of statement.inputs) {
+    addEdge(netKeyForAssignment(assignment, "in"), {
+      signal: targetInputs.get(assignment.key)?.signal ?? "unknown",
+      role: "consumer",
+      label: `input "${assignment.key}" of ${statement.instanceId} (${targetModuleLabel(use)})`,
+    });
   }
+
+  for (const assignment of statement.outputs) {
+    addEdge(netKeyForAssignment(assignment, "out"), {
+      signal: targetOutputs.get(assignment.key)?.signal ?? "unknown",
+      role: "producer",
+      label: `output "${assignment.key}" of ${statement.instanceId} (${targetModuleLabel(use)})`,
+    });
+  }
+}
+
+// Emit one NET_SIGNAL_MISMATCH warning for a net whose contributing edges disagree on signal kind,
+// ignoring "unknown" edges (a legitimate escape hatch, not a mismatch signal).
+function reportNetSignalMismatch(
+  resolvedModule: SwNetResolvedModule,
+  netKey: string,
+  edges: NetSignalEdge[],
+  diagnostics: StormworksLibraryDiagnostic[],
+): void {
+  const distinctSignals = new Set(edges.map((edge) => edge.signal).filter((signal) => signal !== "unknown"));
+
+  if (distinctSignals.size <= 1) {
+    return;
+  }
+
+  const edgeDescriptions = edges
+    .filter((edge) => edge.signal !== "unknown")
+    .map((edge) => `${edge.label} (${edge.signal})`)
+    .join(", ");
+
+  diagnostics.push(
+    createWarningDiagnostic(
+      "NET_SIGNAL_MISMATCH",
+      `Net "${describeNetKey(netKey)}" in module ${resolvedModule.key.moduleId} has inconsistent signal kinds: ${edgeDescriptions}.`,
+      "sw-net",
+      resolvedModule.key.documentPath,
+      resolvedModule.key.moduleId,
+    ),
+  );
+}
+
+// Strip the internal local:/boundary:<direction>: namespace prefix for a human-readable net name.
+function describeNetKey(netKey: string): string {
+  const parts = netKey.split(":");
+  return parts[parts.length - 1] ?? netKey;
 }
 
 // Human-readable label for the target module of a `use` statement, reused in diagnostic messages.

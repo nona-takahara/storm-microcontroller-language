@@ -1027,7 +1027,7 @@ function applyDynamicInputPlaceholders(
     return;
   }
 
-  const dynamicInputCount = resolveDynamicInputCount(instance, dynamicInputs);
+  const dynamicInputCount = resolveDynamicInputCount(instance.statement, dynamicInputs);
 
   if (dynamicInputCount === undefined || dynamicInputCount < 1) {
     return;
@@ -1046,12 +1046,14 @@ function applyDynamicInputPlaceholders(
   }
 }
 
-// Infer how many dynamic input placeholders a component needs from its DSL attributes.
-function resolveDynamicInputCount(
-  instance: LogicInstanceContext,
+// Infer how many dynamic input placeholders a component needs from its DSL attributes. Exported for
+// reuse by net-wide signal validation (src/core/project-source.ts), which needs the same count to
+// resolve dynamic input port keys (e.g. "in3") to their declared signal kind.
+export function resolveDynamicInputCount(
+  statement: SwNetInstStatement,
   dynamicInputs: ComponentDynamicInputsBinding,
 ): number | undefined {
-  const assignment = instance.statement.attributes.find((attribute) => attribute.key === dynamicInputs.countProperty);
+  const assignment = statement.attributes.find((attribute) => attribute.key === dynamicInputs.countProperty);
 
   if (!assignment || assignment.value.kind !== "number") {
     return undefined;
