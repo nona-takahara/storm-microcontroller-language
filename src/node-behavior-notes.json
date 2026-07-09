@@ -1,0 +1,767 @@
+{
+  "schemaVersion": "1",
+  "generatedFrom": "src/definitions.json (schemaVersion 10)",
+  "entries": {
+    "ABS": {
+      "displayName": "Abs",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "ADD": {
+      "displayName": "Add",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "AND": {
+      "displayName": "AND",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
+        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
+      ],
+      "notes": []
+    },
+    "AUDIO_SWITCHBOX": {
+      "displayName": "Audio Switchbox",
+      "category": "composite",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "switch入力による切替の真理値表",
+        "一部入力（bなど）が未接続の場合の挙動（#4）"
+      ],
+      "notes": []
+    },
+    "BLINKER": {
+      "displayName": "Blinker",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "BOOL_FUNC_4": {
+      "displayName": "Boolean Function (4 inputs)",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "4ビット入力の組み合わせ→出力の対応表（プロパティでどう指定されるか）",
+        "未使用ビット・未接続ビットの扱い"
+      ],
+      "notes": []
+    },
+    "BOOL_FUNC_8": {
+      "displayName": "Boolean Function (8 inputs)",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "8ビット入力の組み合わせ→出力の対応表（プロパティでどう指定されるか）",
+        "未使用ビット・未接続ビットの扱い"
+      ],
+      "notes": []
+    },
+    "boolean_in": {
+      "displayName": "Project Input Boolean",
+      "category": "project",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "未接続時の外部入出力のデフォルト値",
+        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+      ],
+      "notes": []
+    },
+    "boolean_out": {
+      "displayName": "Project Output Boolean",
+      "category": "project",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "未接続時の外部入出力のデフォルト値",
+        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+      ],
+      "notes": []
+    },
+    "CAPACITOR": {
+      "displayName": "Capacitor",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [
+        4
+      ],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態",
+        "issue #4 で明示的に指摘: charge_time/discharge_timeの詳細挙動、充電途中の出力値が未確認"
+      ],
+      "notes": []
+    },
+    "CLAMP": {
+      "displayName": "Clamp",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "composite_in": {
+      "displayName": "Project Input Composite",
+      "category": "project",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "未接続時の外部入出力のデフォルト値",
+        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+      ],
+      "notes": []
+    },
+    "composite_out": {
+      "displayName": "Project Output Composite",
+      "category": "project",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "未接続時の外部入出力のデフォルト値",
+        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+      ],
+      "notes": []
+    },
+    "COMPOSITE_READ_BOOLEAN": {
+      "displayName": "Composite Read Boolean",
+      "category": "composite-read",
+      "status": "todo",
+      "relatedIssues": [
+        3
+      ],
+      "focusHints": [
+        "channelプロパティが未設定(null / XMLの@i属性欠落)の場合に実際どのチャンネルとして扱われるか（#3）",
+        "範囲外のchannelを指定した場合の挙動",
+        "issue #3 で指摘: channel=null（XMLの@i属性欠落）時の実際の挙動が未確認"
+      ],
+      "notes": []
+    },
+    "COMPOSITE_READ_NUMBER": {
+      "displayName": "Composite Read Number",
+      "category": "composite-read",
+      "status": "todo",
+      "relatedIssues": [
+        3
+      ],
+      "focusHints": [
+        "channelプロパティが未設定(null / XMLの@i属性欠落)の場合に実際どのチャンネルとして扱われるか（#3）",
+        "範囲外のchannelを指定した場合の挙動",
+        "issue #3 で指摘: channel=null（XMLの@i属性欠落）時の実際の挙動が未確認"
+      ],
+      "notes": []
+    },
+    "COMPOSITE_SWITCHBOX": {
+      "displayName": "Composite Switchbox",
+      "category": "composite",
+      "status": "todo",
+      "relatedIssues": [
+        4
+      ],
+      "focusHints": [
+        "switch入力による切替の真理値表",
+        "一部入力（bなど）が未接続の場合の挙動（#4）",
+        "issue #4 で明示的に指摘: a/b/switch→outの真理値表、およびb未接続時の挙動が未確認"
+      ],
+      "notes": []
+    },
+    "COMPOSITE_TO_NUMBER": {
+      "displayName": "Composite Binary to Number",
+      "category": "composite",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "switch入力による切替の真理値表",
+        "一部入力（bなど）が未接続の場合の挙動（#4）"
+      ],
+      "notes": []
+    },
+    "COMPOSITE_WRITE_BOOLEAN": {
+      "displayName": "Composite Write Boolean",
+      "category": "composite-write",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "count属性が欠落した場合、ラウンドトリップでチャンネル数がどう扱われるか（#14関連）",
+        "書き込み先チャンネルが範囲外の場合の挙動"
+      ],
+      "notes": []
+    },
+    "COMPOSITE_WRITE_NUMBER": {
+      "displayName": "Composite Write Number",
+      "category": "composite-write",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "count属性が欠落した場合、ラウンドトリップでチャンネル数がどう扱われるか（#14関連）",
+        "書き込み先チャンネルが範囲外の場合の挙動"
+      ],
+      "notes": []
+    },
+    "CONST": {
+      "displayName": "Constant Number",
+      "category": "value",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "プロパティ未設定時のデフォルト値",
+        "マイコン起動直後から即座にこの値が出力されるか、1tick遅れるか"
+      ],
+      "notes": []
+    },
+    "CONST_BOOL": {
+      "displayName": "Constant On",
+      "category": "value",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "プロパティ未設定時のデフォルト値",
+        "マイコン起動直後から即座にこの値が出力されるか、1tick遅れるか"
+      ],
+      "notes": []
+    },
+    "COUNTER": {
+      "displayName": "Up/Down Counter",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "DELTA": {
+      "displayName": "Delta",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "DIVIDE": {
+      "displayName": "Divide",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "EQUAL": {
+      "displayName": "Equal",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [
+        11
+      ],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）",
+        "issue #11 で指摘: epsilonはデフォルト値でもXML上に常時出力される反例。省略規則の一般化に注意"
+      ],
+      "notes": []
+    },
+    "FUNC_NUM_1": {
+      "displayName": "Function (x)",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "FUNC_NUM_3": {
+      "displayName": "Function (x,y,z)",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "FUNC_NUM_8": {
+      "displayName": "Function (x,y,z,w,a,b,c,d)",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "GREATER_THAN": {
+      "displayName": "Greater Than",
+      "category": "comparison",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "境界値（a=bちょうど等）での出力"
+      ],
+      "notes": []
+    },
+    "JK_FF": {
+      "displayName": "JK Flip-Flop",
+      "category": "logic-flip-flop",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "マイコン起動直後（電源投入直後）の初期出力状態",
+        "Set/Reset（またはJ/K）が同時に真になった場合の優先順位",
+        "1tick内で入力が複数回変化した場合の扱い"
+      ],
+      "notes": []
+    },
+    "LESS_THAN": {
+      "displayName": "Less Than",
+      "category": "comparison",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "境界値（a=bちょうど等）での出力"
+      ],
+      "notes": []
+    },
+    "LUA": {
+      "displayName": "Lua Script",
+      "category": "script",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "スクリプトの実行タイミング（1tickに1回呼ばれるか等）",
+        "onTick以外の特殊な引数・グローバル関数の有無"
+      ],
+      "notes": []
+    },
+    "MEMORY_REGISTER": {
+      "displayName": "Memory Register",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [
+        4
+      ],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態",
+        "issue #4 で明示的に指摘: set/reset同時入力時の優先順位が未確認"
+      ],
+      "notes": []
+    },
+    "MODULO": {
+      "displayName": "Modulo",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "MULTIPLY": {
+      "displayName": "Multiply",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "NAND": {
+      "displayName": "NAND",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
+        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
+      ],
+      "notes": []
+    },
+    "NOR": {
+      "displayName": "NOR",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
+        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
+      ],
+      "notes": []
+    },
+    "NOT": {
+      "displayName": "NOT",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "入力がunknown/未接続の場合の出力",
+        "他の1入力ノードと同様、tick遅延の有無"
+      ],
+      "notes": []
+    },
+    "NUM_JUNCTION": {
+      "displayName": "Numerical Junction",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "NUM_SWITCHBOX": {
+      "displayName": "Numerical Switchbox",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "number_in": {
+      "displayName": "Project Input Number",
+      "category": "project",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "未接続時の外部入出力のデフォルト値",
+        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+      ],
+      "notes": []
+    },
+    "number_out": {
+      "displayName": "Project Output Number",
+      "category": "project",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "未接続時の外部入出力のデフォルト値",
+        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+      ],
+      "notes": []
+    },
+    "NUMBER_TO_COMPOSITE": {
+      "displayName": "Number to Composite Binary",
+      "category": "composite",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "switch入力による切替の真理値表",
+        "一部入力（bなど）が未接続の場合の挙動（#4）"
+      ],
+      "notes": []
+    },
+    "OR": {
+      "displayName": "OR",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
+        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
+      ],
+      "notes": []
+    },
+    "PID": {
+      "displayName": "PID Controller",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "PID_ADVANCED": {
+      "displayName": "PID Controller (Advanced)",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "PROPERTY_DROPDOWN": {
+      "displayName": "Property Dropdown",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
+        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+      ],
+      "notes": []
+    },
+    "PROPERTY_NUMBER": {
+      "displayName": "Property Number",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
+        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+      ],
+      "notes": []
+    },
+    "PROPERTY_SLIDER": {
+      "displayName": "Property Slider",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
+        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+      ],
+      "notes": []
+    },
+    "PROPERTY_TEXT": {
+      "displayName": "Property Text",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
+        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+      ],
+      "notes": []
+    },
+    "PROPERTY_TOGGLE": {
+      "displayName": "Property Toggle",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "デフォルト値の場合にXML上で属性が省略されるか（#1, #11, #13関連）",
+        "UI上での編集済み状態の有無が保存内容に影響するか（#11関連）"
+      ],
+      "notes": []
+    },
+    "PULSE": {
+      "displayName": "Pulse",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "出力パルスの幅（1tickのみか、複数tickか）",
+        "エッジ検出のタイミング（立ち上がり/立ち下がり）"
+      ],
+      "notes": []
+    },
+    "SR_LATCH": {
+      "displayName": "SR Latch",
+      "category": "logic-flip-flop",
+      "status": "todo",
+      "relatedIssues": [
+        4
+      ],
+      "focusHints": [
+        "マイコン起動直後（電源投入直後）の初期出力状態",
+        "Set/Reset（またはJ/K）が同時に真になった場合の優先順位",
+        "1tick内で入力が複数回変化した場合の扱い",
+        "issue #4 で明示的に指摘: リセット/セット優先順位と電源投入直後の初期状態が未確認"
+      ],
+      "notes": []
+    },
+    "SUBTRACT": {
+      "displayName": "Subtract",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "0除算・オーバーフロー・NaN等の境界値での挙動",
+        "epsilon等の比較用パラメータのデフォルト値省略規則（#11のEQUALの反例に注意）"
+      ],
+      "notes": []
+    },
+    "THRESHOLD": {
+      "displayName": "Threshold",
+      "category": "comparison",
+      "status": "todo",
+      "relatedIssues": [
+        1
+      ],
+      "focusHints": [
+        "境界値（a=bちょうど等）での出力",
+        "issue #1 で指摘: min/maxのtext/value読み取り元が非対称。実機での影響有無を確認"
+      ],
+      "notes": []
+    },
+    "TIMER_RTF": {
+      "displayName": "Timer (RTF)",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "TIMER_RTO": {
+      "displayName": "Timer (RTO)",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "TIMER_TOF": {
+      "displayName": "Timer (TOF)",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "TIMER_TON": {
+      "displayName": "Timer (TON)",
+      "category": "control",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "reset系入力があるノードは、reset時の内部状態の扱い",
+        "interval/charge_time等パラメータのデフォルト値と単位",
+        "マイコン起動直後の初期状態"
+      ],
+      "notes": []
+    },
+    "TOGGLE": {
+      "displayName": "Toggle",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "エッジ検出のタイミング（立ち上がりのみか、両エッジか）",
+        "マイコン起動直後の初期出力状態"
+      ],
+      "notes": []
+    },
+    "TOOLTIP_BOOLEAN": {
+      "displayName": "Tooltip On/Off",
+      "category": "debug",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "出力ポートを持つかどうか（TOOLTIP_BOOLEANは出力なしと確認済み。#4備考）",
+        "表示専用（cosmetic-only）で他ノードの挙動に影響しないか"
+      ],
+      "notes": []
+    },
+    "TOOLTIP_NUMBER": {
+      "displayName": "Tooltip Number",
+      "category": "debug",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "出力ポートを持つかどうか（TOOLTIP_BOOLEANは出力なしと確認済み。#4備考）",
+        "表示専用（cosmetic-only）で他ノードの挙動に影響しないか"
+      ],
+      "notes": []
+    },
+    "video_in": {
+      "displayName": "Project Input Video",
+      "category": "project",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "未接続時の外部入出力のデフォルト値",
+        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+      ],
+      "notes": []
+    },
+    "video_out": {
+      "displayName": "Project Output Video",
+      "category": "project",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "未接続時の外部入出力のデフォルト値",
+        "sym*（アイコン）属性等、往復変換で失われやすい付随情報の有無（#10関連）"
+      ],
+      "notes": []
+    },
+    "VIDEO_SWITCHBOX": {
+      "displayName": "Video Switchbox",
+      "category": "composite",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "switch入力による切替の真理値表",
+        "一部入力（bなど）が未接続の場合の挙動（#4）"
+      ],
+      "notes": []
+    },
+    "XOR": {
+      "displayName": "XOR",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "複数入力が同時に真になった場合の出力（論理式通りか、実装上の特殊挙動がないか）",
+        "未接続の入力ポートのデフォルト値（false固定か、警告のみで済むか）"
+      ],
+      "notes": []
+    }
+  }
+}

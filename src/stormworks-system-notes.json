@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "1",
+  "description": "個々のゲート/ノードに紐づかない、Stormworksマイコン全体に共通する仕様・挙動のナレッジソース。node-behavior-notes.json と同じ形式で notes を追記する。",
+  "entries": {
+    "tick-rate": {
+      "title": "マイコンの実行周期（tick rate）",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "1秒あたりのtick数（想定: 60Hz）と、DELTA/CAPACITOR/TIMER系ノードの時間パラメータとの単位換算",
+        "ゲーム内のポーズ・スロー再生時にtickがどう扱われるか"
+      ],
+      "notes": []
+    },
+    "execution-order": {
+      "title": "コンポーネント間の評価順序",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "1tick内でノードがどの順序で評価されるか（依存関係によるトポロジカル順か、固定順か）",
+        "フィードバックループ（自己参照的な配線）がある場合、値が1tick遅れる境界はどこか"
+      ],
+      "notes": []
+    },
+    "composite-signal-layout": {
+      "title": "Composite信号のチャンネル数・レイアウト",
+      "status": "todo",
+      "relatedIssues": [
+        3,
+        4
+      ],
+      "focusHints": [
+        "1つのcomposite信号が持つnumber/booleanチャンネル数の上限",
+        "COMPOSITE_READ/WRITE系のchannelインデックスが0始まりか1始まりか（#3のchannel=null調査と合わせて確認）"
+      ],
+      "notes": []
+    },
+    "number-precision": {
+      "title": "数値信号の型・精度・範囲",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "number信号の内部表現（float32/double等）と有効範囲",
+        "オーバーフロー・Infinity・NaNがゲーム内でどう扱われるか"
+      ],
+      "notes": []
+    },
+    "lua-script-api": {
+      "title": "LUAコンポーネントのスクリプトAPI",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "onTick等のエントリポイント関数名・呼び出しタイミング",
+        "input/output/property/screen等、スクリプトから参照できるグローバルAPIの一覧"
+      ],
+      "notes": []
+    },
+    "project-io-limits": {
+      "title": "マイコンの入出力ピン数・種別ごとの上限",
+      "status": "todo",
+      "relatedIssues": [],
+      "focusHints": [
+        "number/boolean/composite/video/audio各signal種別の入出力ピン数上限",
+        "上限を超えた場合にエディタ・実機でどう扱われるか"
+      ],
+      "notes": []
+    },
+    "xml-serialization-conventions": {
+      "title": "XML保存時の一般的な省略規則",
+      "status": "todo",
+      "relatedIssues": [
+        1,
+        11,
+        13
+      ],
+      "focusHints": [
+        "デフォルト値のプロパティがXML上で省略されるかどうかの一般規則（#1, #11, #13で個別ケースを確認済み。共通パターン化できるか）",
+        "position(x/y/z)が0の場合に軸ごと省略されるルール（#13）"
+      ],
+      "notes": []
+    }
+  }
+}
