@@ -4,6 +4,7 @@
 import type { IrScalarValue, IrSignalKind } from "../ir.js";
 import type {
   ComponentBinding,
+  ComponentDynamicInputsBinding,
   DefinitionValueType,
   NodePortDefinition,
   ProjectNodeBinding,
@@ -11,6 +12,7 @@ import type {
 import type { NodeDefinitionRegistry } from "../definitions/loader.js";
 import type {
   BehaviorNote,
+  BehaviorNoteStatus,
   NodeBehaviorNotesDocument,
   StormworksSystemNotesDocument,
 } from "../behavior-notes/schema.js";
@@ -30,6 +32,20 @@ export interface GateSpecProperty {
   enumOptions?: string[];
 }
 
+// Components whose actual input port count is determined at instantiation time by a property
+// value (e.g. COMPOSITE_WRITE_NUMBER's `in1`, `in2`, ... driven by its `count` property) don't
+// list those ports under `ports.inputs` at all -- only the prefix/count/signal pattern is known
+// statically. `exampleKeys` materializes one concrete instantiation (using the property's
+// default count) so callers always see at least one realistic set of dynamic port names.
+export interface GateSpecDynamicInputs {
+  prefix: string;
+  startIndex: number;
+  countProperty: string;
+  signal: IrSignalKind;
+  exampleCount: number;
+  exampleKeys: string[];
+}
+
 export interface GateSpec {
   id: string;
   displayName: string;
@@ -37,8 +53,11 @@ export interface GateSpec {
   stormworksBinding: string;
   inputs: GateSpecPort[];
   outputs: GateSpecPort[];
+  dynamicInputs?: GateSpecDynamicInputs;
   properties: GateSpecProperty[];
   notes: BehaviorNote[];
+  status: BehaviorNoteStatus;
+  focusHints: string[];
   relatedIssues: number[];
   usageExample: string;
 }
@@ -72,6 +91,12 @@ export function buildGateSpec(
   const inputs = definition.ports.inputs.map(toGateSpecPort);
   const outputs = definition.ports.outputs.map(toGateSpecPort);
 
+  const dynamicInputsBinding =
+    definition.category !== "project" ? (definition.stormworks as ComponentBinding).dynamicInputs : undefined;
+  const dynamicInputs = dynamicInputsBinding
+    ? buildDynamicInputsSpec(dynamicInputsBinding, definition.defaults)
+    : undefined;
+
   return {
     id: definition.id,
     displayName: definition.displayName,
@@ -79,10 +104,46 @@ export function buildGateSpec(
     stormworksBinding,
     inputs,
     outputs,
+    dynamicInputs,
     properties,
     notes: behaviorEntry?.notes ?? [],
+    status: behaviorEntry?.status ?? "todo",
+    focusHints: behaviorEntry?.focusHints ?? [],
     relatedIssues: behaviorEntry?.relatedIssues ?? [],
-    usageExample: buildUsageExample(definition.id, definition.category, definition.displayName, inputs, outputs, properties),
+    usageExample: buildUsageExample(
+      definition.id,
+      definition.category,
+      definition.displayName,
+      inputs,
+      outputs,
+      dynamicInputs,
+      properties,
+    ),
+  };
+}
+
+// Materialize the prefix/count/signal pattern for a dynamic-input component into one concrete
+// example (using the property's own default count, falling back to 1 if it has none).
+function buildDynamicInputsSpec(
+  binding: ComponentDynamicInputsBinding,
+  defaults: Record<string, IrScalarValue> | undefined,
+): GateSpecDynamicInputs {
+  const startIndex = binding.startIndex ?? 1;
+  const defaultCount = defaults?.[binding.countProperty];
+  const exampleCount = typeof defaultCount === "number" && defaultCount >= 1 ? defaultCount : 1;
+  const exampleKeys: string[] = [];
+
+  for (let index = startIndex; index < startIndex + exampleCount; index += 1) {
+    exampleKeys.push(`${binding.prefix}${index}`);
+  }
+
+  return {
+    prefix: binding.prefix,
+    startIndex,
+    countProperty: binding.countProperty,
+    signal: binding.signal ?? "unknown",
+    exampleCount,
+    exampleKeys,
   };
 }
 
@@ -95,6 +156,7 @@ function buildUsageExample(
   displayName: string,
   inputs: GateSpecPort[],
   outputs: GateSpecPort[],
+  dynamicInputs: GateSpecDynamicInputs | undefined,
   properties: GateSpecProperty[],
 ): string {
   if (category === "project") {
@@ -111,10 +173,13 @@ function buildUsageExample(
     .join(", ");
   const propertiesSuffix = propertyAssignments.length > 0 ? ` (${propertyAssignments})` : "";
 
-  const inputAssignments = inputs.map((port) => `${port.key}=${toNetPlaceholder(port.key)}`).join(", ");
+  const staticInputAssignments = inputs.map((port) => `${port.key}=${toNetPlaceholder(port.key)}`);
+  const dynamicInputAssignments = (dynamicInputs?.exampleKeys ?? []).map((key) => `${key}=${toNetPlaceholder(key)}`);
+  const inputAssignments = [...staticInputAssignments, ...dynamicInputAssignments].join(", ");
   const outputAssignments = outputs.map((port) => `${port.key}=${toNetPlaceholder(port.key)}`).join(", ");
+  const inputSegment = inputAssignments.length > 0 ? `${inputAssignments} ` : "";
 
-  return `inst ${id} ${toInstanceNamePlaceholder(id)}${propertiesSuffix} : ${inputAssignments} -> ${outputAssignments}`;
+  return `inst ${id} ${toInstanceNamePlaceholder(id)}${propertiesSuffix} : ${inputSegment}-> ${outputAssignments}`;
 }
 
 function formatExamplePropertyValue(property: GateSpecProperty): string {
@@ -155,6 +220,11 @@ export function formatGateSpecText(spec: GateSpec): string {
   lines.push("");
   lines.push("Inputs:");
   lines.push(...formatPortLines(spec.inputs));
+
+  if (spec.dynamicInputs) {
+    lines.push(...formatDynamicInputsLines(spec.dynamicInputs));
+  }
+
   lines.push("Outputs:");
   lines.push(...formatPortLines(spec.outputs));
 
@@ -178,6 +248,15 @@ export function formatGateSpecText(spec: GateSpec): string {
     lines.push("  No documented behavior notes for this gate yet. This does not mean it behaves");
     lines.push('  exactly as a "textbook" gate would -- it means nobody has recorded a note for it.');
     lines.push("  If precise behavior matters for your task, verify in-game rather than assuming.");
+
+    if (spec.focusHints.length > 0) {
+      lines.push("");
+      lines.push("  Open questions nobody has confirmed yet (worth checking if precise behavior matters):");
+
+      for (const hint of spec.focusHints) {
+        lines.push(`    - ${hint}`);
+      }
+    }
   } else {
     for (const note of spec.notes) {
       lines.push(formatNoteLine(note));
@@ -334,6 +413,14 @@ function formatPortLines(ports: GateSpecPort[]): string[] {
   }
 
   return ports.map((port) => `  ${port.key}: ${port.signal}${port.label ? ` ("${port.label}")` : ""}`);
+}
+
+function formatDynamicInputsLines(dynamicInputs: GateSpecDynamicInputs): string[] {
+  const lastExampleKey = dynamicInputs.exampleKeys[dynamicInputs.exampleKeys.length - 1] ?? `${dynamicInputs.prefix}${dynamicInputs.startIndex}`;
+
+  return [
+    `  ${dynamicInputs.prefix}${dynamicInputs.startIndex}..${lastExampleKey}: ${dynamicInputs.signal} (dynamic -- the actual count is set by the "${dynamicInputs.countProperty}" property; shown here with its default count of ${dynamicInputs.exampleCount})`,
+  ];
 }
 
 function formatPropertyLine(property: GateSpecProperty): string {
