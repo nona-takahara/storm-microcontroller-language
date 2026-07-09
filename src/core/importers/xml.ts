@@ -34,6 +34,8 @@ export interface StormworksXmlImportWarning {
   code: string;
   message: string;
   path?: string;
+  /** Defaults to "warning" when omitted; use "info" for non-actionable status reporting (e.g. import summaries). */
+  severity?: "warning" | "info";
 }
 
 export interface StormworksXmlImportOptions {
@@ -173,6 +175,7 @@ function buildIrProgram(
   warnings.unshift({
     code: "XML_IMPORT_SUMMARY",
     message: `Imported ${program.nodes.length} nodes, ${program.links.length} links, and ${program.submodules.length} submodules from XML.`,
+    severity: "info",
   });
 
   return program;

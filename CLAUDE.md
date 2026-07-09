@@ -47,7 +47,7 @@ All formats pass through `IrProgram` (nodes + links + submodules + metadata). Th
 - `project.json` — metadata + project-surface layout (external pin/submodule anchor positions); Lua scripts referenced by `script_ref` live in separate `.lua` files
 
 **Node definitions** — `src/definitions.json`  
-The single source of truth for all gate definitions. Maps Stormworks XML `type` numbers to DSL `definitionId`s, including port signals and property XML paths. `scripts/copy-definitions.mjs` copies this file to `dist/` at build time. Schema version is enforced (`NODE_DEFINITIONS_SCHEMA_VERSION = "9"`). `definitions/sample/` is intentionally empty (the directory exists for historical reasons).
+The single source of truth for all gate definitions. Maps Stormworks XML `type` numbers to DSL `definitionId`s, including port signals and property XML paths. `scripts/copy-definitions.mjs` copies this file to `dist/` at build time. Schema version is enforced (`NODE_DEFINITIONS_SCHEMA_VERSION = "10"`). `definitions/sample/` is intentionally empty (the directory exists for historical reasons).
 
 Gate coverage as of the current definitions: all known boolean logic, arithmetic, comparison, control (PID/timer/counter), composite signal, property, debug, and Lua gates are defined. Unknown XML types pass through as `LOGIC_COMPONENT:<type>` with a warning.
 
