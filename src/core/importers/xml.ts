@@ -1039,9 +1039,9 @@ function extractDefinedProperties(
       warnings.push(createWarningDiagnostic(
         "PROPERTY_MISSING",
         `Required property ${propertyDefinition.key} was not found for ${definition?.id ?? "unknown"}.`,
-        path,
         "xml-importer",
         undefined,
+        path,
       ));
     }
   }
