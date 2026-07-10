@@ -103,7 +103,7 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
       from: formatProjectLinkEndpoint(link.from.nodeId, nodeById, projectNodeIdByIrId, constantIdByIrId, submodulePortIndex),
       to: formatProjectLinkEndpoint(link.to.nodeId, nodeById, projectNodeIdByIrId, constantIdByIrId, submodulePortIndex),
     })),
-    warnings: [...program.metadata.warnings],
+    warnings: program.metadata.warnings.map((warning) => warning.message),
   };
 }
 

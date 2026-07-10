@@ -1,8 +1,8 @@
 // Shared diagnostic helpers keep CLI, MCP, and library code on one public shape.
 export type StormworksDiagnosticSeverity = "error" | "warning" | "info";
-export type StormworksDiagnosticSource = "project" | "sw-net" | "sw-mcl" | "script" | "xml" | "library";
+export type StormworksDiagnosticSource = string;
 
-export interface StormworksLibraryDiagnostic {
+export interface Diagnostic {
   severity: StormworksDiagnosticSeverity;
   code: string;
   message: string;
@@ -11,13 +11,15 @@ export interface StormworksLibraryDiagnostic {
   source: StormworksDiagnosticSource;
 }
 
+export type StormworksLibraryDiagnostic = Diagnostic;
+
 export interface StormworksLibraryResult<T> {
   value?: T;
-  diagnostics: StormworksLibraryDiagnostic[];
+  diagnostics: Diagnostic[];
 }
 
 // Keep error checks centralized so future severity additions cannot drift between callers.
-export function hasErrorDiagnostics(diagnostics: readonly StormworksLibraryDiagnostic[]): boolean {
+export function hasErrorDiagnostics(diagnostics: readonly Diagnostic[]): boolean {
   return diagnostics.some((diagnostic) => diagnostic.severity === "error");
 }
 
@@ -30,7 +32,7 @@ export function createDiagnostic(
   source: StormworksDiagnosticSource,
   documentId?: string,
   path?: string,
-): StormworksLibraryDiagnostic {
+): Diagnostic {
   return {
     severity,
     code,
@@ -47,7 +49,7 @@ export function createWarningDiagnostic(
   source: StormworksDiagnosticSource,
   documentId?: string,
   path?: string,
-): StormworksLibraryDiagnostic {
+): Diagnostic {
   return createDiagnostic("warning", code, message, source, documentId, path);
 }
 
@@ -57,7 +59,7 @@ export function createInfoDiagnostic(
   source: StormworksDiagnosticSource,
   documentId?: string,
   path?: string,
-): StormworksLibraryDiagnostic {
+): Diagnostic {
   return createDiagnostic("info", code, message, source, documentId, path);
 }
 
@@ -67,17 +69,67 @@ export function createErrorDiagnostic(
   source: StormworksDiagnosticSource,
   documentId?: string,
   path?: string,
-): StormworksLibraryDiagnostic {
+): Diagnostic {
   return createDiagnostic("error", code, message, source, documentId, path);
 }
 
+// Wrap validator/parser calls that still throw into the library result shape at the boundary.
+// This keeps throw-based code local to schema validators while public facades return diagnostics.
+export function runToDiagnostics<T>(
+  fn: () => T,
+  source: StormworksDiagnosticSource,
+  code = "OPERATION_FAILED",
+  documentId?: string,
+  path?: string,
+): StormworksLibraryResult<T> {
+  try {
+    return { value: fn(), diagnostics: [] };
+  } catch (error) {
+    return {
+      diagnostics: [
+        createErrorDiagnostic(
+          code,
+          error instanceof Error ? error.message : String(error),
+          source,
+          documentId,
+          path,
+        ),
+      ],
+    };
+  }
+}
+
+export async function runAsyncToDiagnostics<T>(
+  fn: () => Promise<T>,
+  source: StormworksDiagnosticSource,
+  code = "OPERATION_FAILED",
+  documentId?: string,
+  path?: string,
+): Promise<StormworksLibraryResult<T>> {
+  try {
+    return { value: await fn(), diagnostics: [] };
+  } catch (error) {
+    return {
+      diagnostics: [
+        createErrorDiagnostic(
+          code,
+          error instanceof Error ? error.message : String(error),
+          source,
+          documentId,
+          path,
+        ),
+      ],
+    };
+  }
+}
+
 // Format diagnostics consistently for human-facing CLI/MCP output; include location only when present.
-export function formatDiagnostic(diagnostic: StormworksLibraryDiagnostic): string {
+export function formatDiagnostic(diagnostic: Diagnostic): string {
   const location = [diagnostic.documentId, diagnostic.path].filter((value): value is string => !!value).join(":");
   const suffix = location.length > 0 ? ` (${location})` : "";
   return `[${diagnostic.severity}] ${diagnostic.code}${suffix}: ${diagnostic.message}`;
 }
 
-export function formatDiagnostics(diagnostics: readonly StormworksLibraryDiagnostic[]): string {
+export function formatDiagnostics(diagnostics: readonly Diagnostic[]): string {
   return diagnostics.map(formatDiagnostic).join("\n");
 }

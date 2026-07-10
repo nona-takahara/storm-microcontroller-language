@@ -53,7 +53,7 @@ export function buildStormworksSwMclDocument(
     moduleId,
     ports: submodule ? buildSwMclPorts(submodule, nodeById) : [],
     instances: submodule ? buildSwMclInstances(submodule, nodeById) : buildFallbackSwMclInstances(program),
-    warnings: [...program.metadata.warnings],
+    warnings: program.metadata.warnings.map((warning) => warning.message),
   };
 }
 

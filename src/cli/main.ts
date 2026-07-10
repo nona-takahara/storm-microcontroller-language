@@ -28,6 +28,7 @@ import {
   STORMWORKS_SW_MCL_FORMAT_VERSION,
   type IrVector2,
   type LayoutTarget,
+  createErrorDiagnostic,
   formatDiagnostic,
   hasErrorDiagnostics,
   type StormworksLibraryDiagnostic,
@@ -79,7 +80,14 @@ async function runXml2DslCommand(args: string[]): Promise<number> {
   }
 
   const definitions = await loadBundledNodeDefinitions();
-  const xmlText = await readUtf8TextFile(parsedArgs.inputPath);
+  const xmlRead = await readTextFileToDiagnostics(parsedArgs.inputPath);
+
+  if (!xmlRead.value) {
+    printDiagnostics(xmlRead.diagnostics);
+    return 1;
+  }
+
+  const xmlText = xmlRead.value;
   const result = importStormworksXmlToProjectSource(xmlText, {
     definitions,
     sourceName: parsedArgs.inputPath,
@@ -699,6 +707,38 @@ function parseDsl2XmlArgs(
   return projectJsonPath ? { projectJsonPath, outputPath } : undefined;
 }
 
+
+// File-system failures are user input errors in the CLI, so report them as diagnostics rather
+// than leaking raw Node.js exceptions from individual command handlers.
+async function readTextFileToDiagnostics(
+  filePath: string,
+): Promise<{ value?: string; diagnostics: StormworksLibraryDiagnostic[] }> {
+  try {
+    return { value: await readUtf8TextFile(filePath), diagnostics: [] };
+  } catch (error) {
+    const code = isNodeErrorCode(error, "ENOENT") ? "FILE_NOT_FOUND" : "FILE_READ_FAILED";
+    return {
+      diagnostics: [
+        createErrorDiagnostic(
+          code,
+          error instanceof Error ? error.message : String(error),
+          "cli",
+          filePath,
+        ),
+      ],
+    };
+  }
+}
+
+function isNodeErrorCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === code
+  );
+}
+
 // Parse commands that take exactly one project.json path.
 function parseProjectJsonPathArgs(
   args: string[],
@@ -768,7 +808,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
       process.exitCode = exitCode;
     })
     .catch((error) => {
-      console.error(error instanceof Error ? error.message : String(error));
+      printDiagnostics([
+        createErrorDiagnostic("INTERNAL_ERROR", error instanceof Error ? error.message : String(error), "cli"),
+      ]);
       process.exitCode = 1;
     });
 }
