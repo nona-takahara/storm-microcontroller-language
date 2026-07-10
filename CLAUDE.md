@@ -23,6 +23,15 @@ pnpm cli layout-dsl <project.json> [--module <id>] [--all-submodules] [--force] 
 pnpm cli spec [<definitionId>] [--list] [--json]   # gate/tool behavior reference, see below
 ```
 
+## MCP server
+
+```bash
+pnpm mcp          # run the stdio MCP server directly via tsx
+storm-mcl-mcp    # installed/built package binary
+```
+
+The MCP server exposes `xml_to_dsl`, `dsl_to_xml`, `check_dsl`, `typecheck_dsl`, and `spec`. The `spec` tool intentionally mirrors `storm-mcl spec` because its overview, gate list, and per-gate behavior notes are optimized for AI-agent reference workflows. Keep MCP-facing descriptions and result text in English for global client compatibility.
+
 ## Architecture
 
 The tool converts Stormworks microcontroller save files (XML) to/from a human-editable DSL format.
