@@ -88,6 +88,7 @@ Available MCP tools mirror the core CLI workflows.
 | `check_dsl` | Validate DSL syntax and import resolution. |
 | `typecheck_dsl` | Validate signal types and report port mismatches. |
 | `spec` | Read the same gate/tool behavior reference as `storm-mcl spec`; use `list=true`, `gate_id`, and/or `json=true`. |
+| `layout_dsl` | Compute (and by default write) `.sw-mcl` auto-layout, same as `storm-mcl layout-dsl`; supports `module_id`/`document_path`, `all_submodules`, `force`, `dry_run`, and `grid_size`. |
 
 All MCP tool descriptions and responses are written in English so global MCP clients can display them consistently.
 

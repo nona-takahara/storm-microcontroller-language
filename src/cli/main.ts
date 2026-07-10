@@ -8,11 +8,9 @@ import {
   buildSpecOverview,
   buildStormworksXmlFromProjectSource,
   buildStormworksXmlTreeFromProjectSource,
-  compareSwNetIdentifier,
   createFileSystemProjectSourceDocumentLoader,
   formatGateSpecListText,
   formatGateSpecText,
-  formatPortOccurrenceKey,
   formatSpecOverviewText,
   importStormworksXmlToProjectSource,
   listGateSpecSummaries,
@@ -20,29 +18,21 @@ import {
   loadBundledNodeDefinitions,
   loadBundledStormworksSystemNotes,
   loadProjectSourceFromProjectJsonFile,
-  readSwNetAndOptionalSwMcl,
   readUtf8TextFile,
   resolveLayoutTargets,
   resolveProjectSource,
+  runLayoutDslForTarget,
   serializeSourceDocumentTexts,
-  STORMWORKS_SW_MCL_FORMAT_VERSION,
-  type IrVector2,
   type LayoutTarget,
   createErrorDiagnostic,
   formatDiagnostic,
   hasErrorDiagnostics,
   type StormworksLibraryDiagnostic,
   type StormworksProjectSource,
-  type StormworksSwMclDocument,
-  type SwMclInstanceDocument,
-  type SwMclPortDocument,
-  type SwNetModule,
   validateProjectSource,
   writeProjectSourceToDirectory,
-  writeSwMclDocument,
   writeUtf8TextFile,
 } from "../node.js";
-import { computeSwNetModuleLayout, type AutoLayoutExistingPositions } from "../core/layout/auto-layout.js";
 import { extname } from "node:path";
 
 // Dispatch one CLI invocation to the selected command handler.
@@ -348,149 +338,37 @@ async function runLayoutDslCommand(args: string[]): Promise<number> {
   return hasErrors ? 1 : 0;
 }
 
-// Compute and (unless --dry-run) write the layout for one resolved sw-net/sw-mcl target pair.
+// Compute and (unless --dry-run) write the layout for one resolved sw-net/sw-mcl target pair,
+// printing CLI-formatted diagnostics around the shared runLayoutDslForTarget core.
 async function layoutOneTarget(target: LayoutTarget, args: LayoutDslArgs): Promise<boolean> {
-  const { swNet, existingSwMcl } = await readSwNetAndOptionalSwMcl(target.swNetPath, target.swMclPath);
-  const selection = selectTargetModule(swNet.modules, target.moduleId, existingSwMcl?.moduleId);
-
-  if (!selection) {
-    const availableIds = swNet.modules.map((module) => module.id).join(", ") || "(none)";
-    console.error(`[error] ${target.swNetPath}: no target module found; use --module to select one of: ${availableIds}.`);
-    return true;
-  }
-
-  for (const skippedModuleId of selection.skipped) {
-    console.error(
-      `[warning] ${target.swNetPath}: module ${skippedModuleId} is outside layout-dsl's v1 scope (one module per file) and was left untouched; see issue #7.`,
-    );
-  }
-
-  const mode = args.force ? "force" : "fill";
-  const existing = mode === "fill" ? buildExistingPositions(existingSwMcl) : undefined;
-  const result = await computeSwNetModuleLayout(selection.module, {
-    mode,
-    existing,
+  const result = await runLayoutDslForTarget(target, {
+    force: args.force,
+    dryRun: args.dryRun,
     gridSize: args.gridSize,
   });
+
+  if (!result.ok) {
+    console.error(`[error] ${target.swNetPath}: ${result.errorMessage}`);
+    return true;
+  }
 
   for (const warning of result.warnings) {
     console.error(`[warning] ${target.swNetPath}: ${warning}`);
   }
 
-  const document: StormworksSwMclDocument = {
-    formatVersion: STORMWORKS_SW_MCL_FORMAT_VERSION,
-    sourceName: target.documentId,
-    moduleId: selection.module.id,
-    ports: [...result.ports].sort(comparePorts),
-    instances: [...result.instances].sort(compareInstances),
-    warnings: [...(existingSwMcl?.warnings ?? [])],
-  };
-
-  const summary = summarizeLayoutChange(existingSwMcl, document, mode);
-  console.error(
-    `${target.swMclPath}: ${summary.kept} kept, ${summary.added} added, ${summary.overwritten} overwritten.`,
-  );
+  if (result.summary) {
+    console.error(
+      `${target.swMclPath}: ${result.summary.kept} kept, ${result.summary.added} added, ${result.summary.overwritten} overwritten.`,
+    );
+  }
 
   if (args.dryRun) {
-    console.log(JSON.stringify(document, null, 2));
+    console.log(JSON.stringify(result.document, null, 2));
     return false;
   }
 
-  await writeSwMclDocument(target.swMclPath, document);
   console.error(`Wrote ${target.swMclPath}`);
   return false;
-}
-
-// Select the module a sw-net document's layout applies to, mirroring sw-mcl.ts's selectSwMclSubmodule rule.
-function selectTargetModule(
-  modules: SwNetModule[],
-  requestedModuleId: string | undefined,
-  fallbackModuleId: string | undefined,
-): { module: SwNetModule; skipped: string[] } | undefined {
-  const preferredId = requestedModuleId ?? fallbackModuleId;
-  const selected =
-    (preferredId ? modules.find((module) => module.id === preferredId) : undefined) ??
-    modules.find((module) => module.id === "main") ??
-    (modules.length === 1 ? modules[0] : undefined);
-
-  if (!selected) {
-    return undefined;
-  }
-
-  return {
-    module: selected,
-    skipped: modules.filter((module) => module.id !== selected.id).map((module) => module.id),
-  };
-}
-
-// Build the existing-position lookup fed to computeSwNetModuleLayout's fill mode.
-function buildExistingPositions(existingSwMcl: StormworksSwMclDocument | undefined): AutoLayoutExistingPositions | undefined {
-  if (!existingSwMcl) {
-    return undefined;
-  }
-
-  const ports = new Map<string, IrVector2>(
-    existingSwMcl.ports.map((port) => [formatPortOccurrenceKey(port.direction, port.name, port.occurrence), port.position]),
-  );
-  const instances = new Map<string, IrVector2>(
-    existingSwMcl.instances.map((instance) => [instance.id, instance.position]),
-  );
-
-  return { ports, instances };
-}
-
-// Summarize how many port/instance layout entries were kept as-is, newly added, or overwritten.
-function summarizeLayoutChange(
-  existing: StormworksSwMclDocument | undefined,
-  next: StormworksSwMclDocument,
-  mode: "fill" | "force",
-): { kept: number; added: number; overwritten: number } {
-  const existingKeys = new Set([
-    ...(existing?.ports ?? []).map((port) => `port:${formatPortOccurrenceKey(port.direction, port.name, port.occurrence)}`),
-    ...(existing?.instances ?? []).map((instance) => `instance:${instance.id}`),
-  ]);
-  const nextKeys = [
-    ...next.ports.map((port) => `port:${formatPortOccurrenceKey(port.direction, port.name, port.occurrence)}`),
-    ...next.instances.map((instance) => `instance:${instance.id}`),
-  ];
-
-  let kept = 0;
-  let added = 0;
-  let overwritten = 0;
-
-  for (const key of nextKeys) {
-    if (!existingKeys.has(key)) {
-      added += 1;
-    } else if (mode === "force") {
-      overwritten += 1;
-    } else {
-      kept += 1;
-    }
-  }
-
-  return { kept, added, overwritten };
-}
-
-// Sort ports in the same diff-stable order sw-mcl.ts's serializer produces.
-function comparePorts(left: SwMclPortDocument, right: SwMclPortDocument): number {
-  const directionComparison = compareSwNetIdentifier(left.direction, right.direction);
-
-  if (directionComparison !== 0) {
-    return directionComparison;
-  }
-
-  const nameComparison = compareSwNetIdentifier(left.name, right.name);
-
-  if (nameComparison !== 0) {
-    return nameComparison;
-  }
-
-  return left.occurrence - right.occurrence;
-}
-
-// Sort instances in the same diff-stable order sw-mcl.ts's serializer produces.
-function compareInstances(left: SwMclInstanceDocument, right: SwMclInstanceDocument): number {
-  return compareSwNetIdentifier(left.id, right.id);
 }
 
 interface LayoutDslArgs {

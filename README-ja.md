@@ -88,6 +88,7 @@ storm-mcl-mcp
 | `check_dsl` | DSL 構文と import 解決を検証します。 |
 | `typecheck_dsl` | signal 型を検証し、ポート不整合を報告します。 |
 | `spec` | `storm-mcl spec` と同じゲート・ツール挙動リファレンスを返します。`list=true`、`gate_id`、`json=true` を指定できます。 |
+| `layout_dsl` | `storm-mcl layout-dsl` と同様に `.sw-mcl` の自動レイアウトを計算し(既定では書き込みます)。`module_id`/`document_path`、`all_submodules`、`force`、`dry_run`、`grid_size` に対応します。 |
 
 MCP ツールの説明文と応答文は、世界中の MCP クライアントで一貫して表示できるように英語で返します。
 
