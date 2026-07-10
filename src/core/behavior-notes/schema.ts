@@ -1,6 +1,12 @@
 // Lightweight schema for the hand-curated gate/system behavior-notes knowledge base.
 // These are internal bundled assets (not user-supplied input), so validation here is
 // intentionally lighter than definitions/schema.ts's fully recursive validator.
+import {
+  expectArrayWith,
+  expectIntegerWith,
+  expectRecordWith,
+  expectStringWith,
+} from "../shared/json-schema-helpers.js";
 
 export const NODE_BEHAVIOR_NOTES_SCHEMA_VERSION = "1";
 export const STORMWORKS_SYSTEM_NOTES_SCHEMA_VERSION = "1";
@@ -153,34 +159,13 @@ function parseConfidence(input: unknown, path: string): BehaviorNoteConfidence {
   throw new BehaviorNotesSchemaError("Expected one of verified | inferred | unconfirmed", path);
 }
 
-function expectRecord(input: unknown, path: string): Record<string, unknown> {
-  if (typeof input === "object" && input !== null && !Array.isArray(input)) {
-    return input as Record<string, unknown>;
-  }
-
-  throw new BehaviorNotesSchemaError("Expected an object", path);
-}
-
-function expectArray(input: unknown, path: string): unknown[] {
-  if (Array.isArray(input)) {
-    return input;
-  }
-
-  throw new BehaviorNotesSchemaError("Expected an array", path);
-}
-
-function expectString(input: unknown, path: string): string {
-  if (typeof input === "string") {
-    return input;
-  }
-
-  throw new BehaviorNotesSchemaError("Expected a string", path);
-}
-
-function expectInteger(input: unknown, path: string): number {
-  if (typeof input === "number" && Number.isInteger(input)) {
-    return input;
-  }
-
-  throw new BehaviorNotesSchemaError("Expected an integer", path);
-}
+// Behavior-notes validation is intentionally shallow, but still uses the same
+// low-level guard helpers as the stricter public-input schemas to avoid drift.
+const expectRecord = (input: unknown, path: string) =>
+  expectRecordWith(input, path, BehaviorNotesSchemaError, "Expected an object");
+const expectArray = (input: unknown, path: string) =>
+  expectArrayWith(input, path, BehaviorNotesSchemaError, "Expected an array");
+const expectString = (input: unknown, path: string) =>
+  expectStringWith(input, path, BehaviorNotesSchemaError, "Expected a string");
+const expectInteger = (input: unknown, path: string) =>
+  expectIntegerWith(input, path, BehaviorNotesSchemaError, "Expected an integer");

@@ -1,5 +1,13 @@
 // Definitions schema parser that validates the external node-definition JSON used by import/export.
 import type { IrScalarValue, IrSignalKind } from "../ir.js";
+import {
+  expectArrayWith,
+  expectBooleanWith,
+  expectFiniteNumberWith,
+  expectIntegerWith,
+  expectRecordWith,
+  expectStringWith,
+} from "../shared/json-schema-helpers.js";
 
 export const NODE_DEFINITIONS_SCHEMA_VERSION = "10";
 
@@ -358,58 +366,20 @@ function parseSignalKind(input: unknown, path: string): IrSignalKind {
   );
 }
 
-// Require a plain object at the current schema path.
-function expectRecord(input: unknown, path: string): Record<string, unknown> {
-  if (typeof input === "object" && input !== null && !Array.isArray(input)) {
-    return input as Record<string, unknown>;
-  }
-
-  throw new NodeDefinitionsSchemaError("Expected an object", path);
-}
-
-// Require an array at the current schema path.
-function expectArray(input: unknown, path: string): unknown[] {
-  if (Array.isArray(input)) {
-    return input;
-  }
-
-  throw new NodeDefinitionsSchemaError("Expected an array", path);
-}
-
-// Require a string at the current schema path.
-function expectString(input: unknown, path: string): string {
-  if (typeof input === "string") {
-    return input;
-  }
-
-  throw new NodeDefinitionsSchemaError("Expected a string", path);
-}
-
-// Require a boolean at the current schema path.
-function expectBoolean(input: unknown, path: string): boolean {
-  if (typeof input === "boolean") {
-    return input;
-  }
-
-  throw new NodeDefinitionsSchemaError("Expected a boolean", path);
-}
-
-// Require an integer at the current schema path.
-function expectInteger(input: unknown, path: string): number {
-  if (typeof input === "number" && Number.isInteger(input)) {
-    return input;
-  }
-
-  throw new NodeDefinitionsSchemaError("Expected an integer", path);
-}
-
-function expectNumber(input: unknown, path: string): number {
-  if (typeof input === "number" && Number.isFinite(input)) {
-    return input;
-  }
-
-  throw new NodeDefinitionsSchemaError("Expected a number", path);
-}
+// Schema-specific wrappers preserve the wording already exposed in validation errors,
+// while the actual guard logic is shared with the other JSON parsers.
+const expectRecord = (input: unknown, path: string) =>
+  expectRecordWith(input, path, NodeDefinitionsSchemaError, "Expected an object");
+const expectArray = (input: unknown, path: string) =>
+  expectArrayWith(input, path, NodeDefinitionsSchemaError, "Expected an array");
+const expectString = (input: unknown, path: string) =>
+  expectStringWith(input, path, NodeDefinitionsSchemaError, "Expected a string");
+const expectBoolean = (input: unknown, path: string) =>
+  expectBooleanWith(input, path, NodeDefinitionsSchemaError, "Expected a boolean");
+const expectInteger = (input: unknown, path: string) =>
+  expectIntegerWith(input, path, NodeDefinitionsSchemaError, "Expected an integer");
+const expectNumber = (input: unknown, path: string) =>
+  expectFiniteNumberWith(input, path, NodeDefinitionsSchemaError, "Expected a number");
 
 function parseEnumMapping(input: unknown, path: string): Record<string, number> {
   const record = expectRecord(input, path);
