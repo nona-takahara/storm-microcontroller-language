@@ -193,7 +193,7 @@ export function buildStormworksXmlTree(
     warnings,
   );
   const componentElements = logicInstances.map((instance) =>
-    buildComponentElement(instance, netProducerByName, projectPortBindings.projectNodeByPortKey, warnings, options),
+    buildComponentElement(instance, netProducerByName, projectPortBindings.projectNodeByPortKey, projectOutputBindings, warnings, options),
   );
   const componentStateElements = buildComponentStateElements(componentElements);
   const bridgeStateElements = buildBridgeStateElements(
@@ -969,6 +969,7 @@ function buildComponentElement(
   instance: LogicInstanceContext,
   netProducerByName: Map<string, NetProducer>,
   projectNodeByPortKey: Map<string, ProjectNodeContext>,
+  projectOutputBindings: Map<string, NetProducer[]>,
   warnings: Diagnostic[],
   options: BuildStormworksXmlTreeOptions,
 ): StormworksXmlTreeElement {
@@ -1008,6 +1009,7 @@ function buildComponentElement(
       instance,
       netProducerByName,
       projectNodeByPortKey,
+      projectOutputBindings,
       warnings,
     );
 
@@ -1200,6 +1202,7 @@ function resolveXmlInputElement(
   instance: LogicInstanceContext,
   netProducerByName: Map<string, NetProducer>,
   projectNodeByPortKey: Map<string, ProjectNodeContext>,
+  projectOutputBindings: Map<string, NetProducer[]>,
   warnings: Diagnostic[],
 ): StormworksXmlTreeElement | undefined {
   if (input.value.kind === "identifier") {
@@ -1225,14 +1228,34 @@ function resolveXmlInputElement(
   if (input.value.kind === "string") {
     const projectNode = projectNodeByPortKey.get(formatPortNameKey("in", input.value.value));
 
-    if (!projectNode) {
+    if (projectNode) {
+      return {
+        "@_component_id": String(projectNode.componentId),
+      };
+    }
+
+    // Not a project input port — this can be a module reading its own output port back internally
+    // as a feedback input, where the caller bound that output straight to a project output port
+    // (e.g. entry-level `use helper h : -> y="result"`). Resolve it the same way a project output
+    // bridge would: through whichever flattened instance actually produces that output.
+    const producers = projectOutputBindings.get(input.value.value) ?? [];
+    const producer = producers[0];
+
+    if (!producer) {
       pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} references unknown module input port ${input.value.value}.`);
       return undefined;
     }
 
-    return {
-      "@_component_id": String(projectNode.componentId),
+    const element: StormworksXmlTreeElement = {
+      "@_component_id": String(producer.instance.objectId),
     };
+    const nodeIndex = resolveXmlOutputNodeIndex(producer.instance.definition, producer.outputKey);
+
+    if (nodeIndex !== undefined) {
+      element["@_node_index"] = String(nodeIndex);
+    }
+
+    return element;
   }
 
   pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} uses a non-net expression and was skipped.`);
