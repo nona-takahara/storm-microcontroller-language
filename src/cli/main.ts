@@ -31,7 +31,7 @@ import {
   createErrorDiagnostic,
   formatDiagnostic,
   hasErrorDiagnostics,
-  type StormworksLibraryDiagnostic,
+  type Diagnostic,
   type StormworksProjectSource,
   type StormworksSwMclDocument,
   type SwMclInstanceDocument,
@@ -712,7 +712,7 @@ function parseDsl2XmlArgs(
 // than leaking raw Node.js exceptions from individual command handlers.
 async function readTextFileToDiagnostics(
   filePath: string,
-): Promise<{ value?: string; diagnostics: StormworksLibraryDiagnostic[] }> {
+): Promise<{ value?: string; diagnostics: Diagnostic[] }> {
   try {
     return { value: await readUtf8TextFile(filePath), diagnostics: [] };
   } catch (error) {
@@ -753,7 +753,7 @@ function parseProjectJsonPathArgs(
 }
 
 // Print diagnostics and return whether any of them were errors.
-function printDiagnostics(diagnostics: StormworksLibraryDiagnostic[]): boolean {
+function printDiagnostics(diagnostics: Diagnostic[]): boolean {
   for (const diagnostic of diagnostics) {
     console.error(formatDiagnostic(diagnostic));
   }
