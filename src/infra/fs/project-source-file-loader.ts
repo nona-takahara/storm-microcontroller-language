@@ -8,7 +8,6 @@ import {
   createErrorDiagnostic,
   serializeSourceDocumentTexts,
   type ProjectJsonDocument,
-  type ProjectJsonSubmoduleDocument,
   type StormworksDocumentLoader,
   type StormworksLibraryDiagnostic,
   type StormworksLibraryResult,
@@ -18,6 +17,7 @@ import {
 import { type SwNetDocument, type SwNetInstStatement } from "../../core/parsers/sw-net.js";
 import { STORMWORKS_SW_MCL_FORMAT_VERSION } from "../../core/serializers/sw-mcl.js";
 import { readUtf8TextFile, writeUtf8TextFile } from "./text-file.js";
+import { selectEntrySubmodule, isFileNotFoundError } from "./project-file-helpers.js";
 import { resolveRelativeSwNetAssetPath, resolveRelativeSwNetImportPath } from "./sw-net-file-loader.js";
 
 export const DEFAULT_PROJECT_JSON_FILE_NAME = "project.json";
@@ -254,7 +254,7 @@ async function readSwMclTextOrStub(swMclPath: string, moduleId: string): Promise
   try {
     return { text: await readUtf8TextFile(swMclPath), isGenerated: false };
   } catch (error: unknown) {
-    if (typeof error === "object" && error !== null && (error as NodeJS.ErrnoException).code === "ENOENT") {
+    if (isFileNotFoundError(error)) {
       return {
         text: JSON.stringify({ formatVersion: STORMWORKS_SW_MCL_FORMAT_VERSION, moduleId, ports: [], instances: [], warnings: [] }),
         isGenerated: true,
@@ -263,26 +263,4 @@ async function readSwMclTextOrStub(swMclPath: string, moduleId: string): Promise
 
     throw error;
   }
-}
-
-// Select the entry submodule record used to locate the primary sw-net/sw-mcl files.
-function selectEntrySubmodule(
-  project: ProjectJsonDocument,
-  preferredModuleId?: string,
-): ProjectJsonSubmoduleDocument | undefined {
-  if (preferredModuleId) {
-    const preferred =
-      project.submodules.find((submodule) => submodule.id === preferredModuleId) ??
-      project.submodules.find((submodule) => submodule.name === preferredModuleId);
-
-    if (preferred) {
-      return preferred;
-    }
-  }
-
-  return (
-    project.submodules.find((submodule) => submodule.id === "main") ??
-    project.submodules.find((submodule) => submodule.name === "main") ??
-    (project.submodules.length === 1 ? project.submodules[0] : undefined)
-  );
 }

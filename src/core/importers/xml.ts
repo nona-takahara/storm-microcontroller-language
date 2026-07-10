@@ -22,6 +22,7 @@ import {
   type ProjectNodeDefinition,
   type NodePropertySource,
 } from "../definitions/schema.js";
+import { coerceScalarValue } from "../shared/scalar-coercion.js";
 
 export type StormworksXmlParserOptions = NonNullable<ConstructorParameters<typeof XMLParser>[0]>;
 
@@ -1087,41 +1088,6 @@ function extractPropertyValue(
   return coerceScalarValue(rawValue, valueType);
 }
 
-// Coerce XML text and attribute data into the scalar types stored in IR properties.
-function coerceScalarValue(value: unknown, valueType: DefinitionValueType): IrScalarValue | undefined {
-  if (valueType === "string") {
-    return typeof value === "string" ? value : String(value);
-  }
-
-  if (valueType === "number") {
-    if (typeof value === "number") {
-      return Number.isFinite(value) ? value : undefined;
-    }
-
-    if (typeof value === "string" && value.trim().length > 0) {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }
-
-    return undefined;
-  }
-
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    if (value === "true" || value === "1") {
-      return true;
-    }
-
-    if (value === "false" || value === "0") {
-      return false;
-    }
-  }
-
-  return undefined;
-}
 
 // Read a Selector-style <items><i l=".."><v text=".." value=".."/></i></items> list into a stable
 // {l, value} JSON array; attribute values are kept as raw strings to avoid numeric formatting drift.
@@ -1262,9 +1228,9 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Read the vehicle-space position attached to a project node.
-function readProjectPosition(nodeRecord: Record<string, unknown>): { x: number; y: number } | undefined {
-  const positionRecord = asRecord(nodeRecord.position);
+// Read a nested XML position record while allowing each Stormworks scope to use its own path/axis names.
+function readPosition(record: Record<string, unknown>, positionPath: string, yAxisKey: "y" | "z"): { x: number; y: number } | undefined {
+  const positionRecord = asRecord(getValueByPath(record, positionPath));
 
   if (!positionRecord) {
     return undefined;
@@ -1272,36 +1238,23 @@ function readProjectPosition(nodeRecord: Record<string, unknown>): { x: number; 
 
   return {
     x: parseNumberAttribute(positionRecord, "x") ?? 0,
-    y: parseNumberAttribute(positionRecord, "z") ?? 0,
+    y: parseNumberAttribute(positionRecord, yAxisKey) ?? 0,
   };
+}
+
+// Read the vehicle-space position attached to a project node.
+function readProjectPosition(nodeRecord: Record<string, unknown>): { x: number; y: number } | undefined {
+  return readPosition(nodeRecord, "position", "z");
 }
 
 // Read the bridge-canvas position attached to a project bridge record.
 function readBridgePosition(bridgeRecord: Record<string, unknown>): { x: number; y: number } | undefined {
-  const positionRecord = asRecord(bridgeRecord.pos);
-
-  if (!positionRecord) {
-    return undefined;
-  }
-
-  return {
-    x: parseNumberAttribute(positionRecord, "x") ?? 0,
-    y: parseNumberAttribute(positionRecord, "y") ?? 0,
-  };
+  return readPosition(bridgeRecord, "pos", "y");
 }
 
 // Read the module-canvas position attached to a logic component.
 function readLogicPosition(componentRecord: Record<string, unknown>): { x: number; y: number } | undefined {
-  const positionRecord = asRecord(getValueByPath(componentRecord, "object.pos"));
-
-  if (!positionRecord) {
-    return undefined;
-  }
-
-  return {
-    x: parseNumberAttribute(positionRecord, "x") ?? 0,
-    y: parseNumberAttribute(positionRecord, "y") ?? 0,
-  };
+  return readPosition(componentRecord, "object.pos", "y");
 }
 
 // Walk a dotted path through the parsed XML object tree.
