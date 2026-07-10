@@ -344,6 +344,10 @@ async function handleLayoutDsl(args: {
   dry_run?: boolean;
   grid_size?: number;
 }) {
+  if (args.all_submodules && (args.module_id !== undefined || args.document_path !== undefined)) {
+    return errorResult("Use all_submodules alone; it cannot be combined with module_id or document_path.");
+  }
+
   const targets = await resolveLayoutTargets(args.project_json_path, {
     document: args.document_path,
     module: args.module_id,
