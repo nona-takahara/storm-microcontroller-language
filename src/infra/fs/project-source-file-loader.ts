@@ -8,9 +8,9 @@ import {
   createErrorDiagnostic,
   createWarningDiagnostic,
   serializeSourceDocumentTexts,
+  type Diagnostic,
   type ProjectJsonDocument,
   type StormworksDocumentLoader,
-  type StormworksLibraryDiagnostic,
   type StormworksLibraryResult,
   type StormworksProjectSource,
   type StormworksSourceDocument,
@@ -54,7 +54,7 @@ export function resolveProjectSourceFilePaths(
 export async function loadProjectSourceFromProjectJsonFile(
   projectJsonPath: string,
 ): Promise<StormworksLibraryResult<StormworksProjectSource>> {
-  const diagnostics: StormworksLibraryDiagnostic[] = [];
+  const diagnostics: Diagnostic[] = [];
   const filePaths = resolveProjectSourceFilePaths(projectJsonPath);
 
   try {
