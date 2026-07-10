@@ -80,6 +80,7 @@ const DEFAULT_MAX_EXTENT = 32;
 const PORT_NODE_SIZE = 0.25;
 const INSTANCE_NODE_WIDTH = 1.0;
 const INSTANCE_NODE_ROW_HEIGHT = 0.25;
+const INSTANCE_NODE_MIN_HEIGHT = 0.5;
 
 const PORT_NODE_ID_PREFIX = "p$";
 const INSTANCE_NODE_ID_PREFIX = "n$";
@@ -168,6 +169,14 @@ function buildPortSlots(module: SwNetModule): PortSlot[] {
   });
 }
 
+// Estimate an inst/use statement's node height in .sw-mcl grid units from its pin count, calibrated
+// against real Stormworks block measurements (see the scale-constants comment above): half a grid
+// cell minimum, growing by one row per pin beyond the block's built-in first row.
+function estimateInstanceHeight(statement: SwNetStatement): number {
+  const pinCount = Math.max(statement.inputs.length, statement.outputs.length);
+  return Math.max(INSTANCE_NODE_MIN_HEIGHT, (pinCount + 1) * INSTANCE_NODE_ROW_HEIGHT);
+}
+
 // Compute the bounding box of a module that already has a real .sw-mcl layout, so a `use`
 // statement referencing it from another module can be sized to its real footprint instead of a
 // generic placeholder box. Ports/instances without a matching swMcl entry are skipped rather than
@@ -210,7 +219,6 @@ export function computeModuleFootprint(
       continue;
     }
 
-    const rowCount = Math.max(1, statement.inputs.length, statement.outputs.length);
     const nested = nestedFootprints.get(statement.instanceId);
     // instance.position is an anchor, not the content's top-left, whenever the statement is
     // itself a real-layout `use`: the anchor-correction step in computeSwNetModuleLayout writes
@@ -222,7 +230,7 @@ export function computeModuleFootprint(
       instance.position.x + offsetX,
       instance.position.y + offsetY,
       nested?.width ?? INSTANCE_NODE_WIDTH,
-      nested?.height ?? rowCount * INSTANCE_NODE_ROW_HEIGHT,
+      nested?.height ?? estimateInstanceHeight(statement),
     );
   }
 
@@ -309,13 +317,12 @@ function buildElkGraph(
   }));
 
   for (const statement of statements) {
-    const rowCount = Math.max(1, statement.inputs.length, statement.outputs.length);
     const footprint = options.submoduleFootprints?.get(statement.instanceId);
 
     children.push({
       id: INSTANCE_NODE_ID_PREFIX + statement.instanceId,
       width: footprint?.width ?? INSTANCE_NODE_WIDTH,
-      height: footprint?.height ?? rowCount * INSTANCE_NODE_ROW_HEIGHT,
+      height: footprint?.height ?? estimateInstanceHeight(statement),
     });
   }
 
