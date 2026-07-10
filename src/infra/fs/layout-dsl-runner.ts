@@ -5,7 +5,9 @@ import { type IrVector2 } from "../../core/ir.js";
 import { compareSwNetIdentifier, formatPortNameKey, formatPortOccurrenceKey } from "../../core/serializers/sw-net-shared.js";
 import { STORMWORKS_SW_MCL_FORMAT_VERSION, type StormworksSwMclDocument } from "../../core/serializers/sw-mcl.js";
 import { type SwMclInstanceDocument, type SwMclPortDocument } from "../../core/serializers/sw-mcl.js";
-import { type SwNetModule } from "../../core/parsers/sw-net.js";
+import { type SwNetDocument, type SwNetModule } from "../../core/parsers/sw-net.js";
+import { replaceSwNetExtension } from "./project-source-file-loader.js";
+import { resolveRelativeSwNetImportPath } from "./sw-net-file-loader.js";
 import {
   type LayoutTarget,
   readSwNetAndOptionalSwMcl,
@@ -224,18 +226,33 @@ export interface EnsureProjectLayoutResult {
 // src/core/exporters/xml-tree.ts's resolveInstancePosition). Best-effort: .sw-mcl has always been an
 // optional input (CLAUDE.md), so failures here are reported as messages but never thrown — the
 // caller's normal load/export flow still runs afterward and will surface any real, blocking problem.
+//
+// Covers every module reachable from the project, not just project.json's declared submodules:
+// resolveLayoutTargets({ allSubmodules: true }) alone would (a) return nothing at all for the
+// supported "no submodules array, fall back to main.sw-net" project.json shape, and (b) never look
+// past project.json into cross-file `use ... from` imports (e.g. a main.sw-net that composes a
+// separately-authored control_handle.sw-net) — both of which would silently leave those modules on
+// the old degraded fallback. So this seeds from the entry module plus every declared submodule, then
+// recursively follows each module's own imports the same way resolveSubmoduleFootprints does for
+// footprint sizing.
 export async function ensureProjectLayoutIsComplete(projectJsonPath: string): Promise<EnsureProjectLayoutResult> {
   const messages: string[] = [];
-  let targets: LayoutTarget[];
+  let seedTargets: LayoutTarget[];
 
   try {
-    targets = await resolveLayoutTargets(projectJsonPath, { allSubmodules: true });
+    const [entryTarget, declaredSubmoduleTargets] = await Promise.all([
+      resolveLayoutTargets(projectJsonPath, {}),
+      resolveLayoutTargets(projectJsonPath, { allSubmodules: true }),
+    ]);
+    seedTargets = dedupeLayoutTargets([...entryTarget, ...declaredSubmoduleTargets]);
   } catch (error) {
     messages.push(
       `Could not resolve layout targets for auto-layout: ${error instanceof Error ? error.message : String(error)}`,
     );
     return { messages };
   }
+
+  const targets = await collectReachableLayoutTargets(seedTargets);
 
   for (const target of targets) {
     try {
@@ -270,4 +287,89 @@ export async function ensureProjectLayoutIsComplete(projectJsonPath: string): Pr
   }
 
   return { messages };
+}
+
+// De-duplicate layout targets by (file, module) so a document reachable through more than one seed
+// (e.g. it's both project.json's entry and its only declared submodule) is only processed once.
+function dedupeLayoutTargets(targets: LayoutTarget[]): LayoutTarget[] {
+  const seen = new Set<string>();
+  const deduped: LayoutTarget[] = [];
+
+  for (const target of targets) {
+    const key = `${target.swNetPath}#${target.moduleId ?? ""}`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(target);
+  }
+
+  return deduped;
+}
+
+// Breadth-first walk of every module reachable from `seedTargets` via cross-file `use ... from`
+// imports, mirroring resolveSubmoduleFootprintsForModule's traversal. Unreadable/malformed documents
+// are left for the per-target loop in ensureProjectLayoutIsComplete to report; this walk just stops
+// following that particular branch rather than failing the whole pass.
+async function collectReachableLayoutTargets(seedTargets: LayoutTarget[]): Promise<LayoutTarget[]> {
+  const visited = new Set<string>();
+  const collected: LayoutTarget[] = [];
+  const queue = [...seedTargets];
+
+  while (queue.length > 0) {
+    const target = queue.shift();
+
+    if (!target) {
+      break;
+    }
+
+    const key = `${target.swNetPath}#${target.moduleId ?? ""}`;
+
+    if (visited.has(key)) {
+      continue;
+    }
+
+    visited.add(key);
+    collected.push(target);
+
+    let swNet: SwNetDocument;
+
+    try {
+      swNet = (await readSwNetAndOptionalSwMcl(target.swNetPath, target.swMclPath)).swNet;
+    } catch {
+      continue;
+    }
+
+    const module = selectTargetModule(swNet.modules, target.moduleId, undefined)?.module;
+
+    if (!module) {
+      continue;
+    }
+
+    for (const statement of module.statements) {
+      if (statement.kind !== "use" || statement.moduleRef.kind !== "imported") {
+        continue;
+      }
+
+      const { alias, moduleId: importedModuleId } = statement.moduleRef;
+      const importEntry = swNet.imports.find((imported) => imported.alias === alias);
+
+      if (!importEntry) {
+        continue;
+      }
+
+      const importedSwNetPath = resolveRelativeSwNetImportPath(target.swNetPath, importEntry.path);
+
+      queue.push({
+        documentId: importedSwNetPath,
+        swNetPath: importedSwNetPath,
+        swMclPath: replaceSwNetExtension(importedSwNetPath, ".sw-mcl"),
+        moduleId: importedModuleId,
+      });
+    }
+  }
+
+  return collected;
 }
