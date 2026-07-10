@@ -611,12 +611,13 @@ function tryResolveModuleSwMcl(
 // net local to the module, even if its text happens to match a declared port name; only a quoted
 // string references the module's own declared port. String port references get substituted with
 // whatever the caller already bound that port to, looked up by the port's own declared direction
-// rather than the local usage site's: a *read* (direction "in") may target either the module's own
-// input port or, as internal feedback, its own output port (an output can fan out to any number of
-// readers). A *write* (direction "out") may only ever target a declared output port — an input port
-// has exactly one producer, the caller's binding, so the module body driving its own input port would
-// create a second, conflicting producer for that single value. At the entry module, strings still
-// name real project.json ports and pass through unchanged.
+// rather than the local usage site's. This is deliberately asymmetric, by design: an output port
+// behaves like an ordinary net as well as a port — it has exactly one producer inside the module, so
+// the module is free to also read that same value back internally (direction "in") any number of
+// times, in addition to the caller reading it from outside. An input port is a port only — its one
+// and only producer is the caller's binding, so the module body may never target it as a write
+// (direction "out"); doing so would create a second, conflicting producer for a single-source signal.
+// At the entry module, strings still name real project.json ports and pass through unchanged.
 function resolveFlattenExpr(
   expr: SwNetExpression,
   direction: "in" | "out",
@@ -685,11 +686,11 @@ function buildModulePortNameSets(ports: SwNetPort[]): ModulePortNameSets {
 // declared in the local usage direction is unambiguous and always wins, even if the same name is
 // also declared in the other direction — this is what makes an ambiguous same-named in/out pair
 // resolve predictably instead of silently picking whichever declaration happened to be registered
-// last. A *read* (direction "in") falls back to the module's own output port when there's no
-// matching input port, for a module reading its own output back as internal feedback — an output can
-// have any number of readers. A *write* (direction "out") never falls back to an input port: an
-// input has exactly one producer, the caller's binding, so nothing inside the module may also drive
-// it — that would be a second, conflicting producer for a single-source signal.
+// last. A *read* (direction "in") may also resolve against the module's own output port: this is the
+// intended way to reuse a value the module already exposes as one of its outputs, not a workaround —
+// an output can have any number of readers, inside the module or out. A *write* (direction "out")
+// may only ever target a declared output port: an input port's one and only producer is the caller,
+// so nothing inside the module is allowed to also drive it.
 function resolveStringPortDirection(
   portName: string,
   usageDirection: "in" | "out",
