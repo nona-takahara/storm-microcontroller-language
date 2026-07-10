@@ -109,7 +109,18 @@ export async function computeSwNetModuleLayout(
     rawPositionById.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
   }
 
-  fitPositionsWithinExtent(rawPositionById, options.maxExtent ?? DEFAULT_MAX_EXTENT, warnings);
+  const maxExtent = options.maxExtent ?? DEFAULT_MAX_EXTENT;
+
+  // Fill mode keeps every existing entry verbatim (see the ports/instances mapping below) and only
+  // writes computed positions for genuinely missing ones, so re-centering/scaling the *computed*
+  // frame here would detach newly-filled entries from the untouched existing ones instead of fitting
+  // the module as a whole. Only safe to apply when there's no existing frame to clash with: a full
+  // "force" regeneration, or a fill on a module that has no existing positions at all yet.
+  if (options.mode === "force" || !hasAnyExistingPositions(options.existing)) {
+    fitPositionsWithinExtent(rawPositionById, maxExtent, warnings);
+  } else {
+    warnIfBoundingBoxExceedsExtent(rawPositionById, maxExtent, warnings);
+  }
 
   const gridSize = options.gridSize ?? DEFAULT_GRID_SIZE;
   const positionById = new Map<string, IrVector2>();
@@ -426,18 +437,18 @@ function buildElkGraph(
   };
 }
 
-// Re-center a freshly computed layout on the origin and, if its bounding box still exceeds
-// [-maxExtent, +maxExtent] on either axis, scale that axis down (independently, since this is a
-// schematic grid layout rather than a proportionally-drawn diagram) so it fits. This is a
-// best-effort safety net on top of buildElkGraph's aspect-ratio wrapping: wrapping keeps a long
-// chain from widening (or a tall stack of layers from heightening) unboundedly by folding it toward
-// a square, but it only cuts along the layering axis — it can't help a graph that's wide because a
-// single layer has many parallel nodes, and even squared, a large enough graph can still exceed
-// maxExtent. Heavy compression from this fallback can visually overlap densely-packed nodes, hence
-// the warning below. Mutates `positionById` in place.
-function fitPositionsWithinExtent(positionById: Map<string, IrVector2>, maxExtent: number, warnings: string[]): void {
-  if (positionById.size === 0 || maxExtent <= 0) {
-    return;
+// Whether any port/instance in this fill-mode layout already has a real, preserved position —
+// i.e. whether there's an established coordinate frame that a global re-center/rescale could
+// detach newly-computed positions from. See the guard in computeSwNetModuleLayout.
+function hasAnyExistingPositions(existing: AutoLayoutExistingPositions | undefined): boolean {
+  return existing !== undefined && (existing.ports.size > 0 || existing.instances.size > 0);
+}
+
+function computeBoundingBox(
+  positionById: Map<string, IrVector2>,
+): { minX: number; minY: number; maxX: number; maxY: number } | undefined {
+  if (positionById.size === 0) {
+    return undefined;
   }
 
   let minX = Number.POSITIVE_INFINITY;
@@ -452,6 +463,56 @@ function fitPositionsWithinExtent(positionById: Map<string, IrVector2>, maxExten
     maxY = Math.max(maxY, position.y);
   }
 
+  return { minX, minY, maxX, maxY };
+}
+
+// A fill-mode layout with existing entries can't safely be re-centered/rescaled (see the guard in
+// computeSwNetModuleLayout), but the module may still end up bigger than maxExtent once the
+// genuinely-missing entries this call computed are combined with the preserved existing ones. Warn
+// instead of silently leaving the module oversized.
+function warnIfBoundingBoxExceedsExtent(
+  positionById: Map<string, IrVector2>,
+  maxExtent: number,
+  warnings: string[],
+): void {
+  const box = computeBoundingBox(positionById);
+
+  if (!box || maxExtent <= 0) {
+    return;
+  }
+
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  const targetSpan = maxExtent * 2;
+
+  if (width > targetSpan || height > targetSpan) {
+    warnings.push(
+      `Newly computed positions span ${width.toFixed(2)}x${height.toFixed(2)}, exceeding the ±${maxExtent} target ` +
+        `area; left unscaled because this module keeps existing hand-placed positions, and rescaling only the new ` +
+        `ones would detach them from the preserved layout. Re-run with --force/--regenerate to fully regenerate ` +
+        `within ±${maxExtent}.`,
+    );
+  }
+}
+
+// Re-center a freshly computed layout on the origin and, if its bounding box still exceeds
+// [-maxExtent, +maxExtent] on either axis, scale that axis down (independently, since this is a
+// schematic grid layout rather than a proportionally-drawn diagram) so it fits. This is a
+// best-effort safety net on top of buildElkGraph's aspect-ratio wrapping: wrapping keeps a long
+// chain from widening (or a tall stack of layers from heightening) unboundedly by folding it toward
+// a square, but it only cuts along the layering axis — it can't help a graph that's wide because a
+// single layer has many parallel nodes, and even squared, a large enough graph can still exceed
+// maxExtent. Heavy compression from this fallback can visually overlap densely-packed nodes, hence
+// the warning below. Only safe to call when there's no existing frame to detach from — see the
+// guard in computeSwNetModuleLayout. Mutates `positionById` in place.
+function fitPositionsWithinExtent(positionById: Map<string, IrVector2>, maxExtent: number, warnings: string[]): void {
+  const box = computeBoundingBox(positionById);
+
+  if (!box || maxExtent <= 0) {
+    return;
+  }
+
+  const { minX, minY, maxX, maxY } = box;
   const width = maxX - minX;
   const height = maxY - minY;
   const targetSpan = maxExtent * 2;
