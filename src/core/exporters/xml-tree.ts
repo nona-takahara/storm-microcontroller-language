@@ -19,6 +19,7 @@ import { addVector } from "../serializers/submodule-layout.js";
 import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule, type SwNetResolvedModuleKey } from "../resolvers/sw-net.js";
+import { registerFirstProducer } from "../shared/producer-index.js";
 
 export type StormworksXmlTreeScalar = string | number | boolean | null;
 export type StormworksXmlTreeValue = StormworksXmlTreeScalar | StormworksXmlTreeElement | StormworksXmlTreeValue[];
@@ -771,15 +772,17 @@ function buildNetProducerIndex(
         continue;
       }
 
-      if (producers.has(output.value.value)) {
-        warnings.push(`Multiple instance outputs drive net ${output.value.value}; using the first producer.`);
-        continue;
-      }
-
-      producers.set(output.value.value, {
-        instance,
-        outputKey: output.key,
-      });
+      registerFirstProducer(
+        producers,
+        output.value.value,
+        {
+          instance,
+          outputKey: output.key,
+        },
+        (netName) => {
+          warnings.push(`Multiple instance outputs drive net ${netName}; using the first producer.`);
+        },
+      );
     }
   }
 

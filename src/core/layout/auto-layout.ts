@@ -7,6 +7,7 @@ import { type IrVector2 } from "../ir.js";
 import { type SwNetModule, type SwNetStatement } from "../parsers/sw-net.js";
 import { type SwMclInstanceDocument, type SwMclPortDocument } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
+import { registerFirstProducer } from "../shared/producer-index.js";
 
 export interface AutoLayoutExistingPositions {
   ports: Map<string, IrVector2>;
@@ -142,12 +143,9 @@ function buildNetProducerIndex(statements: SwNetStatement[], warnings: string[])
         continue;
       }
 
-      if (producers.has(output.value.value)) {
-        warnings.push(`Multiple instance outputs drive net ${output.value.value}; using the first producer for layout.`);
-        continue;
-      }
-
-      producers.set(output.value.value, { instanceId: statement.instanceId });
+      registerFirstProducer(producers, output.value.value, { instanceId: statement.instanceId }, (netName) => {
+        warnings.push(`Multiple instance outputs drive net ${netName}; using the first producer for layout.`);
+      });
     }
   }
 
