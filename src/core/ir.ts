@@ -22,6 +22,11 @@ export interface IrNode {
   position?: IrVector2;
   properties: Record<string, IrScalarValue>;
   source?: IrSourceRef;
+  // Raw-XML/cross-reference bookkeeping populated by the importer, not user-editable gate properties.
+  objectId?: string;
+  stormworksType?: string;
+  componentId?: string;
+  projectNodeId?: string;
 }
 
 export interface IrLink {

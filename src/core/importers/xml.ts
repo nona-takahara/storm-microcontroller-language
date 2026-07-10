@@ -252,8 +252,6 @@ function collectProjectNodes(
       definitionId: binding.definitionId,
       position: readProjectPosition(nodeRecord),
       properties: {
-        componentId: rawId,
-        projectNodeId: getAttribute(record, "id") ?? rawId,
         type: rawType ?? null,
         mode: rawMode ?? null,
         label,
@@ -261,12 +259,13 @@ function collectProjectNodes(
         description: getAttribute(nodeRecord, "description") ?? null,
         signal: binding.signal,
         direction: binding.direction,
-        layer: "project",
       },
       source: {
         format: "stormworks-xml",
         path: `microprocessor.nodes.n[${index}]`,
       },
+      componentId: rawId,
+      projectNodeId: getAttribute(record, "id") ?? rawId,
     };
 
     if (binding.definitionId.startsWith("PROJECT_NODE:")) {
@@ -425,9 +424,6 @@ function collectLogicNodes(
       definitionId: definition?.id ?? `LOGIC_COMPONENT:${componentType}`,
       position: readLogicPosition(component),
       properties: {
-        objectId: rawId,
-        stormworksType: componentType,
-        layer: "logic",
         ...extractObjectAttributes(objectRecord, definition),
         ...definedProperties,
       },
@@ -435,6 +431,8 @@ function collectLogicNodes(
         format: "stormworks-xml",
         path: `microprocessor.group.components.c[${index}]`,
       },
+      objectId: rawId,
+      stormworksType: componentType,
     };
 
     if (!definition) {
@@ -474,19 +472,18 @@ function synthesizeSubmodulePorts(
       definitionId: createSyntheticSubmoduleDefinitionId(projectNode.binding.direction, projectNode.binding.signal),
       position: projectBridge ? readBridgePosition(projectBridge.bridgeRecord) : projectNode.irNode.position,
       properties: {
-        componentId: rawId,
         name: projectNode.label,
         label: projectNode.label,
         direction: projectNode.binding.direction,
         signal: projectNode.binding.signal,
         projectDefinitionId: projectNode.irNode.definitionId,
-        projectNodeId: projectNode.irNode.id,
-        layer: "submodule",
       },
       source: {
         format: "stormworks-xml",
         path: projectBridge?.path ?? projectNode.path,
       },
+      componentId: rawId,
+      projectNodeId: projectNode.irNode.id,
     };
 
     if (!projectBridge) {
@@ -793,18 +790,17 @@ function ensureSubmoduleInputPort(
     layer: "submodule",
     definitionId: createSyntheticSubmoduleDefinitionId("input", "unknown"),
     properties: {
-      componentId: rawId,
       name: rawId,
       label: rawId,
       direction: "input",
       signal: "unknown",
       external: true,
-      layer: "submodule",
     },
     source: {
       format: "stormworks-xml",
       path: describeInputRecord(inputRecord),
     },
+    componentId: rawId,
   };
 
   warnings.push(createWarningDiagnostic(
