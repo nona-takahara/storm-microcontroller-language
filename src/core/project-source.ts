@@ -17,6 +17,14 @@ import {
   type BuildStormworksXmlTreeResult,
 } from "./exporters/xml-tree.js";
 import { importStormworksXml } from "./importers/xml.js";
+import {
+  createErrorDiagnostic,
+  createInfoDiagnostic,
+  createWarningDiagnostic,
+  hasErrorDiagnostics,
+  type StormworksLibraryDiagnostic,
+  type StormworksLibraryResult,
+} from "./diagnostics.js";
 import { type IrProgram, type IrSignalKind } from "./ir.js";
 import {
   parseSwNetDocument,
@@ -81,20 +89,6 @@ export interface StormworksSourceDocumentTexts {
   swNetText: string;
   swMclText: string;
   scripts: Record<string, string>;
-}
-
-export interface StormworksLibraryDiagnostic {
-  severity: "error" | "warning" | "info";
-  code: string;
-  message: string;
-  documentId?: string;
-  path?: string;
-  source: "project" | "sw-net" | "sw-mcl" | "script" | "xml" | "library";
-}
-
-export interface StormworksLibraryResult<T> {
-  value?: T;
-  diagnostics: StormworksLibraryDiagnostic[];
 }
 
 export interface ImportStormworksXmlToProjectSourceOptions {
@@ -1154,63 +1148,4 @@ function buildSwMclByDocumentPath(documents: StormworksSourceDocument[]): Map<st
       .filter((document) => document.swMclOrigin !== "generated")
       .map((document) => [document.documentId, document.swMcl] as const),
   );
-}
-
-// Check whether a diagnostic list already contains at least one build-blocking error.
-function hasErrorDiagnostics(diagnostics: StormworksLibraryDiagnostic[]): boolean {
-  return diagnostics.some((diagnostic) => diagnostic.severity === "error");
-}
-
-// Build a warning diagnostic in the public library result format.
-function createWarningDiagnostic(
-  code: string,
-  message: string,
-  source: StormworksLibraryDiagnostic["source"],
-  documentId?: string,
-  path?: string,
-): StormworksLibraryDiagnostic {
-  return {
-    severity: "warning",
-    code,
-    message,
-    source,
-    documentId,
-    path,
-  };
-}
-
-// Build an informational diagnostic (status reporting, not an actionable problem) in the public library result format.
-function createInfoDiagnostic(
-  code: string,
-  message: string,
-  source: StormworksLibraryDiagnostic["source"],
-  documentId?: string,
-  path?: string,
-): StormworksLibraryDiagnostic {
-  return {
-    severity: "info",
-    code,
-    message,
-    source,
-    documentId,
-    path,
-  };
-}
-
-// Build an error diagnostic in the public library result format.
-function createErrorDiagnostic(
-  code: string,
-  message: string,
-  source: StormworksLibraryDiagnostic["source"],
-  documentId?: string,
-  path?: string,
-): StormworksLibraryDiagnostic {
-  return {
-    severity: "error",
-    code,
-    message,
-    source,
-    documentId,
-    path,
-  };
 }
