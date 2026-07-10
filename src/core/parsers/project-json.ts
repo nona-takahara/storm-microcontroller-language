@@ -1,6 +1,14 @@
 // project.json parser that validates the project-surface document used alongside sw-net and sw-mcl.
 import { type IrScalarValue, type IrVector2 } from "../ir.js";
 import {
+  expectArrayWith,
+  expectFiniteNumberWith,
+  expectRecordWith,
+  expectStringWith,
+  optionalStringWith,
+  parseVector2With,
+} from "../shared/json-schema-helpers.js";
+import {
   STORMWORKS_PROJECT_JSON_FORMAT_VERSION,
   type ProjectJsonConstantDocument,
   type ProjectJsonDocument,
@@ -127,15 +135,9 @@ function parseProjectJsonLinkEndpoint(input: unknown, path: string): ProjectJson
   };
 }
 
-// Parse a 2D vector used for node and layout positions.
-function parseVector2(input: unknown, path: string): IrVector2 {
-  const record = expectRecord(input, path);
-
-  return {
-    x: expectFiniteNumber(record.x, `${path}.x`),
-    y: expectFiniteNumber(record.y, `${path}.y`),
-  };
-}
+// Shared JSON guards remove parser-to-parser copy/paste while this file keeps the
+// nullable project.json conventions close to their call sites.
+const parseVector2 = (input: unknown, path: string) => parseVector2With(input, path, ProjectJsonParseError);
 
 // Parse an optional vector that may be absent or null in persisted project.json.
 function optionalVector2OrNull(input: unknown, path: string): IrVector2 | null {
@@ -155,41 +157,10 @@ function parseScalarValue(input: unknown, path: string): IrScalarValue {
   throw new ProjectJsonParseError("Expected scalar value", path);
 }
 
-// Require a plain object at the current project.json path.
-function expectRecord(input: unknown, path: string): Record<string, unknown> {
-  if (typeof input === "object" && input !== null && !Array.isArray(input)) {
-    return input as Record<string, unknown>;
-  }
-
-  throw new ProjectJsonParseError("Expected object", path);
-}
-
-// Require an array at the current project.json path.
-function expectArray(input: unknown, path: string): unknown[] {
-  if (Array.isArray(input)) {
-    return input;
-  }
-
-  throw new ProjectJsonParseError("Expected array", path);
-}
-
-// Require a string at the current project.json path.
-function expectString(input: unknown, path: string): string {
-  if (typeof input === "string") {
-    return input;
-  }
-
-  throw new ProjectJsonParseError("Expected string", path);
-}
-
-// Parse an optional string field that may be absent.
-function optionalString(input: unknown, path: string): string | undefined {
-  if (input === undefined) {
-    return undefined;
-  }
-
-  return expectString(input, path);
-}
+const expectRecord = (input: unknown, path: string) => expectRecordWith(input, path, ProjectJsonParseError);
+const expectArray = (input: unknown, path: string) => expectArrayWith(input, path, ProjectJsonParseError);
+const expectString = (input: unknown, path: string) => expectStringWith(input, path, ProjectJsonParseError);
+const optionalString = (input: unknown, path: string) => optionalStringWith(input, path, ProjectJsonParseError);
 
 // Parse an optional string field that may be absent or explicitly null.
 function optionalStringOrNull(input: unknown, path: string): string | null {
@@ -200,14 +171,8 @@ function optionalStringOrNull(input: unknown, path: string): string | null {
   return expectString(input, path);
 }
 
-// Require a finite numeric value at the current project.json path.
-function expectFiniteNumber(input: unknown, path: string): number {
-  if (typeof input === "number" && Number.isFinite(input)) {
-    return input;
-  }
-
-  throw new ProjectJsonParseError("Expected finite number", path);
-}
+const expectFiniteNumber = (input: unknown, path: string) =>
+  expectFiniteNumberWith(input, path, ProjectJsonParseError);
 
 // Parse an optional finite number that may be absent or explicitly null.
 function optionalFiniteNumberOrNull(input: unknown, path: string): number | null {
