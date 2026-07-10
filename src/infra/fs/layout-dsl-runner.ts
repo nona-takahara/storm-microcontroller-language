@@ -2,13 +2,14 @@
 // `layout_dsl` tool, so the two front ends stay behaviorally identical.
 import { computeSwNetModuleLayout, type AutoLayoutExistingPositions } from "../../core/layout/auto-layout.js";
 import { type IrVector2 } from "../../core/ir.js";
-import { compareSwNetIdentifier, formatPortOccurrenceKey } from "../../core/serializers/sw-net-shared.js";
+import { compareSwNetIdentifier, formatPortNameKey, formatPortOccurrenceKey } from "../../core/serializers/sw-net-shared.js";
 import { STORMWORKS_SW_MCL_FORMAT_VERSION, type StormworksSwMclDocument } from "../../core/serializers/sw-mcl.js";
 import { type SwMclInstanceDocument, type SwMclPortDocument } from "../../core/serializers/sw-mcl.js";
 import { type SwNetModule } from "../../core/parsers/sw-net.js";
 import {
   type LayoutTarget,
   readSwNetAndOptionalSwMcl,
+  resolveLayoutTargets,
   resolveSubmoduleFootprints,
   writeSwMclDocument,
 } from "./sw-net-layout-file-loader.js";
@@ -85,7 +86,7 @@ export async function runLayoutDslForTarget(
 }
 
 // Select the module a sw-net document's layout applies to, mirroring sw-mcl.ts's selectSwMclSubmodule rule.
-function selectTargetModule(
+export function selectTargetModule(
   modules: SwNetModule[],
   requestedModuleId: string | undefined,
   fallbackModuleId: string | undefined,
@@ -104,6 +105,41 @@ function selectTargetModule(
     module: selected,
     skipped: modules.filter((module) => module.id !== selected.id).map((module) => module.id),
   };
+}
+
+// Check whether every port/instance a module declares already has a matching .sw-mcl layout entry,
+// using the same occurrence-numbering scheme as computeSwNetModuleLayout/buildPortSlots. Callers use
+// this to decide whether an implicit auto-layout pass is actually needed before invoking ELK.
+export function isModuleLayoutComplete(
+  module: SwNetModule,
+  existingSwMcl: StormworksSwMclDocument | undefined,
+): boolean {
+  if (!existingSwMcl) {
+    return false;
+  }
+
+  const instanceIds = new Set(existingSwMcl.instances.map((instance) => instance.id));
+
+  if (module.statements.some((statement) => !instanceIds.has(statement.instanceId))) {
+    return false;
+  }
+
+  const portKeys = new Set(
+    existingSwMcl.ports.map((port) => formatPortOccurrenceKey(port.direction, port.name, port.occurrence)),
+  );
+  const occurrenceByKey = new Map<string, number>();
+
+  for (const port of module.ports) {
+    const nameKey = formatPortNameKey(port.direction, port.name);
+    const occurrence = (occurrenceByKey.get(nameKey) ?? 0) + 1;
+    occurrenceByKey.set(nameKey, occurrence);
+
+    if (!portKeys.has(formatPortOccurrenceKey(port.direction, port.name, occurrence))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // Build the existing-position lookup fed to computeSwNetModuleLayout's fill mode.
@@ -174,4 +210,64 @@ function comparePorts(left: SwMclPortDocument, right: SwMclPortDocument): number
 // Sort instances in the same diff-stable order sw-mcl.ts's serializer produces.
 function compareInstances(left: SwMclInstanceDocument, right: SwMclInstanceDocument): number {
   return compareSwNetIdentifier(left.id, right.id);
+}
+
+export interface EnsureProjectLayoutResult {
+  // One line per notice worth surfacing to the caller (auto-generated layout, or per-target
+  // failures). Empty when every reachable module's .sw-mcl was already complete.
+  messages: string[];
+}
+
+// Fill in any missing/incomplete .sw-mcl layout data via ELK auto-layout before dsl2xml/dsl2xml-tree
+// (CLI) or dsl_to_xml (MCP) consume it, so a missing or partial .sw-mcl degrades to computed
+// positions instead of the exporter's cruder shared-anchor/omitted-<pos> fallback (see
+// src/core/exporters/xml-tree.ts's resolveInstancePosition). Best-effort: .sw-mcl has always been an
+// optional input (CLAUDE.md), so failures here are reported as messages but never thrown — the
+// caller's normal load/export flow still runs afterward and will surface any real, blocking problem.
+export async function ensureProjectLayoutIsComplete(projectJsonPath: string): Promise<EnsureProjectLayoutResult> {
+  const messages: string[] = [];
+  let targets: LayoutTarget[];
+
+  try {
+    targets = await resolveLayoutTargets(projectJsonPath, { allSubmodules: true });
+  } catch (error) {
+    messages.push(
+      `Could not resolve layout targets for auto-layout: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { messages };
+  }
+
+  for (const target of targets) {
+    try {
+      const { swNet, existingSwMcl } = await readSwNetAndOptionalSwMcl(target.swNetPath, target.swMclPath);
+      const selected = selectTargetModule(swNet.modules, target.moduleId, existingSwMcl?.moduleId);
+
+      if (selected && isModuleLayoutComplete(selected.module, existingSwMcl)) {
+        continue;
+      }
+
+      const result = await runLayoutDslForTarget(target, { force: false, dryRun: false });
+
+      if (!result.ok) {
+        messages.push(`Auto-layout skipped for ${target.swNetPath}: ${result.errorMessage}`);
+        continue;
+      }
+
+      for (const warning of result.warnings) {
+        messages.push(`${target.swNetPath}: ${warning}`);
+      }
+
+      if (result.summary && result.summary.added > 0) {
+        messages.push(
+          `Auto-generated missing layout for ${target.swMclPath}: ${result.summary.added} position(s) filled in.`,
+        );
+      }
+    } catch (error) {
+      messages.push(
+        `Auto-layout failed for ${target.swNetPath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return { messages };
 }

@@ -10,6 +10,7 @@ import {
   buildSpecOverview,
   buildStormworksXmlFromProjectSource,
   createFileSystemProjectSourceDocumentLoader,
+  ensureProjectLayoutIsComplete,
   formatGateSpecListText,
   formatGateSpecText,
   formatSpecOverviewText,
@@ -245,6 +246,7 @@ async function handleXmlToDsl(args: { xml_path: string; out_dir: string }) {
 }
 
 async function handleDslToXml(args: { project_json_path: string; out_path?: string }) {
+  const layoutResult = await ensureProjectLayoutIsComplete(args.project_json_path);
   const loadResult = await loadProjectSourceFromProjectJsonFile(args.project_json_path);
   const diagnostics = [...loadResult.diagnostics];
 
@@ -265,7 +267,7 @@ async function handleDslToXml(args: { project_json_path: string; out_path?: stri
 
   if (args.out_path) {
     await writeUtf8TextFile(args.out_path, buildResult.value.xml);
-    const lines = [`XML output completed: ${args.out_path}`];
+    const lines = [`XML output completed: ${args.out_path}`, ...layoutResult.messages.map((message) => `Auto-layout: ${message}`)];
 
     if (diagnostics.length > 0) {
       lines.push("", "Warnings:", formatDiagnostics(diagnostics));
@@ -274,6 +276,8 @@ async function handleDslToXml(args: { project_json_path: string; out_path?: stri
     return textResult(lines.join("\n"));
   }
 
+  // Documented contract: with no out_path, the response is exactly the XML text (agents may save it
+  // verbatim), so auto-layout notices/diagnostics are intentionally not prepended here.
   return textResult(buildResult.value.xml);
 }
 

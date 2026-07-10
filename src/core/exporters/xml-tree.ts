@@ -1278,7 +1278,9 @@ function buildBridgeObjectElement(
     "@_id": String(projectNode.componentId),
   };
   const slot = portSlotsByProjectNodeId.get(projectNode.document.id);
-  const position = projectNode.document.position ?? slot?.position;
+  // Bridge-canvas position now lives entirely in .sw-mcl's port slots (project.json no longer
+  // carries its own copy); ensureProjectLayoutIsComplete (CLI/MCP) keeps that data filled in.
+  const position = slot?.position;
 
   if (position) {
     bridgeState.pos = {

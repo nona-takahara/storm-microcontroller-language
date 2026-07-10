@@ -71,7 +71,10 @@ export function parseProjectJsonDocument(input: unknown): ProjectJsonDocument {
   };
 }
 
-// Parse one project-node entry from project.json.
+// Parse one project-node entry from project.json. A legacy "position" (bridge-canvas position) key
+// may still be present in older files — it's part of .sw-mcl's domain now (see xml-tree.ts's bridge
+// export, which sources it from the module port slot), so it's intentionally accepted-but-unused here
+// rather than rejected.
 function parseProjectJsonNode(input: unknown, path: string): ProjectJsonNodeDocument {
   const record = expectRecord(input, path);
 
@@ -81,7 +84,6 @@ function parseProjectJsonNode(input: unknown, path: string): ProjectJsonNodeDocu
     label: optionalStringOrNull(record.label, `${path}.label`),
     description: optionalStringOrNull(record.description, `${path}.description`),
     nodePosition: parseVector2(record.nodePosition, `${path}.nodePosition`),
-    position: optionalVector2OrNull(record.position, `${path}.position`),
   };
 }
 
