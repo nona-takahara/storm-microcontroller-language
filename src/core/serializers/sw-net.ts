@@ -194,7 +194,7 @@ function collectAttributeAssignments(
   instanceName: string,
   definition: ComponentDefinition | undefined,
 ): string[] {
-  const hiddenKeys = new Set(["objectId", "stormworksType", "layer", "script"]);
+  const hiddenKeys = new Set(["script"]);
   const assignments: string[] = [];
   const emittedDslKeys = new Set<string>();
   const definedPropertyKeys = new Set((definition?.properties ?? []).map((property) => property.key));

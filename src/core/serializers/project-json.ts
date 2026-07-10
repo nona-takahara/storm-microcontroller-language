@@ -123,7 +123,7 @@ function buildProjectNodeBridgePositionIndex(
     for (const portNodeId of submodule.portNodeIds) {
       // Submodule surface nodes carry the bridge-canvas position paired with each project pin.
       const portNode = nodeById.get(portNodeId);
-      const projectNodeId = typeof portNode?.properties.projectNodeId === "string" ? portNode.properties.projectNodeId : undefined;
+      const projectNodeId = portNode?.projectNodeId;
 
       if (!projectNodeId || !portNode?.position) {
         continue;
@@ -156,7 +156,7 @@ function buildConstantIdMap(nodes: IrNode[]): Map<string, string> {
   const idMap = new Map<string, string>();
 
   for (const node of nodes) {
-    const rawObjectId = typeof node.properties.objectId === "string" ? node.properties.objectId : undefined;
+    const rawObjectId = node.objectId;
     const trailingId = rawObjectId ?? tryParseSwNetTrailingNumber(node.id)?.toString() ?? node.id;
     idMap.set(node.id, `const_${trailingId}`);
   }

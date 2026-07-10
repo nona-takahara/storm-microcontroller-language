@@ -12,7 +12,7 @@ export function getSwNetInstanceTypeName(node: IrNode): string {
 
 // Choose a stable sw-net instance id from imported object ids or fallback IR ids.
 export function getSwNetInstanceName(node: IrNode): string {
-  const rawObjectId = node.properties.objectId;
+  const rawObjectId = node.objectId;
 
   if (typeof rawObjectId === "string" && rawObjectId.length > 0) {
     return `n${sanitizeSwNetIdentifier(rawObjectId)}`;
