@@ -20,6 +20,7 @@ import { addVector } from "../serializers/submodule-layout.js";
 import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule, type SwNetResolvedModuleKey } from "../resolvers/sw-net.js";
+import { buildModulePortNameSets, type ModulePortNameSets } from "../shared/module-port-directions.js";
 import { registerFirstProducer } from "../shared/producer-index.js";
 
 export type StormworksXmlTreeScalar = string | number | boolean | null;
@@ -193,7 +194,7 @@ export function buildStormworksXmlTree(
     warnings,
   );
   const componentElements = logicInstances.map((instance) =>
-    buildComponentElement(instance, netProducerByName, projectPortBindings.projectNodeByPortKey, warnings, options),
+    buildComponentElement(instance, netProducerByName, projectPortBindings.projectNodeByPortKey, projectOutputBindings, warnings, options),
   );
   const componentStateElements = buildComponentStateElements(componentElements);
   const bridgeStateElements = buildBridgeStateElements(
@@ -606,15 +607,25 @@ function tryResolveModuleSwMcl(
 }
 
 // Resolve one sw-net expression from the module currently being flattened into a global, entry-scope
-// expression: identifiers get namespaced into module-local net names, and string port references get
-// substituted with whatever the caller already bound that port to (or passed through unchanged at the
-// entry module, where strings still name real project.json ports).
+// expression: identifiers always get namespaced into module-local net names — per this tool's
+// documented convention (src/core/spec/tool-conventions.ts), a bare identifier is always an internal
+// net local to the module, even if its text happens to match a declared port name; only a quoted
+// string references the module's own declared port. String port references get substituted with
+// whatever the caller already bound that port to, looked up by the port's own declared direction
+// rather than the local usage site's. This is deliberately asymmetric, by design: an output port
+// behaves like an ordinary net as well as a port — it has exactly one producer inside the module, so
+// the module is free to also read that same value back internally (direction "in") any number of
+// times, in addition to the caller reading it from outside. An input port is a port only — its one
+// and only producer is the caller's binding, so the module body may never target it as a write
+// (direction "out"); doing so would create a second, conflicting producer for a single-source signal.
+// At the entry module, strings still name real project.json ports and pass through unchanged.
 function resolveFlattenExpr(
   expr: SwNetExpression,
   direction: "in" | "out",
   namespace: string,
   portBindings: Map<string, SwNetExpression>,
   isEntryModule: boolean,
+  modulePorts: ModulePortNameSets,
   contextLabel: string,
   warnings: Diagnostic[],
 ): SwNetExpression | undefined {
@@ -630,7 +641,18 @@ function resolveFlattenExpr(
       return expr;
     }
 
-    const resolved = portBindings.get(formatPortBindingKey(direction, expr.value));
+    const portDirection = resolveStringPortDirection(expr.value, direction, modulePorts);
+
+    if (portDirection === undefined) {
+      const message =
+        direction === "out" && modulePorts.in.has(expr.value)
+          ? `${contextLabel} tries to drive its own input port "${expr.value}"; an input port has exactly one producer (the caller's binding), so a module cannot also drive it internally.`
+          : `${contextLabel} references undeclared module port "${expr.value}".`;
+      pushExportWarning(warnings, message);
+      return undefined;
+    }
+
+    const resolved = portBindings.get(formatPortBindingKey(portDirection, expr.value));
 
     if (!resolved) {
       pushExportWarning(warnings, `${contextLabel} references undeclared module port "${expr.value}".`);
@@ -643,6 +665,32 @@ function resolveFlattenExpr(
   return expr;
 }
 
+// Decide which of the module's own declared ports a quoted string reference means, or undefined if
+// the reference doesn't resolve to any usable port declaration. A reference that matches a port
+// declared in the local usage direction is unambiguous and always wins, even if the same name is
+// also declared in the other direction — this is what makes an ambiguous same-named in/out pair
+// resolve predictably instead of silently picking whichever declaration happened to be registered
+// last. A *read* (direction "in") may also resolve against the module's own output port: this is the
+// intended way to reuse a value the module already exposes as one of its outputs, not a workaround —
+// an output can have any number of readers, inside the module or out. A *write* (direction "out")
+// may only ever target a declared output port: an input port's one and only producer is the caller,
+// so nothing inside the module is allowed to also drive it.
+function resolveStringPortDirection(
+  portName: string,
+  usageDirection: "in" | "out",
+  modulePorts: ModulePortNameSets,
+): "in" | "out" | undefined {
+  if (modulePorts[usageDirection].has(portName)) {
+    return usageDirection;
+  }
+
+  if (usageDirection === "in" && modulePorts.out.has(portName)) {
+    return "out";
+  }
+
+  return undefined;
+}
+
 // Resolve a whole inst/use pin-assignment list through resolveFlattenExpr, dropping assignments that
 // could not be resolved (resolveFlattenExpr already warned for those).
 function resolveAssignmentList(
@@ -651,13 +699,23 @@ function resolveAssignmentList(
   namespace: string,
   portBindings: Map<string, SwNetExpression>,
   isEntryModule: boolean,
+  modulePorts: ModulePortNameSets,
   contextLabel: string,
   warnings: Diagnostic[],
 ): SwNetAssignment[] {
   const resolved: SwNetAssignment[] = [];
 
   for (const assignment of assignments) {
-    const value = resolveFlattenExpr(assignment.value, direction, namespace, portBindings, isEntryModule, contextLabel, warnings);
+    const value = resolveFlattenExpr(
+      assignment.value,
+      direction,
+      namespace,
+      portBindings,
+      isEntryModule,
+      modulePorts,
+      contextLabel,
+      warnings,
+    );
 
     if (value !== undefined) {
       resolved.push({ key: assignment.key, value });
@@ -694,6 +752,8 @@ function flattenModule(
 
   assertUniqueStatementInstanceIds(resolvedModule.module, moduleKey);
 
+  const modulePorts = buildModulePortNameSets(resolvedModule.module.ports);
+
   for (const statement of resolvedModule.module.statements) {
     const namespacedInstanceId = namespace ? `${namespace}$${statement.instanceId}` : statement.instanceId;
     const contextLabel = `Instance ${namespacedInstanceId}`;
@@ -705,8 +765,26 @@ function flattenModule(
           typeId: statement.typeId,
           instanceId: namespacedInstanceId,
           attributes: statement.attributes,
-          inputs: resolveAssignmentList(statement.inputs, "in", namespace, portBindings, isEntryModule, contextLabel, warnings),
-          outputs: resolveAssignmentList(statement.outputs, "out", namespace, portBindings, isEntryModule, contextLabel, warnings),
+          inputs: resolveAssignmentList(
+            statement.inputs,
+            "in",
+            namespace,
+            portBindings,
+            isEntryModule,
+            modulePorts,
+            contextLabel,
+            warnings,
+          ),
+          outputs: resolveAssignmentList(
+            statement.outputs,
+            "out",
+            namespace,
+            portBindings,
+            isEntryModule,
+            modulePorts,
+            contextLabel,
+            warnings,
+          ),
         },
         sourceModuleKey: moduleKey,
         position: resolveInstancePosition(layout, statement.instanceId, namespacedInstanceId, warnings),
@@ -719,7 +797,16 @@ function flattenModule(
     const childPortBindings = new Map<string, SwNetExpression>();
 
     for (const assignment of statement.inputs) {
-      const value = resolveFlattenExpr(assignment.value, "in", namespace, portBindings, isEntryModule, contextLabel, warnings);
+      const value = resolveFlattenExpr(
+        assignment.value,
+        "in",
+        namespace,
+        portBindings,
+        isEntryModule,
+        modulePorts,
+        contextLabel,
+        warnings,
+      );
 
       if (value !== undefined) {
         childPortBindings.set(formatPortBindingKey("in", assignment.key), value);
@@ -727,7 +814,16 @@ function flattenModule(
     }
 
     for (const assignment of statement.outputs) {
-      const value = resolveFlattenExpr(assignment.value, "out", namespace, portBindings, isEntryModule, contextLabel, warnings);
+      const value = resolveFlattenExpr(
+        assignment.value,
+        "out",
+        namespace,
+        portBindings,
+        isEntryModule,
+        modulePorts,
+        contextLabel,
+        warnings,
+      );
 
       if (value !== undefined) {
         childPortBindings.set(formatPortBindingKey("out", assignment.key), value);
@@ -871,6 +967,7 @@ function buildComponentElement(
   instance: LogicInstanceContext,
   netProducerByName: Map<string, NetProducer>,
   projectNodeByPortKey: Map<string, ProjectNodeContext>,
+  projectOutputBindings: Map<string, NetProducer[]>,
   warnings: Diagnostic[],
   options: BuildStormworksXmlTreeOptions,
 ): StormworksXmlTreeElement {
@@ -910,6 +1007,7 @@ function buildComponentElement(
       instance,
       netProducerByName,
       projectNodeByPortKey,
+      projectOutputBindings,
       warnings,
     );
 
@@ -1102,6 +1200,7 @@ function resolveXmlInputElement(
   instance: LogicInstanceContext,
   netProducerByName: Map<string, NetProducer>,
   projectNodeByPortKey: Map<string, ProjectNodeContext>,
+  projectOutputBindings: Map<string, NetProducer[]>,
   warnings: Diagnostic[],
 ): StormworksXmlTreeElement | undefined {
   if (input.value.kind === "identifier") {
@@ -1127,14 +1226,34 @@ function resolveXmlInputElement(
   if (input.value.kind === "string") {
     const projectNode = projectNodeByPortKey.get(formatPortNameKey("in", input.value.value));
 
-    if (!projectNode) {
+    if (projectNode) {
+      return {
+        "@_component_id": String(projectNode.componentId),
+      };
+    }
+
+    // Not a project input port — this can be a module reading its own output port back internally
+    // as a feedback input, where the caller bound that output straight to a project output port
+    // (e.g. entry-level `use helper h : -> y="result"`). Resolve it the same way a project output
+    // bridge would: through whichever flattened instance actually produces that output.
+    const producers = projectOutputBindings.get(input.value.value) ?? [];
+    const producer = producers[0];
+
+    if (!producer) {
       pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} references unknown module input port ${input.value.value}.`);
       return undefined;
     }
 
-    return {
-      "@_component_id": String(projectNode.componentId),
+    const element: StormworksXmlTreeElement = {
+      "@_component_id": String(producer.instance.objectId),
     };
+    const nodeIndex = resolveXmlOutputNodeIndex(producer.instance.definition, producer.outputKey);
+
+    if (nodeIndex !== undefined) {
+      element["@_node_index"] = String(nodeIndex);
+    }
+
+    return element;
   }
 
   pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} uses a non-net expression and was skipped.`);
