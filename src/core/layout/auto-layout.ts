@@ -401,6 +401,18 @@ function buildElkGraph(
       "elk.spacing.edgeEdge": String(nodeSpacing),
       "elk.layered.spacing.edgeNodeBetweenLayers": String(layerSpacing),
       "elk.layered.spacing.edgeEdgeBetweenLayers": String(layerSpacing),
+      // Without wrapping, a long chain of instances grows the layer axis unboundedly with graph
+      // size. Wrapping folds long chains back on themselves toward a roughly square bounding box.
+      // ELK treats each wrapped chunk like a separate weakly-connected component and packs them
+      // using elk.spacing.componentComponent, and spaces wrapped edges via
+      // elk.layered.wrapping.additionalEdgeSpacing — both default to a pixel-diagram scale (~20),
+      // which (unpinned) blew up a 300-node chain from width 375/height 0 to width 14/height 587 in
+      // testing. Pinning both to our calibrated grid scale is what makes wrapping actually shrink
+      // the bounding box instead of exploding it.
+      "elk.aspectRatio": "1.0",
+      "elk.layered.wrapping.strategy": "MULTI_EDGE",
+      "elk.spacing.componentComponent": String(nodeSpacing),
+      "elk.layered.wrapping.additionalEdgeSpacing": String(nodeSpacing),
     },
     children,
     edges,
@@ -409,13 +421,13 @@ function buildElkGraph(
 
 // Re-center a freshly computed layout on the origin and, if its bounding box still exceeds
 // [-maxExtent, +maxExtent] on either axis, scale that axis down (independently, since this is a
-// schematic grid layout rather than a proportionally-drawn diagram) so it fits. ELK's layered
-// algorithm otherwise grows one axis unboundedly with graph size (a long chain widens, a wide
-// fan-out heightens); tried gating this on ELK's own aspect-ratio wrapping option instead, but its
-// wrapped-band spacing defaults to a pixel-diagram scale that isn't pinned anywhere else in this
-// file, and it made test graphs larger, not smaller — so this scale-based clamp is the only bound.
-// It's best-effort: heavy compression can visually overlap densely-packed nodes, hence the warning
-// below. Mutates `positionById` in place.
+// schematic grid layout rather than a proportionally-drawn diagram) so it fits. This is a
+// best-effort safety net on top of buildElkGraph's aspect-ratio wrapping: wrapping keeps a long
+// chain from widening (or a tall stack of layers from heightening) unboundedly by folding it toward
+// a square, but it only cuts along the layering axis — it can't help a graph that's wide because a
+// single layer has many parallel nodes, and even squared, a large enough graph can still exceed
+// maxExtent. Heavy compression from this fallback can visually overlap densely-packed nodes, hence
+// the warning below. Mutates `positionById` in place.
 function fitPositionsWithinExtent(positionById: Map<string, IrVector2>, maxExtent: number, warnings: string[]): void {
   if (positionById.size === 0 || maxExtent <= 0) {
     return;
