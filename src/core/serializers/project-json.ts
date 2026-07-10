@@ -11,8 +11,6 @@ export interface ProjectJsonNodeDocument {
   description: string | null;
   // nodePosition is the Stormworks vehicle-space position of the external pin.
   nodePosition: IrVector2;
-  // position is the bridge/submodule-canvas position paired with the implicit submodule surface.
-  position: IrVector2 | null;
 }
 
 export interface ProjectJsonConstantDocument {
@@ -67,7 +65,6 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
   const projectLinks = program.links.filter((link) => isProjectSerializableLink(nodeById, link)).sort(compareById);
   const constantNodes = collectLinkedConstantNodes(projectLinks, nodeById);
   const constantIdByIrId = buildConstantIdMap(constantNodes);
-  const bridgePositionByProjectNodeId = buildProjectNodeBridgePositionIndex(program.submodules, nodeById);
 
   // Keep only the project-visible slice of the IR so project.json stays small and editor-friendly.
   return {
@@ -83,7 +80,6 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
       label: asNullableString(node.properties.label),
       description: asNullableString(node.properties.description),
       nodePosition: node.position ?? { x: 0, y: 0 },
-      position: bridgePositionByProjectNodeId.get(node.id) ?? null,
     })),
     constants: constantNodes.map((node) => ({
       id: constantIdByIrId.get(node.id) ?? node.id,
@@ -110,30 +106,6 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
 // Serialize the project-surface document to human-editable JSON text.
 export function serializeProjectJson(program: IrProgram): string {
   return JSON.stringify(buildProjectJsonDocument(program), null, 2);
-}
-
-// Index the bridge-surface position of each project node from the synthesized submodule ports.
-function buildProjectNodeBridgePositionIndex(
-  submodules: IrSubmodule[],
-  nodeById: Map<string, IrNode>,
-): Map<string, IrVector2> {
-  const index = new Map<string, IrVector2>();
-
-  for (const submodule of submodules) {
-    for (const portNodeId of submodule.portNodeIds) {
-      // Submodule surface nodes carry the bridge-canvas position paired with each project pin.
-      const portNode = nodeById.get(portNodeId);
-      const projectNodeId = portNode?.projectNodeId;
-
-      if (!projectNodeId || !portNode?.position) {
-        continue;
-      }
-
-      index.set(projectNodeId, portNode.position);
-    }
-  }
-
-  return index;
 }
 
 // Prefer readable project-node ids and suffix duplicates deterministically.
