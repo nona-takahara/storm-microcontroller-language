@@ -6,7 +6,12 @@ import { compareSwNetIdentifier, formatPortOccurrenceKey } from "../../core/seri
 import { STORMWORKS_SW_MCL_FORMAT_VERSION, type StormworksSwMclDocument } from "../../core/serializers/sw-mcl.js";
 import { type SwMclInstanceDocument, type SwMclPortDocument } from "../../core/serializers/sw-mcl.js";
 import { type SwNetModule } from "../../core/parsers/sw-net.js";
-import { type LayoutTarget, readSwNetAndOptionalSwMcl, writeSwMclDocument } from "./sw-net-layout-file-loader.js";
+import {
+  type LayoutTarget,
+  readSwNetAndOptionalSwMcl,
+  resolveSubmoduleFootprints,
+  writeSwMclDocument,
+} from "./sw-net-layout-file-loader.js";
 
 export interface RunLayoutDslTargetOptions {
   force: boolean;
@@ -48,12 +53,16 @@ export async function runLayoutDslForTarget(
       `module ${skippedModuleId} is outside layout-dsl's v1 scope (one module per file) and was left untouched; see issue #7.`,
   );
 
+  const submoduleFootprintResult = await resolveSubmoduleFootprints(target.swNetPath, swNet, selection.module);
+  warnings.push(...submoduleFootprintResult.warnings);
+
   const mode = options.force ? "force" : "fill";
   const existing = mode === "fill" ? buildExistingPositions(existingSwMcl) : undefined;
   const result = await computeSwNetModuleLayout(selection.module, {
     mode,
     existing,
     gridSize: options.gridSize,
+    submoduleFootprints: submoduleFootprintResult.footprints,
   });
   warnings.push(...result.warnings);
 
