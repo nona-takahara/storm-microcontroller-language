@@ -1,80 +1,104 @@
 # storm-microcontroller-language
 
-Stormworks のマイコンセーブデータ（XML）を、人間が読み書きできる DSL 形式に相互変換するツールです。
+[日本語版はこちら](README-ja.md)
 
-## 概要
+A toolkit for converting Stormworks microcontroller save data (XML) to and from a human-editable DSL.
 
-Stormworks からエクスポートした XML をテキスト形式の DSL に変換し、テキストエディタや Git で管理できるようにします。編集後は XML に戻してゲームに再インポートできます。
+## Overview
+
+The tool converts XML exported from Stormworks into text-based DSL files that can be edited in a text editor and tracked in Git. After editing, the DSL can be converted back to XML and re-imported into the game.
 
 ```
 Stormworks XML  ──xml2dsl──▶  .sw-net / .sw-mcl / project.json
                 ◀─dsl2xml──
 ```
 
-## セットアップ
+## Setup
 
-Node.js 18 以上と pnpm が必要です。
+Node.js 18 or newer and pnpm are required.
 
 ```bash
 pnpm install
 ```
 
-## 使い方
+## Usage
 
-### XML → DSL（xml2dsl）
+### XML to DSL (`xml2dsl`)
 
-Stormworks からエクスポートした XML を DSL ファイル群に変換します。
+Convert a Stormworks-exported XML file into the DSL file set.
 
 ```bash
-pnpm cli xml2dsl <input.xml> --out-dir <出力ディレクトリ>
+pnpm cli xml2dsl <input.xml> --out-dir <output-dir>
 ```
 
-出力ディレクトリに以下のファイルが生成されます。
+The output directory contains the following files.
 
-| ファイル | 内容 |
+| File | Contents |
 |---|---|
-| `main.sw-net` | ノードの定義・接続グラフ |
-| `main.sw-mcl` | Lua ロジックノードの参照 |
-| `scripts/*.lua` | 各 Lua スクリプト本体 |
-| `project.json` | メタデータ・ノード座標 |
+| `main.sw-net` | Node definitions and wiring graph |
+| `main.sw-mcl` | Lua logic-node script references and layout data |
+| `scripts/*.lua` | Lua script bodies |
+| `project.json` | Metadata and node coordinates |
 
-### DSL → XML（dsl2xml）
+### DSL to XML (`dsl2xml`)
 
-編集後の DSL を XML に戻します。
+Convert an edited DSL project back into XML.
 
 ```bash
 pnpm cli dsl2xml <project.json> --out <output.xml>
 ```
 
-### その他のコマンド
+### Other commands
 
 ```bash
-# DSL の構造チェック（未解決の参照など）
+# Check DSL structure, such as unresolved references.
 pnpm cli check-dsl <project.json>
 
-# DSL の型チェック（ポートの signal 種別の整合性確認）
+# Type-check DSL signal compatibility between ports.
 pnpm cli typecheck-dsl <project.json>
 
-# .sw-mcl レイアウトを自動生成・検証する
+# Generate or validate .sw-mcl layout files.
 pnpm cli layout-dsl <project.json> [--all-submodules] [--force] [--dry-run] [--grid-size <n>]
 
-# ゲート仕様・本ツールの挙動を引く（引数無しだとツール規約とStormworks全体仕様の概要）
+# Query gate specs and tool behavior. With no arguments, this prints tool conventions and Stormworks system notes.
 pnpm cli spec
-pnpm cli spec --list                 # 全ゲートID一覧
-pnpm cli spec SR_LATCH                # 指定ゲートの入出力・プロパティ・既知の挙動メモ
-pnpm cli spec SR_LATCH --json         # 機械可読なJSON出力
+pnpm cli spec --list                 # List all gate IDs
+pnpm cli spec SR_LATCH                # Show ports, properties, and known behavior notes for one gate
+pnpm cli spec SR_LATCH --json         # Print machine-readable JSON
 ```
 
-`spec` は、ソースコードを読まなくても人間・AIエージェント双方がゲートやツールの挙動を把握できるようにするためのコマンドです（Issue #5）。ポート・プロパティの構造情報に加え、`src/node-behavior-notes.json` / `src/stormworks-system-notes.json` に記録された実機での既知の挙動（未確認の情報も確信度付きで隠さず表示）を返します。
+The `spec` command helps both humans and AI agents understand gate and tool behavior without reading the source code. It combines port/property structure with known in-game behavior from `src/node-behavior-notes.json` and `src/stormworks-system-notes.json`, including confidence levels for unverified notes.
 
-## DSL 形式
+## MCP server
 
-### .sw-net
+The package also exposes a stdio MCP server for agent clients.
 
-ノードのインスタンス化と配線を記述します。
+```bash
+pnpm mcp
+# after installation/build:
+storm-mcl-mcp
+```
+
+Available MCP tools mirror the core CLI workflows.
+
+| Tool | Purpose |
+|---|---|
+| `xml_to_dsl` | Convert a Stormworks XML file into `project.json`, `.sw-net`, and `.sw-mcl` files. |
+| `dsl_to_xml` | Convert a DSL project back into Stormworks XML, optionally writing it to a path. |
+| `check_dsl` | Validate DSL syntax and import resolution. |
+| `typecheck_dsl` | Validate signal types and report port mismatches. |
+| `spec` | Read the same gate/tool behavior reference as `storm-mcl spec`; use `list=true`, `gate_id`, and/or `json=true`. |
+
+All MCP tool descriptions and responses are written in English so global MCP clients can display them consistently.
+
+## DSL format
+
+### `.sw-net`
+
+`.sw-net` describes node instances and wiring.
 
 ```
-# ファイル先頭に import を書くことで別の .sw-net を参照できる
+# Import another .sw-net file at the top of the file.
 import pid from "./pid.sw-net"
 
 module main
@@ -82,38 +106,38 @@ module main
   port in "Active"      : boolean
   port out "Throttle"   : number
 
-  # inst でゲートを配置し、: 入力 -> 出力 の形式で配線する
+  # Place gates with inst, then wire inputs to outputs with the : ... -> ... form.
   inst CLAMP n1 (min=0, max=1) : value="Speed Input" -> out="Throttle"
   inst AND   n2 : a="Active", b=n1_out -> out=n2_out
 
-  # use で別モジュールをサブモジュールとして埋め込む
+  # Embed another module as a submodule with use.
   use pid.controller ctrl : input=n1_out -> output="Throttle"
 end
 ```
 
-**基本構文:**
+**Basic syntax:**
 
-- `port in / out` — モジュールの外部ポート（Stormworks の入出力ノードに対応）
-- `inst <定義ID> <インスタンス名>` — ゲートを配置
-- `(key=value)` — ゲートのプロパティ
-- `: <入力> -> <出力>` — 配線（ポート名またはネット名で接続）
-- `# ...` — 行コメント（行頭・行末どちらでも使用可）
+- `port in / out` — external module ports, corresponding to Stormworks input/output nodes
+- `inst <definitionId> <instanceName>` — place a gate
+- `(key=value)` — gate properties
+- `: <input> -> <output>` — wiring, using port names or net names
+- `# ...` — line comments, either at the start of a line or after content
 
-**サブモジュール:**
+**Submodules:**
 
-別の `.sw-net` ファイルに定義したモジュールを `use` で埋め込めます。
+Use `use` to embed a module defined in another `.sw-net` file.
 
 ```
-# ファイル先頭で import（エイリアス from "パス" の形式）
+# Import at the top of the file, in the form alias from "path".
 import lib from "./lib.sw-net"
 
 module main
-  # use <エイリアス>.<モジュールID> <インスタンス名> : 入力 -> 出力
+  # use <alias>.<moduleId> <instanceName> : input -> output
   use lib.myModule sub1 : input=someNet -> output=resultNet
 end
 ```
 
-同一ファイル内のモジュールはエイリアスなしで参照できます。
+Modules in the same file can be referenced without an alias.
 
 ```
 module helper
@@ -128,30 +152,30 @@ module main
 end
 ```
 
-### 主な定義 ID
+### Main definition IDs
 
-| カテゴリ | ID 例 |
+| Category | Example IDs |
 |---|---|
-| 論理 | `NOT` `AND` `OR` `XOR` `NAND` `NOR` `TOGGLE` `PULSE` |
-| フリップフロップ | `SR_LATCH` `JK_FF` |
-| 論理式 | `BOOL_FUNC_4` `BOOL_FUNC_8` |
-| 四則演算 | `ADD` `SUBTRACT` `MULTIPLY` `DIVIDE` |
-| 数値演算 | `ABS` `CLAMP` `DELTA` `MODULO` `EQUAL` |
-| 関数 | `FUNC_NUM_1` `FUNC_NUM_3` `FUNC_NUM_8` |
-| 比較 | `GREATER_THAN` `LESS_THAN` `THRESHOLD` |
-| 制御 | `PID` `PID_ADVANCED` `TIMER_TON` `TIMER_TOF` `TIMER_RTF` `TIMER_RTO` `COUNTER` |
-| 制御（その他） | `MEMORY_REGISTER` `BLINKER` `CAPACITOR` `NUM_JUNCTION` `NUM_SWITCHBOX` |
+| Logic | `NOT` `AND` `OR` `XOR` `NAND` `NOR` `TOGGLE` `PULSE` |
+| Flip-flops | `SR_LATCH` `JK_FF` |
+| Logic functions | `BOOL_FUNC_4` `BOOL_FUNC_8` |
+| Arithmetic | `ADD` `SUBTRACT` `MULTIPLY` `DIVIDE` |
+| Numeric operations | `ABS` `CLAMP` `DELTA` `MODULO` `EQUAL` |
+| Functions | `FUNC_NUM_1` `FUNC_NUM_3` `FUNC_NUM_8` |
+| Comparisons | `GREATER_THAN` `LESS_THAN` `THRESHOLD` |
+| Control | `PID` `PID_ADVANCED` `TIMER_TON` `TIMER_TOF` `TIMER_RTF` `TIMER_RTO` `COUNTER` |
+| Other control | `MEMORY_REGISTER` `BLINKER` `CAPACITOR` `NUM_JUNCTION` `NUM_SWITCHBOX` |
 | Composite | `COMPOSITE_READ_NUMBER` `COMPOSITE_READ_BOOLEAN` `COMPOSITE_WRITE_NUMBER` `COMPOSITE_WRITE_BOOLEAN` `COMPOSITE_SWITCHBOX` `COMPOSITE_TO_NUMBER` `NUMBER_TO_COMPOSITE` |
-| 映像・音声 | `VIDEO_SWITCHBOX` `AUDIO_SWITCHBOX` |
+| Video and audio | `VIDEO_SWITCHBOX` `AUDIO_SWITCHBOX` |
 | Lua | `LUA` |
-| 定数 | `CONST` `CONST_BOOL` |
-| プロパティ | `PROPERTY_NUMBER` `PROPERTY_SLIDER` `PROPERTY_TOGGLE` `PROPERTY_TEXT` `PROPERTY_DROPDOWN` |
-| デバッグ | `TOOLTIP_NUMBER` `TOOLTIP_BOOLEAN` |
+| Constants | `CONST` `CONST_BOOL` |
+| Properties | `PROPERTY_NUMBER` `PROPERTY_SLIDER` `PROPERTY_TOGGLE` `PROPERTY_TEXT` `PROPERTY_DROPDOWN` |
+| Debug | `TOOLTIP_NUMBER` `TOOLTIP_BOOLEAN` |
 
-### .sw-mcl
+### `.sw-mcl`
 
-`LUA` ノードのスクリプトファイルを参照します。通常は自動生成されます。
+`.sw-mcl` references script files for `LUA` nodes and stores layout data. It is usually generated automatically.
 
-### project.json
+### `project.json`
 
-マイコン名・サイズ・各ノードの座標などのメタデータを保持します。
+`project.json` stores metadata such as the microcontroller name, size, and node coordinates.

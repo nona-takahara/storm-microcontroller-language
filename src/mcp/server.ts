@@ -6,10 +6,18 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 import {
+  buildGateSpec,
+  buildSpecOverview,
   buildStormworksXmlFromProjectSource,
   createFileSystemProjectSourceDocumentLoader,
+  formatGateSpecListText,
+  formatGateSpecText,
+  formatSpecOverviewText,
   importStormworksXmlToProjectSource,
+  listGateSpecSummaries,
+  loadBundledNodeBehaviorNotes,
   loadBundledNodeDefinitions,
+  loadBundledStormworksSystemNotes,
   loadProjectSourceFromProjectJsonFile,
   readUtf8TextFile,
   resolveProjectSource,
@@ -101,6 +109,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ["project_json_path"],
       },
     },
+    {
+      name: "spec",
+      description:
+        "Read the Stormworks gate and tool behavior reference. With no arguments it returns the overview; use list=true for all gate IDs or gate_id for one gate.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          gate_id: {
+            type: "string",
+            description: "Optional gate definition ID to inspect, for example SR_LATCH",
+          },
+          list: {
+            type: "boolean",
+            description: "When true, list every queryable gate ID instead of returning details",
+          },
+          json: {
+            type: "boolean",
+            description: "When true, return machine-readable JSON instead of formatted text",
+          },
+        },
+      },
+    },
   ],
 }));
 
@@ -117,6 +147,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleCheckDsl(args as { project_json_path: string });
       case "typecheck_dsl":
         return await handleTypecheckDsl(args as { project_json_path: string });
+      case "spec":
+        return await handleSpec(args as { gate_id?: string; list?: boolean; json?: boolean } | undefined);
       default:
         return errorResult(`Unknown tool: ${name}`);
     }
@@ -216,6 +248,37 @@ async function handleCheckDsl(args: { project_json_path: string }) {
   }
 
   return hasErrors ? errorResult(lines.join("\n")) : textResult(lines.join("\n"));
+}
+
+async function handleSpec(args: { gate_id?: string; list?: boolean; json?: boolean } = {}) {
+  if (args.list && args.gate_id) {
+    return errorResult("Use either list=true or gate_id, not both.");
+  }
+
+  const definitions = await loadBundledNodeDefinitions();
+
+  // Keep the MCP behavior aligned with `storm-mcl spec`: the overview is cheap and helps
+  // agents understand tool conventions, while per-gate behavior notes are loaded only when
+  // a specific definition is requested. This avoids surprising latency for simple ID lists.
+  if (args.list) {
+    const summaries = listGateSpecSummaries(definitions);
+    return textResult(args.json ? JSON.stringify(summaries, null, 2) : formatGateSpecListText(summaries));
+  }
+
+  if (args.gate_id) {
+    const notesDoc = await loadBundledNodeBehaviorNotes();
+    const spec = buildGateSpec(args.gate_id, definitions, notesDoc);
+
+    if (!spec) {
+      return errorResult(`Unknown gate id: ${args.gate_id}. Use the spec tool with list=true to see valid ids.`);
+    }
+
+    return textResult(args.json ? JSON.stringify(spec, null, 2) : formatGateSpecText(spec));
+  }
+
+  const systemNotes = await loadBundledStormworksSystemNotes();
+  const overview = buildSpecOverview(systemNotes);
+  return textResult(args.json ? JSON.stringify(overview, null, 2) : formatSpecOverviewText(overview));
 }
 
 async function handleTypecheckDsl(args: { project_json_path: string }) {
