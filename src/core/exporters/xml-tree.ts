@@ -609,14 +609,14 @@ function tryResolveModuleSwMcl(
 // expression: identifiers always get namespaced into module-local net names — per this tool's
 // documented convention (src/core/spec/tool-conventions.ts), a bare identifier is always an internal
 // net local to the module, even if its text happens to match a declared port name; only a quoted
-// string references the module's own declared port. A quoted reference always crosses the module
-// boundary in the direction it's used: a *read* (direction "in") may only target a declared input
-// port (the caller's single binding for it), and a *write* (direction "out") may only target a
-// declared output port (which may fan out to any number of readers on the caller's side). There is no
-// fallback to the other direction — reading a value that also needs to become one of the module's own
-// outputs is done through the bare local net that feeds it, with the quoted reference used exactly
-// once, at the point that net is written out to the port. At the entry module, strings still name
-// real project.json ports and pass through unchanged.
+// string references the module's own declared port. String port references get substituted with
+// whatever the caller already bound that port to, looked up by the port's own declared direction
+// rather than the local usage site's: a *read* (direction "in") may target either the module's own
+// input port or, as internal feedback, its own output port (an output can fan out to any number of
+// readers). A *write* (direction "out") may only ever target a declared output port — an input port
+// has exactly one producer, the caller's binding, so the module body driving its own input port would
+// create a second, conflicting producer for that single value. At the entry module, strings still
+// name real project.json ports and pass through unchanged.
 function resolveFlattenExpr(
   expr: SwNetExpression,
   direction: "in" | "out",
@@ -639,18 +639,18 @@ function resolveFlattenExpr(
       return expr;
     }
 
-    if (!modulePorts[direction].has(expr.value)) {
-      const otherDirection = direction === "in" ? "out" : "in";
-      const message = modulePorts[otherDirection].has(expr.value)
-        ? direction === "out"
+    const portDirection = resolveStringPortDirection(expr.value, direction, modulePorts);
+
+    if (portDirection === undefined) {
+      const message =
+        direction === "out" && modulePorts.in.has(expr.value)
           ? `${contextLabel} tries to drive its own input port "${expr.value}"; an input port has exactly one producer (the caller's binding), so a module cannot also drive it internally.`
-          : `${contextLabel} tries to read its own output port "${expr.value}" back by name; read the local net that feeds that port instead — a quoted port reference only crosses the module boundary in the direction it's declared.`
-        : `${contextLabel} references undeclared module port "${expr.value}".`;
+          : `${contextLabel} references undeclared module port "${expr.value}".`;
       pushExportWarning(warnings, message);
       return undefined;
     }
 
-    const resolved = portBindings.get(formatPortBindingKey(direction, expr.value));
+    const resolved = portBindings.get(formatPortBindingKey(portDirection, expr.value));
 
     if (!resolved) {
       pushExportWarning(warnings, `${contextLabel} references undeclared module port "${expr.value}".`);
@@ -678,6 +678,32 @@ function buildModulePortNameSets(ports: SwNetPort[]): ModulePortNameSets {
     in: new Set(ports.filter((port) => port.direction === "in").map((port) => port.name)),
     out: new Set(ports.filter((port) => port.direction === "out").map((port) => port.name)),
   };
+}
+
+// Decide which of the module's own declared ports a quoted string reference means, or undefined if
+// the reference doesn't resolve to any usable port declaration. A reference that matches a port
+// declared in the local usage direction is unambiguous and always wins, even if the same name is
+// also declared in the other direction — this is what makes an ambiguous same-named in/out pair
+// resolve predictably instead of silently picking whichever declaration happened to be registered
+// last. A *read* (direction "in") falls back to the module's own output port when there's no
+// matching input port, for a module reading its own output back as internal feedback — an output can
+// have any number of readers. A *write* (direction "out") never falls back to an input port: an
+// input has exactly one producer, the caller's binding, so nothing inside the module may also drive
+// it — that would be a second, conflicting producer for a single-source signal.
+function resolveStringPortDirection(
+  portName: string,
+  usageDirection: "in" | "out",
+  modulePorts: ModulePortNameSets,
+): "in" | "out" | undefined {
+  if (modulePorts[usageDirection].has(portName)) {
+    return usageDirection;
+  }
+
+  if (usageDirection === "in" && modulePorts.out.has(portName)) {
+    return "out";
+  }
+
+  return undefined;
 }
 
 // Resolve a whole inst/use pin-assignment list through resolveFlattenExpr, dropping assignments that
