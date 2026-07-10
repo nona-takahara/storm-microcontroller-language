@@ -1,7 +1,8 @@
 ## Summary / 概要
-### 解決したい課題・ゴール
 
-### 解決のためのアプローチ
+### Problem & goal / 解決したい課題・ゴール
+
+### Approach / 解決のためのアプローチ
 
 ## Related issue / 関連Issue
 
@@ -11,9 +12,9 @@
 
 -
 
-### 変更内容に関する落とし穴(Optional)
+### Pitfalls (optional) / 変更内容に関する落とし穴（任意）
 
-<!-- どうしてこのような実装になったのか、一見普通ではない解決策をとった場合はそれを記述する。 -->
+<!-- Explain why you arrived at this implementation, especially if the approach isn't the obvious one. / どうしてこのような実装になったのか、一見普通ではない解決策をとった場合はそれを記述する。 -->
 
 ## How to test / テスト方法
 
@@ -21,8 +22,8 @@
 
 - [ ] `pnpm check`
 - [ ] `pnpm build`
-- [ ] 適当なテストデータでdsl2xml、xml2dslを実施してのチェック
-- [ ] (Optional) Stormworksで出力したマイクロコントローラー→DSL変換→XML変換→Stormworks読み取り→再出力チェック
+- [ ] Round-trip sample test data through `dsl2xml`/`xml2dsl` and verify / 適当なテストデータで dsl2xml、xml2dsl を実施してのチェック
+- [ ] (Optional) Round-trip through Stormworks: exported microcontroller → DSL conversion → XML conversion → load in Stormworks → re-export and verify / (任意) Stormworksで出力したマイクロコントローラー→DSL変換→XML変換→Stormworks読み取り→再出力チェック
 
 ## Checklist / チェックリスト
 
