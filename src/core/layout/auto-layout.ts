@@ -26,6 +26,12 @@ export interface AutoLayoutOptions {
   nodeSpacing?: number;
   layerSpacing?: number;
   gridSize?: number;
+  // Half-width of the target output area, centered on the origin (so the layout is meant to land
+  // within [-maxExtent, +maxExtent] on each axis). Stormworks' in-game microcontroller logic canvas
+  // is only comfortably reachable/editable within roughly this range of its origin; ELK's layered
+  // algorithm otherwise grows one axis unboundedly with graph size. See computeSwNetModuleLayout's
+  // post-layout fit step.
+  maxExtent?: number;
   // Real footprints for `use` statements whose target module already has its own layout, keyed
   // by this module's use-statement instanceId. See computeModuleFootprint.
   submoduleFootprints?: Map<string, ModuleFootprint>;
@@ -69,6 +75,8 @@ interface NetProducer {
 const DEFAULT_NODE_SPACING = 0.25;
 const DEFAULT_LAYER_SPACING = 0.25;
 const DEFAULT_GRID_SIZE = 0.25;
+// Default half-width of the fit target: roughly ±32 around the origin (see AutoLayoutOptions.maxExtent).
+const DEFAULT_MAX_EXTENT = 32;
 const PORT_NODE_SIZE = 0.25;
 const INSTANCE_NODE_WIDTH = 1.0;
 const INSTANCE_NODE_ROW_HEIGHT = 0.25;
@@ -94,11 +102,19 @@ export async function computeSwNetModuleLayout(
   const elk = new ElkConstructor();
   const laidOut = await elk.layout(graph);
 
+  const rawPositionById = new Map<string, IrVector2>();
+
+  for (const child of laidOut.children ?? []) {
+    rawPositionById.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
+  }
+
+  fitPositionsWithinExtent(rawPositionById, options.maxExtent ?? DEFAULT_MAX_EXTENT, warnings);
+
   const gridSize = options.gridSize ?? DEFAULT_GRID_SIZE;
   const positionById = new Map<string, IrVector2>();
 
-  for (const child of laidOut.children ?? []) {
-    positionById.set(child.id, snapVector({ x: child.x ?? 0, y: child.y ?? 0 }, gridSize));
+  for (const [id, position] of rawPositionById) {
+    positionById.set(id, snapVector(position, gridSize));
   }
 
   const ports: SwMclPortDocument[] = portSlots.map((slot) => {
@@ -389,6 +405,59 @@ function buildElkGraph(
     children,
     edges,
   };
+}
+
+// Re-center a freshly computed layout on the origin and, if its bounding box still exceeds
+// [-maxExtent, +maxExtent] on either axis, scale that axis down (independently, since this is a
+// schematic grid layout rather than a proportionally-drawn diagram) so it fits. ELK's layered
+// algorithm otherwise grows one axis unboundedly with graph size (a long chain widens, a wide
+// fan-out heightens); tried gating this on ELK's own aspect-ratio wrapping option instead, but its
+// wrapped-band spacing defaults to a pixel-diagram scale that isn't pinned anywhere else in this
+// file, and it made test graphs larger, not smaller — so this scale-based clamp is the only bound.
+// It's best-effort: heavy compression can visually overlap densely-packed nodes, hence the warning
+// below. Mutates `positionById` in place.
+function fitPositionsWithinExtent(positionById: Map<string, IrVector2>, maxExtent: number, warnings: string[]): void {
+  if (positionById.size === 0 || maxExtent <= 0) {
+    return;
+  }
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const position of positionById.values()) {
+    minX = Math.min(minX, position.x);
+    minY = Math.min(minY, position.y);
+    maxX = Math.max(maxX, position.x);
+    maxY = Math.max(maxY, position.y);
+  }
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const targetSpan = maxExtent * 2;
+  const scaleX = width > targetSpan ? targetSpan / width : 1;
+  const scaleY = height > targetSpan ? targetSpan / height : 1;
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  if (scaleX === 1 && scaleY === 1 && centerX === 0 && centerY === 0) {
+    return;
+  }
+
+  for (const [id, position] of positionById) {
+    positionById.set(id, {
+      x: (position.x - centerX) * scaleX,
+      y: (position.y - centerY) * scaleY,
+    });
+  }
+
+  if (scaleX < 1 || scaleY < 1) {
+    warnings.push(
+      `Computed layout bounding box (${width.toFixed(2)}x${height.toFixed(2)}) exceeded the ±${maxExtent} target ` +
+        `area; scaled down (x${scaleX.toFixed(3)}, y${scaleY.toFixed(3)}) to fit, which may compress spacing.`,
+    );
+  }
 }
 
 // Snap one computed coordinate to the requested grid unit; a non-positive grid size disables snapping.
