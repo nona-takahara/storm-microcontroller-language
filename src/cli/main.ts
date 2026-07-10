@@ -9,6 +9,7 @@ import {
   buildStormworksXmlFromProjectSource,
   buildStormworksXmlTreeFromProjectSource,
   createFileSystemProjectSourceDocumentLoader,
+  ensureProjectLayoutIsComplete,
   formatGateSpecListText,
   formatGateSpecText,
   formatSpecOverviewText,
@@ -143,6 +144,8 @@ async function runDsl2XmlCommand(args: string[]): Promise<number> {
     return 1;
   }
 
+  await ensureLayoutIsComplete(parsedArgs.projectJsonPath);
+
   const loadResult = await loadProjectSourceFromProjectJsonFile(parsedArgs.projectJsonPath);
   const loadHasErrors = printDiagnostics(loadResult.diagnostics);
 
@@ -180,6 +183,8 @@ async function runDsl2XmlTreeCommand(args: string[]): Promise<number> {
     return 1;
   }
 
+  await ensureLayoutIsComplete(parsedArgs.projectJsonPath);
+
   const loadResult = await loadProjectSourceFromProjectJsonFile(parsedArgs.projectJsonPath);
   const loadHasErrors = printDiagnostics(loadResult.diagnostics);
 
@@ -200,6 +205,16 @@ async function runDsl2XmlTreeCommand(args: string[]): Promise<number> {
 
   console.log(JSON.stringify(buildResult.value.tree, null, 2));
   return loadHasErrors || buildHasErrors ? 1 : 0;
+}
+
+// Run the shared implicit-auto-layout pass (see layout-dsl-runner.ts) and print any of its notices
+// as CLI warnings before dsl2xml/dsl2xml-tree read the (now hopefully complete) .sw-mcl file set.
+async function ensureLayoutIsComplete(projectJsonPath: string): Promise<void> {
+  const { messages } = await ensureProjectLayoutIsComplete(projectJsonPath);
+
+  for (const message of messages) {
+    console.error(`[auto-layout] ${message}`);
+  }
 }
 
 // Resolve imports and report the reachable sw-net document/module graph.
