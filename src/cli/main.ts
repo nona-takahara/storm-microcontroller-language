@@ -24,6 +24,7 @@ import {
   readUtf8TextFile,
   resolveLayoutTargets,
   resolveProjectSource,
+  resolveSubmoduleFootprints,
   serializeSourceDocumentTexts,
   STORMWORKS_SW_MCL_FORMAT_VERSION,
   type IrVector2,
@@ -365,12 +366,19 @@ async function layoutOneTarget(target: LayoutTarget, args: LayoutDslArgs): Promi
     );
   }
 
+  const submoduleFootprintResult = await resolveSubmoduleFootprints(target.swNetPath, swNet, selection.module);
+
+  for (const warning of submoduleFootprintResult.warnings) {
+    console.error(`[warning] ${target.swNetPath}: ${warning}`);
+  }
+
   const mode = args.force ? "force" : "fill";
   const existing = mode === "fill" ? buildExistingPositions(existingSwMcl) : undefined;
   const result = await computeSwNetModuleLayout(selection.module, {
     mode,
     existing,
     gridSize: args.gridSize,
+    submoduleFootprints: submoduleFootprintResult.footprints,
   });
 
   for (const warning of result.warnings) {
