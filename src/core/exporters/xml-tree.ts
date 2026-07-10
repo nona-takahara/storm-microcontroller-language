@@ -14,12 +14,13 @@ import {
 } from "../definitions/schema.js";
 import { createWarningDiagnostic, type Diagnostic } from "../diagnostics.js";
 import { type IrSignalKind, type IrScalarValue, type IrVector2 } from "../ir.js";
-import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement, type SwNetModule, type SwNetPort } from "../parsers/sw-net.js";
+import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement, type SwNetModule } from "../parsers/sw-net.js";
 import { type ProjectJsonDocument, type ProjectJsonLinkDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
 import { addVector } from "../serializers/submodule-layout.js";
 import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule, type SwNetResolvedModuleKey } from "../resolvers/sw-net.js";
+import { buildModulePortNameSets, type ModulePortNameSets } from "../shared/module-port-directions.js";
 import { registerFirstProducer } from "../shared/producer-index.js";
 
 export type StormworksXmlTreeScalar = string | number | boolean | null;
@@ -662,23 +663,6 @@ function resolveFlattenExpr(
   }
 
   return expr;
-}
-
-// Port names declared by the module currently being flattened, split by direction. A module may
-// legally (if unusually) declare the same name in both directions — the parser and rest of the
-// exporter don't reject it — so direction lookups must stay direction-keyed rather than collapsing
-// to a single name -> direction map, which would silently let one direction's declaration shadow
-// the other's.
-interface ModulePortNameSets {
-  in: ReadonlySet<string>;
-  out: ReadonlySet<string>;
-}
-
-function buildModulePortNameSets(ports: SwNetPort[]): ModulePortNameSets {
-  return {
-    in: new Set(ports.filter((port) => port.direction === "in").map((port) => port.name)),
-    out: new Set(ports.filter((port) => port.direction === "out").map((port) => port.name)),
-  };
 }
 
 // Decide which of the module's own declared ports a quoted string reference means, or undefined if

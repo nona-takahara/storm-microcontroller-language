@@ -48,6 +48,7 @@ import {
 import { buildProjectJsonDocument, type ProjectJsonDocument } from "./serializers/project-json.js";
 import { serializeSwNetDocument } from "./serializers/sw-net-document.js";
 import { getSwNetInstanceName } from "./serializers/sw-net-shared.js";
+import { buildModulePortNameSets, type ModulePortNameSets } from "./shared/module-port-directions.js";
 import { buildStormworksSwMclDocument, type StormworksSwMclDocument } from "./serializers/sw-mcl.js";
 import { serializeStormworksSwNet } from "./serializers/sw-net.js";
 
@@ -815,7 +816,7 @@ function validateNetSignalConsistency(
   const moduleByKey = new Map(swNet.modules.map((module) => [formatResolvedModuleKey(module.key), module] as const));
 
   for (const resolvedModule of swNet.modules) {
-    const nets = collectModuleNetSignalEdges(resolvedModule, moduleByKey, definitions);
+    const nets = collectModuleNetSignalEdges(resolvedModule, moduleByKey, definitions, diagnostics);
 
     for (const [netKey, edges] of nets) {
       reportNetSignalMismatch(resolvedModule, netKey, edges, diagnostics);
@@ -832,6 +833,7 @@ function collectModuleNetSignalEdges(
   resolvedModule: SwNetResolvedModule,
   moduleByKey: Map<string, SwNetResolvedModule>,
   definitions: NodeDefinitionRegistry,
+  diagnostics: Diagnostic[],
 ): Map<string, NetSignalEdge[]> {
   const nets = new Map<string, NetSignalEdge[]>();
   const addEdge = (netKey: string | undefined, edge: NetSignalEdge): void => {
@@ -858,27 +860,69 @@ function collectModuleNetSignalEdges(
   }
 
   const useByStatement = new Map(resolvedModule.uses.map((use) => [use.statement, use] as const));
+  const modulePorts = buildModulePortNameSets(resolvedModule.module.ports);
 
   for (const statement of resolvedModule.module.statements) {
     if (statement.kind === "inst") {
-      collectInstNetEdges(statement, definitions, addEdge);
+      collectInstNetEdges(statement, definitions, addEdge, resolvedModule, modulePorts, diagnostics);
     } else {
-      collectUseNetEdges(statement, useByStatement.get(statement), moduleByKey, addEdge);
+      collectUseNetEdges(statement, useByStatement.get(statement), moduleByKey, addEdge, resolvedModule, modulePorts, diagnostics);
     }
   }
 
   return nets;
 }
 
-// Resolve one assignment's net identity: identifiers join the local-net bucket, string literals join
-// the boundary-port bucket for the module's own port with that name in the given direction.
-function netKeyForAssignment(assignment: SwNetAssignment, boundaryDirection: "in" | "out"): string | undefined {
+// Resolve one assignment's net identity: identifiers join the local-net bucket; string literals join
+// the boundary-port bucket for the *current* module's own port with that name — matching the
+// exporter's flattening semantics (src/core/exporters/xml-tree.ts) exactly, on purpose, so this
+// checker can't disagree with what dsl2xml actually wires. This is deliberately asymmetric: reading
+// (usageDirection "in") may target either the module's own input port or, as internal feedback, its
+// own output port — an output has exactly one producer inside the module but may have any number of
+// readers, inside the module or out. Writing (usageDirection "out") may only ever target a declared
+// output port; an input port's one and only producer is the caller's binding, so nothing inside the
+// module may also drive it — that's flagged here as a hard error, the same as any other rule
+// violation this checker catches, rather than left to surface later as an export-time warning.
+function netKeyForAssignment(
+  assignment: SwNetAssignment,
+  usageDirection: "in" | "out",
+  resolvedModule: SwNetResolvedModule,
+  modulePorts: ModulePortNameSets,
+  contextLabel: string,
+  diagnostics: Diagnostic[],
+): string | undefined {
   if (assignment.value.kind === "identifier") {
     return `local:${assignment.value.value}`;
   }
 
   if (assignment.value.kind === "string") {
-    return `boundary:${boundaryDirection}:${assignment.value.value}`;
+    const portName = assignment.value.value;
+
+    if (modulePorts[usageDirection].has(portName)) {
+      return `boundary:${usageDirection}:${portName}`;
+    }
+
+    if (usageDirection === "in" && modulePorts.out.has(portName)) {
+      return `boundary:out:${portName}`;
+    }
+
+    if (usageDirection === "out" && modulePorts.in.has(portName)) {
+      diagnostics.push(
+        createErrorDiagnostic(
+          "MODULE_INPUT_PORT_DRIVEN_INTERNALLY",
+          `${contextLabel} tries to drive its own input port "${portName}"; an input port has exactly one producer (the caller's binding), so nothing inside module ${resolvedModule.key.moduleId} may also drive it.`,
+          "sw-net",
+          resolvedModule.key.documentPath,
+          resolvedModule.key.moduleId,
+        ),
+      );
+      return undefined;
+    }
+
+    // Not declared as a port of this module in either direction — keep the assignment's own local
+    // role as the net key so it still participates in cross-net signal checks instead of vanishing
+    // silently; the exporter reports the "undeclared module port" warning for this case at export time.
+    return `boundary:${usageDirection}:${portName}`;
   }
 
   return undefined;
@@ -890,23 +934,32 @@ function collectInstNetEdges(
   statement: SwNetInstStatement,
   definitions: NodeDefinitionRegistry,
   addEdge: (netKey: string | undefined, edge: NetSignalEdge) => void,
+  resolvedModule: SwNetResolvedModule,
+  modulePorts: ModulePortNameSets,
+  diagnostics: Diagnostic[],
 ): void {
   const definition = findCompatibleComponentDefinition(definitions, statement.typeId);
 
   for (const assignment of statement.inputs) {
-    addEdge(netKeyForAssignment(assignment, "in"), {
-      signal: resolveInstPortSignal(definition, statement, assignment.key, "input"),
-      role: "consumer",
-      label: `input "${assignment.key}" of ${statement.instanceId}`,
-    });
+    addEdge(
+      netKeyForAssignment(assignment, "in", resolvedModule, modulePorts, `Input "${assignment.key}" of ${statement.instanceId}`, diagnostics),
+      {
+        signal: resolveInstPortSignal(definition, statement, assignment.key, "input"),
+        role: "consumer",
+        label: `input "${assignment.key}" of ${statement.instanceId}`,
+      },
+    );
   }
 
   for (const assignment of statement.outputs) {
-    addEdge(netKeyForAssignment(assignment, "out"), {
-      signal: resolveInstPortSignal(definition, statement, assignment.key, "output"),
-      role: "producer",
-      label: `output "${assignment.key}" of ${statement.instanceId}`,
-    });
+    addEdge(
+      netKeyForAssignment(assignment, "out", resolvedModule, modulePorts, `Output "${assignment.key}" of ${statement.instanceId}`, diagnostics),
+      {
+        signal: resolveInstPortSignal(definition, statement, assignment.key, "output"),
+        role: "producer",
+        label: `output "${assignment.key}" of ${statement.instanceId}`,
+      },
+    );
   }
 }
 
@@ -948,11 +1001,16 @@ function resolveInstPortSignal(
 
 // Collect net edges contributed by one `use` statement against its resolved target module's declared
 // ports: inputs are consumer edges, outputs are producer edges (from the caller module's perspective).
+// Note the assignment *values* here are expressions in the calling module's own scope (they wire the
+// callee's ports to the caller's nets/ports), so net-key resolution uses the caller's modulePorts.
 function collectUseNetEdges(
   statement: SwNetUseStatement,
   use: SwNetResolvedUse | undefined,
   moduleByKey: Map<string, SwNetResolvedModule>,
   addEdge: (netKey: string | undefined, edge: NetSignalEdge) => void,
+  resolvedModule: SwNetResolvedModule,
+  modulePorts: ModulePortNameSets,
+  diagnostics: Diagnostic[],
 ): void {
   if (!use) {
     // The resolver already raises a hard SwNetResolveError for a genuinely-unresolvable target;
@@ -974,19 +1032,39 @@ function collectUseNetEdges(
   );
 
   for (const assignment of statement.inputs) {
-    addEdge(netKeyForAssignment(assignment, "in"), {
-      signal: targetInputs.get(assignment.key)?.signal ?? "unknown",
-      role: "consumer",
-      label: `input "${assignment.key}" of ${statement.instanceId} (${targetModuleLabel(use)})`,
-    });
+    addEdge(
+      netKeyForAssignment(
+        assignment,
+        "in",
+        resolvedModule,
+        modulePorts,
+        `Input "${assignment.key}" of ${statement.instanceId}`,
+        diagnostics,
+      ),
+      {
+        signal: targetInputs.get(assignment.key)?.signal ?? "unknown",
+        role: "consumer",
+        label: `input "${assignment.key}" of ${statement.instanceId} (${targetModuleLabel(use)})`,
+      },
+    );
   }
 
   for (const assignment of statement.outputs) {
-    addEdge(netKeyForAssignment(assignment, "out"), {
-      signal: targetOutputs.get(assignment.key)?.signal ?? "unknown",
-      role: "producer",
-      label: `output "${assignment.key}" of ${statement.instanceId} (${targetModuleLabel(use)})`,
-    });
+    addEdge(
+      netKeyForAssignment(
+        assignment,
+        "out",
+        resolvedModule,
+        modulePorts,
+        `Output "${assignment.key}" of ${statement.instanceId}`,
+        diagnostics,
+      ),
+      {
+        signal: targetOutputs.get(assignment.key)?.signal ?? "unknown",
+        role: "producer",
+        label: `output "${assignment.key}" of ${statement.instanceId} (${targetModuleLabel(use)})`,
+      },
+    );
   }
 }
 
