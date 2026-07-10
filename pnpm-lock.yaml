@@ -18,9 +18,6 @@ importers:
         specifier: ^4.5.3
         version: 4.5.4
     devDependencies:
-      '@esbuild/linux-x64':
-        specifier: ^0.28.1
-        version: 0.28.1
       '@types/node':
         specifier: ^24.0.0
         version: 24.12.0
@@ -131,12 +128,6 @@ packages:
 
   '@esbuild/linux-x64@0.27.4':
     resolution: {integrity: sha512-S5qOXrKV8BQEzJPVxAwnryi2+Iq5pB40gTEIT69BQONqR7JH1EPIcQ/Uiv9mCnn05jff9umq/5nqzxlqTOg9NA==}
-    engines: {node: '>=18'}
-    cpu: [x64]
-    os: [linux]
-
-  '@esbuild/linux-x64@0.28.1':
-    resolution: {integrity: sha512-u/anNYF2mmVOEDwLtnQ1wOr3EZ9sTNGLWrsYGYwHWzGA3Si84IOkHXlbWTD1NB+9/1lcnweYKO54uhxZydNzfA==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [linux]
@@ -659,8 +650,6 @@ snapshots:
 
   '@esbuild/linux-x64@0.27.4':
     optional: true
-
-  '@esbuild/linux-x64@0.28.1': {}
 
   '@esbuild/netbsd-arm64@0.27.4':
     optional: true

@@ -19,6 +19,7 @@ pnpm cli xml2dsl <input.xml> --out-dir <output-dir>   # Stormworks XML → proje
 pnpm cli dsl2xml <project.json> --out <output.xml>    # project.json + sw-net + sw-mcl → XML
 pnpm cli check-dsl <project.json>
 pnpm cli typecheck-dsl <project.json>
+pnpm cli layout-dsl <project.json> [--module <id>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]
 pnpm cli spec [<definitionId>] [--list] [--json]   # gate/tool behavior reference, see below
 ```
 
@@ -37,7 +38,6 @@ All formats pass through `IrProgram` (nodes + links + submodules + metadata). Th
 | Serializers | IR → DSL files | `src/core/serializers/sw-net.ts` (orchestrates others) |
 | Parsers | DSL files → IR | `src/core/parsers/sw-net.ts`, `sw-mcl.ts`, `project-json.ts` |
 | Exporters | IR → XML | `src/core/exporters/xml.ts` |
-| Pipeline | XML → sw-net (one call) | `src/core/pipeline/convert.ts` |
 
 **Project source** — `src/core/project-source.ts`  
 `StormworksProjectSource` is the aggregate of all DSL documents for a project directory. `resolveProjectSource` links `sw-net` imports across files. The `src/core/resolvers/sw-net.ts` resolves `use` statements to the correct module definitions.

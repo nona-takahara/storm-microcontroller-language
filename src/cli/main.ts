@@ -48,20 +48,15 @@ export async function main(argv: string[]): Promise<number> {
 
   switch (command) {
     case "xml2dsl":
-    case "serialize-sw-net":
       return runXml2DslCommand(rest);
     case "dsl2xml":
-    case "build-xml":
       return runDsl2XmlCommand(rest);
     case "dsl2xml-tree":
-    case "build-xml-tree":
       return runDsl2XmlTreeCommand(rest);
     case "check-dsl":
       return runCheckDslCommand(rest);
     case "typecheck-dsl":
       return runTypecheckDslCommand(rest);
-    case "import-xml":
-      return runImportXmlCommand(rest);
     case "layout-dsl":
       return runLayoutDslCommand(rest);
     case "spec":
@@ -98,13 +93,13 @@ async function runXml2DslCommand(args: string[]): Promise<number> {
     await writeProjectSourceToDirectory(result.value, parsedArgs.outputDirectory);
     const entryRelativePath = resolveEntryDocumentRelativePath(result.value);
     const entrySwMclRelativePath = replaceSwNetExtensionForDisplay(entryRelativePath, ".sw-mcl");
-    console.error(`Wrote ${parsedArgs.outputDirectory}\\project.json`);
-    console.error(`Wrote ${parsedArgs.outputDirectory}\\${entryRelativePath.replaceAll("/", "\\")}`);
-    console.error(`Wrote ${parsedArgs.outputDirectory}\\${entrySwMclRelativePath.replaceAll("/", "\\")}`);
+    console.error(`Wrote ${parsedArgs.outputDirectory}/project.json`);
+    console.error(`Wrote ${parsedArgs.outputDirectory}/${entryRelativePath}`);
+    console.error(`Wrote ${parsedArgs.outputDirectory}/${entrySwMclRelativePath}`);
 
     for (const relativeScriptPath of Object.keys(result.value.entryDocument.scripts).sort()) {
       const scriptOutputPath = joinRelativeDisplayPath(entryRelativePath, relativeScriptPath);
-      console.error(`Wrote ${parsedArgs.outputDirectory}\\${scriptOutputPath.replaceAll("/", "\\")}`);
+      console.error(`Wrote ${parsedArgs.outputDirectory}/${scriptOutputPath}`);
     }
 
     return hasErrors ? 1 : 0;
@@ -267,27 +262,6 @@ async function runTypecheckDslCommand(args: string[]): Promise<number> {
   }
 
   return loadHasErrors || validationHasErrors || !validationResult.isValid ? 1 : 0;
-}
-
-// Debug command that prints the raw IR imported directly from XML.
-async function runImportXmlCommand(args: string[]): Promise<number> {
-  const inputPath = parseSingleInputPath(args);
-
-  if (!inputPath) {
-    printUsage();
-    return 1;
-  }
-
-  const definitions = await loadBundledNodeDefinitions();
-  const xmlText = await readUtf8TextFile(inputPath);
-  const { importStormworksXml } = await import("../core/importers/xml.js");
-  const result = importStormworksXml(xmlText, {
-    definitions,
-    sourceName: inputPath,
-  });
-
-  console.log(JSON.stringify(result.program, null, 2));
-  return 0;
 }
 
 // Look up gate/tool behavior spec: no args prints the tool+system overview, --list enumerates
@@ -675,10 +649,6 @@ function parseXml2DslArgs(
       continue;
     }
 
-    if (arg === "--layout") {
-      continue;
-    }
-
     if (!inputPath) {
       inputPath = arg;
       continue;
@@ -740,17 +710,6 @@ function parseProjectJsonPathArgs(
   return { projectJsonPath };
 }
 
-// Parse commands that take exactly one input path.
-function parseSingleInputPath(args: string[]): string | undefined {
-  const [inputPath, ...rest] = args;
-
-  if (!inputPath || rest.length > 0) {
-    return undefined;
-  }
-
-  return inputPath;
-}
-
 // Print diagnostics and return whether any of them were errors.
 function printDiagnostics(diagnostics: StormworksLibraryDiagnostic[]): boolean {
   let hasErrors = false;
@@ -780,12 +739,6 @@ function printUsage(): void {
     "  storm-mcl layout-dsl <project.json> [--module <id>] [--document <path>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]",
   );
   console.log("  storm-mcl spec [<definitionId>] [--list] [--json]");
-  console.log("");
-  console.log("Legacy / debug:");
-  console.log("  storm-mcl import-xml <input.xml>");
-  console.log("  storm-mcl serialize-sw-net <input.xml> [--out-dir output-directory]");
-  console.log("  storm-mcl build-xml <project.json> [--out output.xml]");
-  console.log("  storm-mcl build-xml-tree <project.json>");
 }
 
 // Resolve the entry sw-net relative path to display from the loaded project source.

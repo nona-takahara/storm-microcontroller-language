@@ -6,8 +6,8 @@ import {
   compareSwNetIdentifier,
   getSwNetInstanceName,
   getSwNetInstanceTypeName,
+  IDENTIFIER_PATTERN,
   sanitizeSwNetIdentifier,
-  tryParseSwNetTrailingNumber,
 } from "./sw-net-shared.js";
 
 export const STORMWORKS_SW_NET_FILE_EXTENSION = ".sw-net";
@@ -172,7 +172,6 @@ function renderInstance(
     nodeById,
   );
   const outputAssignments = collectOutputAssignments(
-    node,
     instanceName,
     definition,
     linksBySourceNodeId.get(node.id) ?? [],
@@ -269,7 +268,6 @@ function collectInputAssignments(
 
 // Render outgoing links as right-hand-side pin assignments, inferring named outputs when possible.
 function collectOutputAssignments(
-  node: IrNode,
   instanceName: string,
   definition: ComponentDefinition | undefined,
   outgoingLinks: IrLink[],
@@ -371,7 +369,7 @@ function createInternalNetName(instanceName: string, portKey: string): string {
 
 // Keep generated identifiers valid and stable even when source names contain spaces.
 function formatBareIdentifier(value: string): string {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) ? value : sanitizeSwNetIdentifier(value, "module");
+  return IDENTIFIER_PATTERN.test(value) ? value : sanitizeSwNetIdentifier(value, "module");
 }
 
 // Keep user-facing module-port names verbatim by always quoting them in DSL.
@@ -390,7 +388,7 @@ function formatDslScalar(value: IrScalarValue | undefined): string {
   }
 
   if (typeof value === "number") {
-    return formatNumber(value);
+    return String(value);
   }
 
   return value ? "true" : "false";
@@ -442,11 +440,6 @@ function coerceDslScalarValue(
   }
 
   return undefined;
-}
-
-// Format numbers compactly while keeping integer-looking values readable.
-function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(value);
 }
 
 // Check whether a link is fully contained within one rendered submodule body.
@@ -512,14 +505,7 @@ function compareById<T extends { id: string }>(left: T, right: T): number {
   return compareIdentifier(left.id, right.id);
 }
 
-// Compare identifiers, treating trailing numbers naturally when possible.
+// Compare identifiers using the shared natural ordering helper.
 function compareIdentifier(left: string, right: string): number {
-  const leftNumeric = tryParseSwNetTrailingNumber(left);
-  const rightNumeric = tryParseSwNetTrailingNumber(right);
-
-  if (leftNumeric !== undefined && rightNumeric !== undefined && leftNumeric !== rightNumeric) {
-    return leftNumeric - rightNumeric;
-  }
-
   return compareSwNetIdentifier(left, right);
 }

@@ -26,6 +26,14 @@ export function getSwNetInstanceName(node: IrNode): string {
   return `n_${sanitizeSwNetIdentifier(node.id)}`;
 }
 
+
+export const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+// Preserve valid bare identifiers and JSON-quote every other human-authored name.
+export function quoteIdentifierIfNeeded(value: string): string {
+  return IDENTIFIER_PATTERN.test(value) ? value : JSON.stringify(value);
+}
+
 // Sanitize arbitrary source text into a bare sw-net identifier.
 export function sanitizeSwNetIdentifier(value: string, emptyFallback = "node"): string {
   const sanitized = value.replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");

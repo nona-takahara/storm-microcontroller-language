@@ -153,7 +153,7 @@ function buildIrProgram(
   // Import is intentionally split into:
   // 1. project nodes from <nodes><n>
   // 2. project bridge components from <components_bridge><c>
-  //    (with component_bridge_states as a legacy fallback only)
+  //    (with component_bridge_states as an alternate shape we have not fully characterized yet)
   // 3. pure logic graph from <components><c>
   const program = createEmptyIrProgram({
     sourceFormat: "stormworks-xml",
@@ -292,7 +292,7 @@ function collectProjectNodes(
   return contexts;
 }
 
-// Collect project/logics boundary data from bridge components, with legacy state data as fallback.
+// Collect project/logics boundary data from bridge components, with alternate state data as a fallback while Stormworks variants are still being characterized.
 function collectProjectBridges(
   root: unknown,
   warnings: StormworksXmlImportWarning[],
@@ -303,7 +303,7 @@ function collectProjectBridges(
     return collectProjectBridgesFromComponents(bridgeComponents, warnings);
   }
 
-  return collectProjectBridgesFromLegacyStates(root);
+  return collectProjectBridgesFromAlternateStates(root);
 }
 
 // Read canonical bridge components from <components_bridge><c>.
@@ -346,7 +346,7 @@ function collectProjectBridgesFromComponents(
 }
 
 // Fall back to editor-oriented bridge state data when bridge components are unavailable.
-function collectProjectBridgesFromLegacyStates(root: unknown): Map<string, ProjectBridgeContext> {
+function collectProjectBridgesFromAlternateStates(root: unknown): Map<string, ProjectBridgeContext> {
   const projectBridges = new Map<string, ProjectBridgeContext>();
   const bridgeGroup = asRecord(getValueByPath(root, "microprocessor.group.component_bridge_states"));
 
@@ -915,7 +915,7 @@ function getBridgeInputBindings(
 }
 
 // Some Stormworks-authored saves omit a dynamic-input component's count attribute (e.g. after
-// legacy edits), even though wired inN entries extend past the schema default. Since links are
+// Stormworks-authored variants), even though wired inN entries extend past the schema default. Since links are
 // imported independently of the declared count (see importLogicLinks), a too-small count would
 // silently make dsl2xml re-export fewer <inN> slots than are actually wired, and Stormworks itself
 // discards any connection beyond the declared count when it next resaves the file. Raise count to

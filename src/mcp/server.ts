@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -18,8 +19,15 @@ import {
   type StormworksLibraryDiagnostic,
 } from "../node.js";
 
+
+function readPackageVersion(): string {
+  const packageJsonUrl = new URL("../../package.json", import.meta.url);
+  const packageJson = JSON.parse(readFileSync(packageJsonUrl, "utf8")) as { version?: unknown };
+  return typeof packageJson.version === "string" ? packageJson.version : "0.0.0";
+}
+
 const server = new Server(
-  { name: "storm-mcl", version: "0.1.0" },
+  { name: "storm-mcl", version: readPackageVersion() },
   { capabilities: { tools: {} } },
 );
 
@@ -28,17 +36,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "xml_to_dsl",
       description:
-        "StormworksのマイコンXMLファイルをDSL形式（project.json + .sw-net + .sw-mcl）に変換します。",
+        "Convert a Stormworks microcontroller XML file into the DSL file set (project.json + .sw-net + .sw-mcl).",
       inputSchema: {
         type: "object",
         properties: {
           xml_path: {
             type: "string",
-            description: "変換元のXMLファイルの絶対パス",
+            description: "Absolute path to the source XML file",
           },
           out_dir: {
             type: "string",
-            description: "DSLファイルの出力先ディレクトリの絶対パス",
+            description: "Absolute output directory for DSL files",
           },
         },
         required: ["xml_path", "out_dir"],
@@ -47,17 +55,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "dsl_to_xml",
       description:
-        "DSL形式（project.json + .sw-net + .sw-mcl）をStormworksのマイコンXMLファイルに変換します。",
+        "Convert the DSL file set (project.json + .sw-net + .sw-mcl) into Stormworks microcontroller XML.",
       inputSchema: {
         type: "object",
         properties: {
           project_json_path: {
             type: "string",
-            description: "project.jsonファイルの絶対パス",
+            description: "Absolute path to project.json",
           },
           out_path: {
             type: "string",
-            description: "出力XMLファイルの絶対パス（省略時はXMLテキストを返す）",
+            description: "Absolute output XML path; when omitted, XML text is returned",
           },
         },
         required: ["project_json_path"],
@@ -66,13 +74,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "check_dsl",
       description:
-        "DSLファイルの構文と参照（importの解決）を検証します。エラーと警告の一覧を返します。",
+        "Validate DSL syntax and import resolution, returning errors and warnings.",
       inputSchema: {
         type: "object",
         properties: {
           project_json_path: {
             type: "string",
-            description: "project.jsonファイルの絶対パス",
+            description: "Absolute path to project.json",
           },
         },
         required: ["project_json_path"],
@@ -81,13 +89,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "typecheck_dsl",
       description:
-        "DSLファイルの信号型の整合性を検証します。ポートの型ミスマッチなどを検出します。",
+        "Validate DSL signal types and report issues such as port type mismatches.",
       inputSchema: {
         type: "object",
         properties: {
           project_json_path: {
             type: "string",
-            description: "project.jsonファイルの絶対パス",
+            description: "Absolute path to project.json",
           },
         },
         required: ["project_json_path"],
@@ -129,22 +137,22 @@ async function handleXmlToDsl(args: { xml_path: string; out_dir: string }) {
   const diagnosticLines = formatDiagnostics(result.diagnostics);
 
   if (!result.value) {
-    return errorResult(`変換に失敗しました。\n${diagnosticLines}`);
+    return errorResult(`Conversion failed.\n${diagnosticLines}`);
   }
 
   await writeProjectSourceToDirectory(result.value, args.out_dir);
 
   const lines = [
-    `変換が完了しました: ${args.out_dir}`,
+    `Conversion completed: ${args.out_dir}`,
     "",
-    `出力ファイル:`,
+    `Output files:`,
     `  ${args.out_dir}/project.json`,
     `  ${args.out_dir}/main.sw-net`,
     `  ${args.out_dir}/main.sw-mcl`,
   ];
 
   if (diagnosticLines) {
-    lines.push("", "警告:", diagnosticLines);
+    lines.push("", "Warnings:", diagnosticLines);
   }
 
   return textResult(lines.join("\n"));
@@ -155,7 +163,7 @@ async function handleDslToXml(args: { project_json_path: string; out_path?: stri
   const diagnostics = [...loadResult.diagnostics];
 
   if (!loadResult.value) {
-    return errorResult(`DSLの読み込みに失敗しました。\n${formatDiagnostics(diagnostics)}`);
+    return errorResult(`Failed to load DSL.\n${formatDiagnostics(diagnostics)}`);
   }
 
   const definitions = await loadBundledNodeDefinitions();
@@ -166,15 +174,15 @@ async function handleDslToXml(args: { project_json_path: string; out_path?: stri
   diagnostics.push(...buildResult.diagnostics);
 
   if (!buildResult.value) {
-    return errorResult(`XML生成に失敗しました。\n${formatDiagnostics(diagnostics)}`);
+    return errorResult(`Failed to generate XML.\n${formatDiagnostics(diagnostics)}`);
   }
 
   if (args.out_path) {
     await writeUtf8TextFile(args.out_path, buildResult.value.xml);
-    const lines = [`XML出力が完了しました: ${args.out_path}`];
+    const lines = [`XML output completed: ${args.out_path}`];
 
     if (diagnostics.length > 0) {
-      lines.push("", "警告:", formatDiagnostics(diagnostics));
+      lines.push("", "Warnings:", formatDiagnostics(diagnostics));
     }
 
     return textResult(lines.join("\n"));
@@ -188,7 +196,7 @@ async function handleCheckDsl(args: { project_json_path: string }) {
   const diagnostics = [...loadResult.diagnostics];
 
   if (!loadResult.value) {
-    return errorResult(`DSLの読み込みに失敗しました。\n${formatDiagnostics(diagnostics)}`);
+    return errorResult(`Failed to load DSL.\n${formatDiagnostics(diagnostics)}`);
   }
 
   const resolveResult = await resolveProjectSource(loadResult.value, {
@@ -198,10 +206,10 @@ async function handleCheckDsl(args: { project_json_path: string }) {
 
   const hasErrors = diagnostics.some((d) => d.severity === "error");
   const summary = resolveResult.value
-    ? `ドキュメント数: ${resolveResult.value.documents.length} / モジュール数: ${resolveResult.value.swNet.modules.length} / use文: ${resolveResult.value.swNet.uses.length}`
-    : "解決失敗";
+    ? `Documents: ${resolveResult.value.documents.length} / Modules: ${resolveResult.value.swNet.modules.length} / use statements: ${resolveResult.value.swNet.uses.length}`
+    : "Resolution failed";
 
-  const lines = [hasErrors ? "チェック失敗" : "チェック通過", summary];
+  const lines = [hasErrors ? "Check failed" : "Check passed", summary];
 
   if (diagnostics.length > 0) {
     lines.push("", formatDiagnostics(diagnostics));
@@ -215,7 +223,7 @@ async function handleTypecheckDsl(args: { project_json_path: string }) {
   const diagnostics = [...loadResult.diagnostics];
 
   if (!loadResult.value) {
-    return errorResult(`DSLの読み込みに失敗しました。\n${formatDiagnostics(diagnostics)}`);
+    return errorResult(`Failed to load DSL.\n${formatDiagnostics(diagnostics)}`);
   }
 
   const definitions = await loadBundledNodeDefinitions();
@@ -226,7 +234,7 @@ async function handleTypecheckDsl(args: { project_json_path: string }) {
   diagnostics.push(...validationResult.diagnostics);
 
   const hasErrors = diagnostics.some((d) => d.severity === "error") || !validationResult.isValid;
-  const lines = [validationResult.isValid ? "型チェック通過" : "型チェック失敗"];
+  const lines = [validationResult.isValid ? "Typecheck passed" : "Typecheck failed"];
 
   if (diagnostics.length > 0) {
     lines.push("", formatDiagnostics(diagnostics));
