@@ -16,7 +16,7 @@ import {
   validateProjectSource,
   writeProjectSourceToDirectory,
   writeUtf8TextFile,
-  type StormworksLibraryDiagnostic,
+  formatDiagnostics,
 } from "../node.js";
 
 
@@ -241,16 +241,6 @@ async function handleTypecheckDsl(args: { project_json_path: string }) {
   }
 
   return hasErrors ? errorResult(lines.join("\n")) : textResult(lines.join("\n"));
-}
-
-function formatDiagnostics(diagnostics: StormworksLibraryDiagnostic[]): string {
-  return diagnostics
-    .map((d) => {
-      const location = [d.documentId, d.path].filter(Boolean).join(":");
-      const suffix = location ? ` (${location})` : "";
-      return `[${d.severity}] ${d.code}${suffix}: ${d.message}`;
-    })
-    .join("\n");
 }
 
 function textResult(text: string) {

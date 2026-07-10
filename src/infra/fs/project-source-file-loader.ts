@@ -5,6 +5,7 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import {
   parseProjectJsonText,
   parseSourceDocumentTexts,
+  createErrorDiagnostic,
   serializeSourceDocumentTexts,
   type ProjectJsonDocument,
   type ProjectJsonSubmoduleDocument,
@@ -98,13 +99,14 @@ export async function loadProjectSourceFromProjectJsonFile(
       diagnostics,
     };
   } catch (error) {
-    diagnostics.push({
-      severity: "error",
-      code: "PROJECT_SOURCE_LOAD_FAILED",
-      message: error instanceof Error ? error.message : String(error),
-      source: "library",
-      documentId: filePaths.projectJsonPath,
-    });
+    diagnostics.push(
+      createErrorDiagnostic(
+        "PROJECT_SOURCE_LOAD_FAILED",
+        error instanceof Error ? error.message : String(error),
+        "library",
+        filePaths.projectJsonPath,
+      ),
+    );
 
     return { diagnostics };
   }

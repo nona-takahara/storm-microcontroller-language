@@ -28,6 +28,8 @@ import {
   STORMWORKS_SW_MCL_FORMAT_VERSION,
   type IrVector2,
   type LayoutTarget,
+  formatDiagnostic,
+  hasErrorDiagnostics,
   type StormworksLibraryDiagnostic,
   type StormworksProjectSource,
   type StormworksSwMclDocument,
@@ -712,19 +714,11 @@ function parseProjectJsonPathArgs(
 
 // Print diagnostics and return whether any of them were errors.
 function printDiagnostics(diagnostics: StormworksLibraryDiagnostic[]): boolean {
-  let hasErrors = false;
-
   for (const diagnostic of diagnostics) {
-    if (diagnostic.severity === "error") {
-      hasErrors = true;
-    }
-
-    const location = [diagnostic.documentId, diagnostic.path].filter((value): value is string => !!value).join(":");
-    const suffix = location.length > 0 ? ` (${location})` : "";
-    console.error(`[${diagnostic.severity}] ${diagnostic.code}${suffix}: ${diagnostic.message}`);
+    console.error(formatDiagnostic(diagnostic));
   }
 
-  return hasErrors;
+  return hasErrorDiagnostics(diagnostics);
 }
 
 // Print the supported CLI command list.
