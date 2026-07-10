@@ -23,7 +23,7 @@ import {
   hasErrorDiagnostics,
   runAsyncToDiagnostics,
   runToDiagnostics,
-  type StormworksLibraryDiagnostic,
+  type Diagnostic,
   type StormworksLibraryResult,
 } from "./diagnostics.js";
 import { type IrProgram, type IrSignalKind } from "./ir.js";
@@ -68,7 +68,7 @@ export interface StormworksProjectSource {
   entryDocument: StormworksSourceDocument;
   entryModuleId: string;
   sourceName?: string;
-  warnings: StormworksLibraryDiagnostic[];
+  warnings: Diagnostic[];
 }
 
 export interface StormworksDocumentLoader {
@@ -126,7 +126,7 @@ export interface ResolvedStormworksProjectSource {
 
 export interface ValidateProjectSourceResult {
   isValid: boolean;
-  diagnostics: StormworksLibraryDiagnostic[];
+  diagnostics: Diagnostic[];
 }
 
 // Parse one paired sw-net/sw-mcl text set into the in-memory document shape used by the library.
@@ -177,7 +177,7 @@ export function importStormworksXmlToProjectSource(
   xmlText: string,
   options: ImportStormworksXmlToProjectSourceOptions,
 ): StormworksLibraryResult<StormworksProjectSource> {
-  const diagnostics: StormworksLibraryDiagnostic[] = [];
+  const diagnostics: Diagnostic[] = [];
 
   try {
     // Import to IR first, then immediately project that IR into the standard CLI-facing document trio.
@@ -408,7 +408,7 @@ async function collectProjectSourceDiagnostics(
   projectSource: StormworksProjectSource,
   definitions: NodeDefinitionRegistry,
   loadImportedDocument: StormworksDocumentLoader["loadImportedDocument"] | undefined,
-): Promise<{ diagnostics: StormworksLibraryDiagnostic[]; resolved?: ResolvedStormworksProjectSource }> {
+): Promise<{ diagnostics: Diagnostic[]; resolved?: ResolvedStormworksProjectSource }> {
   // Validation walks both the project surface and every reachable sw-net document.
   const preloadResult = await preloadProjectSourceDocuments(projectSource, loadImportedDocument);
   const diagnostics = [...preloadResult.diagnostics];
@@ -466,9 +466,9 @@ async function preloadProjectSourceDocuments(
 ): Promise<{
   documentsById: Map<string, StormworksSourceDocument>;
   resolvedImports: Map<string, string>;
-  diagnostics: StormworksLibraryDiagnostic[];
+  diagnostics: Diagnostic[];
 }> {
-  const diagnostics: StormworksLibraryDiagnostic[] = [];
+  const diagnostics: Diagnostic[] = [];
   const documentsById = new Map<string, StormworksSourceDocument>([
     [projectSource.entryDocument.documentId, projectSource.entryDocument],
   ]);
@@ -559,7 +559,7 @@ async function preloadProjectSourceDocuments(
 function validateProjectDocument(
   project: ProjectJsonDocument,
   definitions: NodeDefinitionRegistry,
-  diagnostics: StormworksLibraryDiagnostic[],
+  diagnostics: Diagnostic[],
 ): void {
   for (const node of project.nodes) {
     const definition = definitions.byId.get(node.type);
@@ -582,7 +582,7 @@ function validateProjectDocument(
 function validateSourceDocument(
   sourceDocument: StormworksSourceDocument,
   definitions: NodeDefinitionRegistry,
-  diagnostics: StormworksLibraryDiagnostic[],
+  diagnostics: Diagnostic[],
   projectSource: StormworksProjectSource,
 ): void {
   const hasLayoutModule = sourceDocument.swNet.modules.some(
@@ -630,7 +630,7 @@ function validateInstStatement(
   sourceDocument: StormworksSourceDocument,
   statement: SwNetInstStatement,
   definitions: NodeDefinitionRegistry,
-  diagnostics: StormworksLibraryDiagnostic[],
+  diagnostics: Diagnostic[],
 ): void {
   if (
     !findCompatibleComponentDefinition(definitions, statement.typeId) &&
@@ -666,7 +666,7 @@ function validateInstStatement(
 }
 
 // Validate every resolved `use` statement in the module graph against its target module's declared ports.
-function validateUseStatements(swNet: SwNetResolutionResult, diagnostics: StormworksLibraryDiagnostic[]): void {
+function validateUseStatements(swNet: SwNetResolutionResult, diagnostics: Diagnostic[]): void {
   const moduleByKey = new Map(swNet.modules.map((module) => [formatResolvedModuleKey(module.key), module] as const));
 
   for (const callerModule of swNet.modules) {
@@ -700,7 +700,7 @@ function validateUseStatements(swNet: SwNetResolutionResult, diagnostics: Stormw
 function validateUseStatement(
   use: SwNetResolvedUse,
   moduleByKey: Map<string, SwNetResolvedModule>,
-  diagnostics: StormworksLibraryDiagnostic[],
+  diagnostics: Diagnostic[],
 ): void {
   const targetModule = moduleByKey.get(formatResolvedModuleKey(use.target));
 
@@ -758,7 +758,7 @@ function validateUsePortAssignments(
   assignments: SwNetAssignment[],
   targetPortsByName: Map<string, SwNetPort>,
   missingPortCode: string,
-  diagnostics: StormworksLibraryDiagnostic[],
+  diagnostics: Diagnostic[],
 ): Set<string> {
   const seenKeys = new Set<string>();
 
@@ -810,7 +810,7 @@ interface NetSignalEdge {
 function validateNetSignalConsistency(
   swNet: SwNetResolutionResult,
   definitions: NodeDefinitionRegistry,
-  diagnostics: StormworksLibraryDiagnostic[],
+  diagnostics: Diagnostic[],
 ): void {
   const moduleByKey = new Map(swNet.modules.map((module) => [formatResolvedModuleKey(module.key), module] as const));
 
@@ -996,7 +996,7 @@ function reportNetSignalMismatch(
   resolvedModule: SwNetResolvedModule,
   netKey: string,
   edges: NetSignalEdge[],
-  diagnostics: StormworksLibraryDiagnostic[],
+  diagnostics: Diagnostic[],
 ): void {
   const distinctSignals = new Set(edges.map((edge) => edge.signal).filter((signal) => signal !== "unknown"));
 

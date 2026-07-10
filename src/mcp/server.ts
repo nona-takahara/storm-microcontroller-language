@@ -20,7 +20,9 @@ import {
   loadBundledStormworksSystemNotes,
   loadProjectSourceFromProjectJsonFile,
   readUtf8TextFile,
+  resolveLayoutTargets,
   resolveProjectSource,
+  runLayoutDslForTarget,
   validateProjectSource,
   writeProjectSourceToDirectory,
   writeUtf8TextFile,
@@ -131,6 +133,46 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
       },
     },
+    {
+      name: "layout_dsl",
+      description:
+        "Compute (and by default write) .sw-mcl auto-layout for one or more sw-net modules via ELK. Missing positions are filled in unless force=true, which regenerates every position. Known limitation: one module per file (see issue #7); other modules in the same file are left untouched with a warning.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          project_json_path: {
+            type: "string",
+            description: "Absolute path to project.json",
+          },
+          module_id: {
+            type: "string",
+            description: "Optional module ID to target; defaults to the entry module (or the file's sole module)",
+          },
+          document_path: {
+            type: "string",
+            description:
+              "Optional path to a specific .sw-net document (relative to project.json's directory) to target instead of the entry module",
+          },
+          all_submodules: {
+            type: "boolean",
+            description: "When true, run layout for every submodule listed in project.json instead of just one target",
+          },
+          force: {
+            type: "boolean",
+            description: "When true, regenerate every port/instance position instead of only filling in missing ones",
+          },
+          dry_run: {
+            type: "boolean",
+            description: "When true, compute the layout and return it without writing any .sw-mcl file",
+          },
+          grid_size: {
+            type: "number",
+            description: "Optional snap grid size for computed positions",
+          },
+        },
+        required: ["project_json_path"],
+      },
+    },
   ],
 }));
 
@@ -149,6 +191,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleTypecheckDsl(args as { project_json_path: string });
       case "spec":
         return await handleSpec(args as { gate_id?: string; list?: boolean; json?: boolean } | undefined);
+      case "layout_dsl":
+        return await handleLayoutDsl(
+          args as {
+            project_json_path: string;
+            module_id?: string;
+            document_path?: string;
+            all_submodules?: boolean;
+            force?: boolean;
+            dry_run?: boolean;
+            grid_size?: number;
+          },
+        );
       default:
         return errorResult(`Unknown tool: ${name}`);
     }
@@ -279,6 +333,76 @@ async function handleSpec(args: { gate_id?: string; list?: boolean; json?: boole
   const systemNotes = await loadBundledStormworksSystemNotes();
   const overview = buildSpecOverview(systemNotes);
   return textResult(args.json ? JSON.stringify(overview, null, 2) : formatSpecOverviewText(overview));
+}
+
+async function handleLayoutDsl(args: {
+  project_json_path: string;
+  module_id?: string;
+  document_path?: string;
+  all_submodules?: boolean;
+  force?: boolean;
+  dry_run?: boolean;
+  grid_size?: number;
+}) {
+  if (args.all_submodules && (args.module_id !== undefined || args.document_path !== undefined)) {
+    return errorResult("Use all_submodules alone; it cannot be combined with module_id or document_path.");
+  }
+
+  const targets = await resolveLayoutTargets(args.project_json_path, {
+    document: args.document_path,
+    module: args.module_id,
+    allSubmodules: args.all_submodules,
+  });
+
+  const sections: string[] = [];
+  let hasErrors = false;
+
+  for (const target of targets) {
+    const lines = [`${target.swMclPath}:`];
+
+    let result: Awaited<ReturnType<typeof runLayoutDslForTarget>>;
+
+    try {
+      result = await runLayoutDslForTarget(target, {
+        force: args.force ?? false,
+        dryRun: args.dry_run ?? false,
+        gridSize: args.grid_size,
+      });
+    } catch (error) {
+      hasErrors = true;
+      lines.push(`  error: ${error instanceof Error ? error.message : String(error)}`);
+      sections.push(lines.join("\n"));
+      continue;
+    }
+
+    if (!result.ok) {
+      hasErrors = true;
+      lines.push(`  error: ${result.errorMessage}`);
+      sections.push(lines.join("\n"));
+      continue;
+    }
+
+    for (const warning of result.warnings) {
+      lines.push(`  warning: ${warning}`);
+    }
+
+    if (result.summary) {
+      lines.push(
+        `  ${result.summary.kept} kept, ${result.summary.added} added, ${result.summary.overwritten} overwritten.`,
+      );
+    }
+
+    lines.push(result.written ? `  Wrote ${target.swMclPath}` : "  (dry run, not written)");
+
+    if (args.dry_run && result.document) {
+      lines.push("", JSON.stringify(result.document, null, 2));
+    }
+
+    sections.push(lines.join("\n"));
+  }
+
+  const text = sections.join("\n\n");
+  return hasErrors ? errorResult(text) : textResult(text);
 }
 
 async function handleTypecheckDsl(args: { project_json_path: string }) {

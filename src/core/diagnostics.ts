@@ -11,8 +11,6 @@ export interface Diagnostic {
   source: StormworksDiagnosticSource;
 }
 
-export type StormworksLibraryDiagnostic = Diagnostic;
-
 export interface StormworksLibraryResult<T> {
   value?: T;
   diagnostics: Diagnostic[];
