@@ -5,9 +5,10 @@ import { dirname, resolve } from "node:path";
 import { parseProjectJsonText } from "../../core/parsers/project-json.js";
 import { parseSwNetDocument, type SwNetDocument } from "../../core/parsers/sw-net.js";
 import { parseStormworksSwMclText } from "../../core/parsers/sw-mcl.js";
-import { type ProjectJsonDocument, type ProjectJsonSubmoduleDocument } from "../../core/serializers/project-json.js";
+import { type ProjectJsonSubmoduleDocument } from "../../core/serializers/project-json.js";
 import { type StormworksSwMclDocument } from "../../core/serializers/sw-mcl.js";
 import { DEFAULT_ENTRY_SW_NET_FILE_NAME, replaceSwNetExtension } from "./project-source-file-loader.js";
+import { selectEntrySubmodule, isFileNotFoundError } from "./project-file-helpers.js";
 import { readUtf8TextFile, writeUtf8TextFile } from "./text-file.js";
 
 export interface LayoutTarget {
@@ -107,16 +108,4 @@ function buildTargetFromSubmodule(
     swMclPath: replaceSwNetExtension(swNetPath, ".sw-mcl"),
     moduleId: moduleId ?? submodule.id,
   };
-}
-
-function selectEntrySubmodule(project: ProjectJsonDocument): ProjectJsonSubmoduleDocument | undefined {
-  return (
-    project.submodules.find((submodule) => submodule.id === "main") ??
-    project.submodules.find((submodule) => submodule.name === "main") ??
-    (project.submodules.length === 1 ? project.submodules[0] : undefined)
-  );
-}
-
-function isFileNotFoundError(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "ENOENT";
 }

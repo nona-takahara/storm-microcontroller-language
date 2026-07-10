@@ -2,6 +2,7 @@
 import { type NodeDefinitionRegistry } from "../definitions/loader.js";
 import { type ComponentDefinition } from "../definitions/schema.js";
 import { type IrLink, type IrNode, type IrProgram, type IrScalarValue, type IrSubmodule } from "../ir.js";
+import { coerceScalarValue } from "../shared/scalar-coercion.js";
 import {
   compareSwNetIdentifier,
   getSwNetInstanceName,
@@ -399,47 +400,7 @@ function coerceDslScalarValue(
   value: IrScalarValue | undefined,
   valueType: "boolean" | "number" | "string",
 ): IrScalarValue | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  // Property definitions decide the DSL-side scalar type even when import preserved the raw XML value loosely.
-  if (value === null) {
-    return null;
-  }
-
-  if (valueType === "string") {
-    return typeof value === "string" ? value : String(value);
-  }
-
-  if (valueType === "number") {
-    if (typeof value === "number") {
-      return Number.isFinite(value) ? value : undefined;
-    }
-
-    if (typeof value === "string" && value.trim().length > 0) {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }
-
-    return undefined;
-  }
-
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    if (value === "true" || value === "1") {
-      return true;
-    }
-
-    if (value === "false" || value === "0") {
-      return false;
-    }
-  }
-
-  return undefined;
+  return coerceScalarValue(value, valueType, { preserveNull: true });
 }
 
 // Check whether a link is fully contained within one rendered submodule body.
