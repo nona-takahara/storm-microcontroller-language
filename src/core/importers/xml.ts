@@ -23,6 +23,7 @@ import {
   type ProjectNodeDefinition,
   type NodePropertySource,
 } from "../definitions/schema.js";
+import { createInfoDiagnostic, createWarningDiagnostic, type Diagnostic } from "../diagnostics.js";
 import { coerceScalarValue } from "../shared/scalar-coercion.js";
 
 export type StormworksXmlParserOptions = NonNullable<ConstructorParameters<typeof XMLParser>[0]>;
@@ -30,14 +31,6 @@ export type StormworksXmlParserOptions = NonNullable<ConstructorParameters<typeo
 export interface ParsedStormworksXmlDocument {
   raw: unknown;
   parserOptions: StormworksXmlParserOptions;
-}
-
-export interface StormworksXmlImportWarning {
-  code: string;
-  message: string;
-  path?: string;
-  /** Defaults to "warning" when omitted; use "info" for non-actionable status reporting (e.g. import summaries). */
-  severity?: "warning" | "info";
 }
 
 export interface StormworksXmlImportOptions {
@@ -49,7 +42,7 @@ export interface StormworksXmlImportOptions {
 export interface StormworksXmlImportResult {
   document: ParsedStormworksXmlDocument;
   program: IrProgram;
-  warnings: StormworksXmlImportWarning[];
+  warnings: Diagnostic[];
 }
 
 type SubmodulePortDirection = "input" | "output";
@@ -125,17 +118,19 @@ export function importStormworksXml(
   options: StormworksXmlImportOptions,
 ): StormworksXmlImportResult {
   const document = parseStormworksXml(xmlText, options.parserOptions);
-  const warnings: StormworksXmlImportWarning[] = [];
+  const warnings: Diagnostic[] = [];
   const program = buildIrProgram(document.raw, options.definitions, options.sourceName, warnings);
 
-  program.metadata.warnings = warnings.map((warning) => warning.message);
+  program.metadata.warnings = [...warnings];
 
   if (program.nodes.length === 0) {
-    warnings.push({
-      code: "XML_IMPORT_EMPTY",
-      message: `No IR nodes were imported. Loaded ${options.definitions.nodes.length + options.definitions.components.length} definitions but did not match any XML content.`,
-    });
-    program.metadata.warnings = warnings.map((warning) => warning.message);
+    warnings.push(createWarningDiagnostic(
+      "XML_IMPORT_EMPTY",
+      `No IR nodes were imported. Loaded ${options.definitions.nodes.length + options.definitions.components.length} definitions but did not match any XML content.`,
+      "xml-importer",
+      options.sourceName,
+    ));
+    program.metadata.warnings = [...warnings];
   }
 
   return {
@@ -150,7 +145,7 @@ function buildIrProgram(
   root: unknown,
   definitions: NodeDefinitionRegistry,
   sourceName: string | undefined,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
 ): IrProgram {
   // Import is intentionally split into:
   // 1. project nodes from <nodes><n>
@@ -174,11 +169,12 @@ function buildIrProgram(
   importProjectAndBridgeLinks(projectNodes, projectBridges, definitions, program, logicNodes, submodulePorts, warnings);
   registerImplicitSubmodule(program, submodulePorts, logicNodes);
 
-  warnings.unshift({
-    code: "XML_IMPORT_SUMMARY",
-    message: `Imported ${program.nodes.length} nodes, ${program.links.length} links, and ${program.submodules.length} submodules from XML.`,
-    severity: "info",
-  });
+  warnings.unshift(createInfoDiagnostic(
+    "XML_IMPORT_SUMMARY",
+    `Imported ${program.nodes.length} nodes, ${program.links.length} links, and ${program.submodules.length} submodules from XML.`,
+    "xml-importer",
+    undefined,
+  ));
 
   return program;
 }
@@ -215,7 +211,7 @@ function collectProjectNodes(
   root: unknown,
   definitions: NodeDefinitionRegistry,
   program: IrProgram,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
 ): Map<string, ProjectNodeContext> {
   const contexts = new Map<string, ProjectNodeContext>();
   const projectNodes = getArrayByPath(root, "microprocessor.nodes.n");
@@ -232,11 +228,13 @@ function collectProjectNodes(
     const nodeRecord = asRecord(record.node);
 
     if (!rawId || !nodeRecord) {
-      warnings.push({
-        code: "PROJECT_NODE_SKIPPED",
-        message: "Skipped a project node because component_id or node data was missing.",
-        path: `microprocessor.nodes.n[${index}]`,
-      });
+      warnings.push(createWarningDiagnostic(
+        "PROJECT_NODE_SKIPPED",
+        "Skipped a project node because component_id or node data was missing.",
+        "xml-importer",
+        undefined,
+        `microprocessor.nodes.n[${index}]`,
+      ));
       continue;
     }
 
@@ -272,11 +270,13 @@ function collectProjectNodes(
     };
 
     if (binding.definitionId.startsWith("PROJECT_NODE:")) {
-      warnings.push({
-        code: "PROJECT_NODE_UNCLASSIFIED",
-        message: `Project node ${typeKey} is not classified yet; imported with inferred direction=${binding.direction} signal=${binding.signal}.`,
-        path: `microprocessor.nodes.n[${index}]`,
-      });
+      warnings.push(createWarningDiagnostic(
+        "PROJECT_NODE_UNCLASSIFIED",
+        `Project node ${typeKey} is not classified yet; imported with inferred direction=${binding.direction} signal=${binding.signal}.`,
+        "xml-importer",
+        undefined,
+        `microprocessor.nodes.n[${index}]`,
+      ));
     }
 
     program.nodes.push(importedNode);
@@ -297,7 +297,7 @@ function collectProjectNodes(
 // Collect project/logics boundary data from bridge components, with alternate state data as a fallback while Stormworks variants are still being characterized.
 function collectProjectBridges(
   root: unknown,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
 ): Map<string, ProjectBridgeContext> {
   const bridgeComponents = getArrayByPath(root, "microprocessor.group.components_bridge.c");
 
@@ -311,7 +311,7 @@ function collectProjectBridges(
 // Read canonical bridge components from <components_bridge><c>.
 function collectProjectBridgesFromComponents(
   bridgeComponents: unknown[],
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
 ): Map<string, ProjectBridgeContext> {
   const projectBridges = new Map<string, ProjectBridgeContext>();
 
@@ -328,11 +328,13 @@ function collectProjectBridgesFromComponents(
     const rawId = bridgeRecord ? getAttribute(bridgeRecord, "id") : undefined;
 
     if (!bridgeRecord || !rawId) {
-      warnings.push({
-        code: "PROJECT_BRIDGE_SKIPPED",
-        message: "Skipped a project bridge component because object or object id was missing.",
-        path: `microprocessor.group.components_bridge.c[${index}]`,
-      });
+      warnings.push(createWarningDiagnostic(
+        "PROJECT_BRIDGE_SKIPPED",
+        "Skipped a project bridge component because object or object id was missing.",
+        "xml-importer",
+        undefined,
+        `microprocessor.group.components_bridge.c[${index}]`,
+      ));
       continue;
     }
 
@@ -379,7 +381,7 @@ function collectLogicNodes(
   root: unknown,
   definitions: NodeDefinitionRegistry,
   program: IrProgram,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
 ): Map<string, IrNode> {
   const logicNodes = new Map<string, IrNode>();
   const components = getArrayByPath(root, "microprocessor.group.components.c");
@@ -397,11 +399,13 @@ function collectLogicNodes(
     const rawId = objectRecord ? getAttribute(objectRecord, "id") : undefined;
 
     if (!objectRecord || !rawId) {
-      warnings.push({
-        code: "LOGIC_COMPONENT_SKIPPED",
-        message: "Skipped a logic component because object or object id was missing.",
-        path: `microprocessor.group.components.c[${index}]`,
-      });
+      warnings.push(createWarningDiagnostic(
+        "LOGIC_COMPONENT_SKIPPED",
+        "Skipped a logic component because object or object id was missing.",
+        "xml-importer",
+        undefined,
+        `microprocessor.group.components.c[${index}]`,
+      ));
       continue;
     }
 
@@ -434,11 +438,13 @@ function collectLogicNodes(
     };
 
     if (!definition) {
-      warnings.push({
-        code: "LOGIC_COMPONENT_UNRESOLVED",
-        message: `No definition matched logic component type ${componentType}; imported as a generic logic node.`,
-        path: `microprocessor.group.components.c[${index}]`,
-      });
+      warnings.push(createWarningDiagnostic(
+        "LOGIC_COMPONENT_UNRESOLVED",
+        `No definition matched logic component type ${componentType}; imported as a generic logic node.`,
+        "xml-importer",
+        undefined,
+        `microprocessor.group.components.c[${index}]`,
+      ));
     }
 
     program.nodes.push(importedNode);
@@ -453,7 +459,7 @@ function synthesizeSubmodulePorts(
   projectNodes: Map<string, ProjectNodeContext>,
   projectBridges: Map<string, ProjectBridgeContext>,
   program: IrProgram,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
 ): Map<string, SubmodulePortContext> {
   // XML has no explicit "submodule" object.
   // We synthesize one IR boundary so DSL/project representations can stay layered.
@@ -484,21 +490,25 @@ function synthesizeSubmodulePorts(
     };
 
     if (!projectBridge) {
-      warnings.push({
-        code: "PROJECT_NODE_WITHOUT_BRIDGE",
-        message: `Project node ${rawId} has no components_bridge.c entry.`,
-        path: projectNode.path,
-      });
+      warnings.push(createWarningDiagnostic(
+        "PROJECT_NODE_WITHOUT_BRIDGE",
+        `Project node ${rawId} has no components_bridge.c entry.`,
+        "xml-importer",
+        undefined,
+        projectNode.path,
+      ));
     } else if (
       projectNode.definition?.stormworks.bridgeType !== undefined &&
       projectBridge.componentType !== undefined &&
       projectBridge.componentType !== projectNode.definition.stormworks.bridgeType
     ) {
-      warnings.push({
-        code: "PROJECT_BRIDGE_TYPE_MISMATCH",
-        message: `Project node ${rawId} expected bridge type ${projectNode.definition.stormworks.bridgeType} but found ${projectBridge.componentType}.`,
-        path: projectBridge.path,
-      });
+      warnings.push(createWarningDiagnostic(
+        "PROJECT_BRIDGE_TYPE_MISMATCH",
+        `Project node ${rawId} expected bridge type ${projectNode.definition.stormworks.bridgeType} but found ${projectBridge.componentType}.`,
+        "xml-importer",
+        undefined,
+        projectBridge.path,
+      ));
     }
 
     program.nodes.push(importedNode);
@@ -520,11 +530,13 @@ function synthesizeSubmodulePorts(
 
   for (const [rawId, projectBridge] of projectBridges) {
     if (!projectNodes.has(rawId)) {
-      warnings.push({
-        code: "BRIDGE_WITHOUT_PROJECT_NODE",
-        message: `Bridge component ${rawId} has no matching project node.`,
-        path: projectBridge.path,
-      });
+      warnings.push(createWarningDiagnostic(
+        "BRIDGE_WITHOUT_PROJECT_NODE",
+        `Bridge component ${rawId} has no matching project node.`,
+        "xml-importer",
+        undefined,
+        projectBridge.path,
+      ));
     }
   }
 
@@ -538,7 +550,7 @@ function importLogicLinks(
   program: IrProgram,
   logicNodes: Map<string, IrNode>,
   submodulePorts: Map<string, SubmodulePortContext>,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
 ): void {
   const components = getArrayByPath(root, "microprocessor.group.components.c");
 
@@ -616,7 +628,7 @@ function importProjectAndBridgeLinks(
   program: IrProgram,
   logicNodes: Map<string, IrNode>,
   submodulePorts: Map<string, SubmodulePortContext>,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
 ): void {
   for (const [rawId, projectNode] of projectNodes) {
     const projectBridge = projectBridges.get(rawId);
@@ -650,17 +662,21 @@ function importProjectAndBridgeLinks(
 
     // Project outputs need the bridge section because XML stores the internal driving component there.
     if (!projectBridge) {
-      warnings.push({
-        code: "PROJECT_OUTPUT_WITHOUT_BRIDGE",
-        message: `Project output node ${rawId} has no components_bridge.c entry.`,
-        path: projectNode.path,
-      });
+      warnings.push(createWarningDiagnostic(
+        "PROJECT_OUTPUT_WITHOUT_BRIDGE",
+        `Project output node ${rawId} has no components_bridge.c entry.`,
+        "xml-importer",
+        undefined,
+        projectNode.path,
+      ));
     } else if (outputBindings.length === 0) {
-      warnings.push({
-        code: "BRIDGE_OUTPUT_SOURCE_MISSING",
-        message: `Output bridge ${rawId} does not specify an internal source component.`,
-        path: projectBridge.path,
-      });
+      warnings.push(createWarningDiagnostic(
+        "BRIDGE_OUTPUT_SOURCE_MISSING",
+        `Output bridge ${rawId} does not specify an internal source component.`,
+        "xml-importer",
+        undefined,
+        projectBridge.path,
+      ));
     }
 
     for (const binding of outputBindings) {
@@ -720,7 +736,7 @@ function resolveLinkSourceEndpoint(
   submodulePorts: Map<string, SubmodulePortContext>,
   definitions: NodeDefinitionRegistry,
   program: IrProgram,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
   inputRecord: Record<string, unknown>,
 ): IrPortEndpoint {
   const logicSourceNode = logicNodes.get(sourceRawId);
@@ -763,7 +779,7 @@ function ensureSubmoduleInputPort(
   submodulePorts: Map<string, SubmodulePortContext>,
   rawId: string,
   program: IrProgram,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
   inputRecord: Record<string, unknown>,
 ): SubmodulePortContext {
   const existing = submodulePorts.get(rawId);
@@ -791,11 +807,13 @@ function ensureSubmoduleInputPort(
     },
   };
 
-  warnings.push({
-    code: "SUBMODULE_EXTERNAL_INPUT_SYNTHESIZED",
-    message: `Synthesized a submodule input port for external component_id=${rawId} referenced from components.c or components_bridge.c.`,
-    path: describeInputRecord(inputRecord),
-  });
+  warnings.push(createWarningDiagnostic(
+    "SUBMODULE_EXTERNAL_INPUT_SYNTHESIZED",
+    `Synthesized a submodule input port for external component_id=${rawId} referenced from components.c or components_bridge.c.`,
+    "xml-importer",
+    undefined,
+    describeInputRecord(inputRecord),
+  ));
 
   program.nodes.push(importedNode);
 
@@ -995,7 +1013,7 @@ function reconcileDynamicInputCount(
 function extractDefinedProperties(
   sourceRecord: Record<string, unknown>,
   definition: DefinitionBase | undefined,
-  warnings: StormworksXmlImportWarning[],
+  warnings: Diagnostic[],
   path: string,
 ): Record<string, IrScalarValue> {
   const properties: Record<string, IrScalarValue> = {
@@ -1018,11 +1036,13 @@ function extractDefinedProperties(
     }
 
     if (propertyDefinition.required && properties[propertyDefinition.key] === undefined) {
-      warnings.push({
-        code: "PROPERTY_MISSING",
-        message: `Required property ${propertyDefinition.key} was not found for ${definition?.id ?? "unknown"}.`,
+      warnings.push(createWarningDiagnostic(
+        "PROPERTY_MISSING",
+        `Required property ${propertyDefinition.key} was not found for ${definition?.id ?? "unknown"}.`,
         path,
-      });
+        "xml-importer",
+        undefined,
+      ));
     }
   }
 

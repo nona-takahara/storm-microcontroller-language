@@ -6,6 +6,7 @@ import {
   parseProjectJsonText,
   parseSourceDocumentTexts,
   createErrorDiagnostic,
+  createWarningDiagnostic,
   serializeSourceDocumentTexts,
   type ProjectJsonDocument,
   type StormworksDocumentLoader,
@@ -94,7 +95,9 @@ export async function loadProjectSourceFromProjectJsonFile(
         entryDocument,
         entryModuleId: entrySubmodule?.id ?? entryDocument.swMcl.moduleId,
         sourceName: project.sourceName ?? filePaths.projectJsonPath,
-        warnings: [...project.warnings],
+        warnings: project.warnings.map((warning) =>
+          createWarningDiagnostic("PROJECT_JSON_WARNING", warning, "project", filePaths.projectJsonPath),
+        ),
       },
       diagnostics,
     };

@@ -12,6 +12,7 @@ import {
   type NodePropertyWriteTarget,
   type ProjectNodeDefinition,
 } from "../definitions/schema.js";
+import { createWarningDiagnostic, type Diagnostic } from "../diagnostics.js";
 import { type IrSignalKind, type IrScalarValue, type IrVector2 } from "../ir.js";
 import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement, type SwNetModule } from "../parsers/sw-net.js";
 import { type ProjectJsonDocument, type ProjectJsonLinkDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
@@ -54,7 +55,7 @@ export interface BuildStormworksXmlTreeInput {
 
 export interface BuildStormworksXmlTreeResult {
   tree: StormworksXmlTreeDocument;
-  warnings: string[];
+  warnings: Diagnostic[];
 }
 
 interface ProjectNodeContext {
@@ -117,6 +118,13 @@ interface XmlIdAllocator {
 
 const DEFAULT_GROUP_DATA_TYPE = "-1104064832";
 
+// Export warnings are emitted as structured diagnostics at their source so callers do not need
+// adapter code that can drift between CLI, MCP, and library entry points.
+function pushExportWarning(warnings: Diagnostic[], message: string, path?: string): void {
+  warnings.push(createWarningDiagnostic("EXPORT_WARNING", message, "exporter", undefined, path));
+}
+
+
 // Reconstruct the structured XML object tree from project.json, sw-net, and sw-mcl.
 export function buildStormworksXmlTree(
   input: BuildStormworksXmlTreeInput,
@@ -124,7 +132,7 @@ export function buildStormworksXmlTree(
 ): BuildStormworksXmlTreeResult {
   // This stage stops at a plain object tree on purpose.
   // XML string generation is a separate concern layered on top of this structure.
-  const warnings: string[] = [];
+  const warnings: Diagnostic[] = [];
   const entryModule = resolveEntryModule(input.swNet, options.entryModuleId);
 
   // Resolve every view of the same module before lowering:
@@ -133,7 +141,8 @@ export function buildStormworksXmlTree(
   const submoduleCanvasOrigin = resolveSubmoduleCanvasOrigin(input.project, entryModule.key.moduleId, warnings);
 
   if (!entrySwMcl) {
-    warnings.push(
+    pushExportWarning(
+      warnings,
       `sw-mcl for entry module ${entryModule.key.moduleId} was not found; instances will share the module canvas anchor position.`,
     );
   }
@@ -264,7 +273,7 @@ function resolveSwMclModule(
 function resolveSubmoduleCanvasOrigin(
   project: ProjectJsonDocument,
   moduleId: string,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): IrVector2 | null {
   // sw-mcl stores module-local positions; project.json provides the placement anchor for XML export.
   const matchingSubmodule =
@@ -272,7 +281,7 @@ function resolveSubmoduleCanvasOrigin(
     project.submodules.find((submodule) => submodule.name === moduleId);
 
   if (!matchingSubmodule) {
-    warnings.push(`project.json does not define a submodule entry for ${moduleId}; treating sw-mcl positions as absolute.`);
+    pushExportWarning(warnings, `project.json does not define a submodule entry for ${moduleId}; treating sw-mcl positions as absolute.`);
     return null;
   }
 
@@ -345,7 +354,7 @@ function buildModulePortSlots(
   entryModule: SwNetResolvedModule["module"],
   swMclModule: StormworksSwMclDocument | null,
   submoduleCanvasOrigin: IrVector2 | null,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): ModulePortSlot[] {
   const occurrenceByKey = new Map<string, number>();
   const positionByKey = new Map(
@@ -364,7 +373,7 @@ function buildModulePortSlots(
     const position = positionByKey.get(key);
 
     if (!position) {
-      warnings.push(`sw-mcl is missing a port layout entry for ${key}.`);
+      pushExportWarning(warnings, `sw-mcl is missing a port layout entry for ${key}.`);
     }
 
     return {
@@ -384,7 +393,7 @@ function bindProjectNodesToModulePorts(
   projectNodes: ProjectNodeContext[],
   portSlots: ModulePortSlot[],
   entryModuleId: string,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): ProjectPortBindingContext {
   const projectNodeById = new Map(projectNodes.map((node) => [node.document.id, node] as const));
   const portSlotsByName = new Map<string, ModulePortSlot[]>();
@@ -428,7 +437,7 @@ function bindProjectNodesToModulePorts(
 
     // project.json and sw-net must agree on how many concrete ports exist for a given semantic name.
     if (slots.length !== boundProjectNodes.length) {
-      warnings.push(`Project links reference ${boundProjectNodes.length} ${key} port(s), but sw-net defines ${slots.length}.`);
+      pushExportWarning(warnings, `Project links reference ${boundProjectNodes.length} ${key} port(s), but sw-net defines ${slots.length}.`);
     }
 
     const count = Math.min(slots.length, boundProjectNodes.length);
@@ -444,7 +453,8 @@ function bindProjectNodesToModulePorts(
       portSlotsByProjectNodeId.set(projectNode.document.id, slot);
 
       if (projectNodeByPortKey.has(formatPortNameKey(slot.direction, slot.name))) {
-        warnings.push(
+        pushExportWarning(
+          warnings,
           `Multiple project nodes map to ${formatPortNameKey(slot.direction, slot.name)}; later matches may be ambiguous.`,
         );
       }
@@ -570,7 +580,7 @@ function resolveInstancePosition(
   layout: FlattenLayoutContext,
   instanceId: string,
   namespacedInstanceId: string,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): IrVector2 | undefined {
   if (layout.fallbackPosition !== undefined) {
     return layout.fallbackPosition;
@@ -579,7 +589,7 @@ function resolveInstancePosition(
   const position = layout.instancePositionById.get(instanceId);
 
   if (!position) {
-    warnings.push(`sw-mcl is missing an instance layout entry for ${namespacedInstanceId}.`);
+    pushExportWarning(warnings, `sw-mcl is missing an instance layout entry for ${namespacedInstanceId}.`);
   }
 
   return position;
@@ -606,7 +616,7 @@ function resolveFlattenExpr(
   portBindings: Map<string, SwNetExpression>,
   isEntryModule: boolean,
   contextLabel: string,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): SwNetExpression | undefined {
   if (expr.kind === "identifier") {
     return {
@@ -623,7 +633,7 @@ function resolveFlattenExpr(
     const resolved = portBindings.get(formatPortBindingKey(direction, expr.value));
 
     if (!resolved) {
-      warnings.push(`${contextLabel} references undeclared module port "${expr.value}".`);
+      pushExportWarning(warnings, `${contextLabel} references undeclared module port "${expr.value}".`);
       return undefined;
     }
 
@@ -642,7 +652,7 @@ function resolveAssignmentList(
   portBindings: Map<string, SwNetExpression>,
   isEntryModule: boolean,
   contextLabel: string,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): SwNetAssignment[] {
   const resolved: SwNetAssignment[] = [];
 
@@ -674,7 +684,7 @@ function flattenModule(
   moduleByKey: Map<string, SwNetResolvedModule>,
   swMclByDocumentPath: Map<string, StormworksSwMclDocument>,
   out: FlattenedInstance[],
-  warnings: string[],
+  warnings: Diagnostic[],
 ): void {
   const resolvedModule = moduleByKey.get(formatModuleKey(moduleKey));
 
@@ -734,7 +744,8 @@ function flattenModule(
     const targetSwMclModule = tryResolveModuleSwMcl(swMclByDocumentPath, useEdge.target);
 
     if (!targetSwMclModule) {
-      warnings.push(
+      pushExportWarning(
+        warnings,
         `sw-mcl for module ${formatModuleKey(useEdge.target)} was not found; instances embedded via "${namespacedInstanceId}" will share its anchor position.`,
       );
     }
@@ -762,7 +773,7 @@ function flattenModule(
 // Index which logic instance produces each internal net name referenced by XML inputs.
 function buildNetProducerIndex(
   logicInstances: LogicInstanceContext[],
-  warnings: string[],
+  warnings: Diagnostic[],
 ): Map<string, NetProducer> {
   const producers = new Map<string, NetProducer>();
 
@@ -780,7 +791,7 @@ function buildNetProducerIndex(
           outputKey: output.key,
         },
         (netName) => {
-          warnings.push(`Multiple instance outputs drive net ${netName}; using the first producer.`);
+          pushExportWarning(warnings, `Multiple instance outputs drive net ${netName}; using the first producer.`);
         },
       );
     }
@@ -860,7 +871,7 @@ function buildComponentElement(
   instance: LogicInstanceContext,
   netProducerByName: Map<string, NetProducer>,
   projectNodeByPortKey: Map<string, ProjectNodeContext>,
-  warnings: string[],
+  warnings: Diagnostic[],
   options: BuildStormworksXmlTreeOptions,
 ): StormworksXmlTreeElement {
   const componentElement: StormworksXmlTreeElement = {
@@ -918,7 +929,7 @@ function buildComponentElement(
 function applyInstanceAttributes(
   componentElement: StormworksXmlTreeElement,
   instance: LogicInstanceContext,
-  warnings: string[],
+  warnings: Diagnostic[],
   options: BuildStormworksXmlTreeOptions,
   documentPath: string,
   moduleId: string,
@@ -933,7 +944,7 @@ function applyInstanceAttributes(
     const scalarValue = expressionToScalarValue(attribute.value);
 
     if (scalarValue === undefined) {
-      warnings.push(`Attribute ${attribute.key} on ${instance.statement.instanceId} is not a scalar and was skipped.`);
+      pushExportWarning(warnings, `Attribute ${attribute.key} on ${instance.statement.instanceId} is not a scalar and was skipped.`);
       continue;
     }
 
@@ -1058,7 +1069,7 @@ function applyScriptReferenceAttribute(
   componentElement: StormworksXmlTreeElement,
   instance: LogicInstanceContext,
   attribute: SwNetAssignment,
-  warnings: string[],
+  warnings: Diagnostic[],
   options: BuildStormworksXmlTreeOptions,
   documentPath: string,
   moduleId: string,
@@ -1067,7 +1078,7 @@ function applyScriptReferenceAttribute(
   const scriptRef = typeof scalarValue === "string" ? scalarValue : undefined;
 
   if (!scriptRef) {
-    warnings.push(`script_ref on ${instance.statement.instanceId} is not a string and was skipped.`);
+    pushExportWarning(warnings, `script_ref on ${instance.statement.instanceId} is not a string and was skipped.`);
     return;
   }
 
@@ -1079,7 +1090,7 @@ function applyScriptReferenceAttribute(
   });
 
   if (scriptText === undefined) {
-    warnings.push(`No script text resolver value was provided for ${scriptRef}; exporting an empty Lua script.`);
+    pushExportWarning(warnings, `No script text resolver value was provided for ${scriptRef}; exporting an empty Lua script.`);
   }
 
   asTreeElement(componentElement.object)["@_script"] = scriptText ?? "";
@@ -1091,13 +1102,13 @@ function resolveXmlInputElement(
   instance: LogicInstanceContext,
   netProducerByName: Map<string, NetProducer>,
   projectNodeByPortKey: Map<string, ProjectNodeContext>,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): StormworksXmlTreeElement | undefined {
   if (input.value.kind === "identifier") {
     const producer = netProducerByName.get(input.value.value);
 
     if (!producer) {
-      warnings.push(`Input ${input.key} on ${instance.statement.instanceId} references unknown net ${input.value.value}.`);
+      pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} references unknown net ${input.value.value}.`);
       return undefined;
     }
 
@@ -1117,7 +1128,7 @@ function resolveXmlInputElement(
     const projectNode = projectNodeByPortKey.get(formatPortNameKey("in", input.value.value));
 
     if (!projectNode) {
-      warnings.push(`Input ${input.key} on ${instance.statement.instanceId} references unknown module input port ${input.value.value}.`);
+      pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} references unknown module input port ${input.value.value}.`);
       return undefined;
     }
 
@@ -1126,7 +1137,7 @@ function resolveXmlInputElement(
     };
   }
 
-  warnings.push(`Input ${input.key} on ${instance.statement.instanceId} uses a non-net expression and was skipped.`);
+  pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} uses a non-net expression and was skipped.`);
   return undefined;
 }
 
@@ -1154,7 +1165,7 @@ function buildBridgeElements(
   projectNodes: ProjectNodeContext[],
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
   projectOutputBindings: Map<string, NetProducer[]>,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): StormworksXmlTreeElement[] {
   return projectNodes.map((projectNode) =>
     buildBridgeComponentElement(projectNode, portSlotsByProjectNodeId, projectOutputBindings, warnings),
@@ -1166,7 +1177,7 @@ function buildBridgeStateElements(
   projectNodes: ProjectNodeContext[],
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
   projectOutputBindings: Map<string, NetProducer[]>,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): StormworksXmlTreeElement {
   const bridgeStates: StormworksXmlTreeElement = {};
 
@@ -1242,7 +1253,7 @@ function buildBridgeComponentElement(
   projectNode: ProjectNodeContext,
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
   projectOutputBindings: Map<string, NetProducer[]>,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): StormworksXmlTreeElement {
   const element: StormworksXmlTreeElement = {
     object: buildBridgeObjectElement(projectNode, portSlotsByProjectNodeId, projectOutputBindings, warnings),
@@ -1260,7 +1271,7 @@ function buildBridgeObjectElement(
   projectNode: ProjectNodeContext,
   portSlotsByProjectNodeId: Map<string, ModulePortSlot>,
   projectOutputBindings: Map<string, NetProducer[]>,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): StormworksXmlTreeElement {
   // Bridge objects are the XML-side glue between project pins and the logic body.
   const bridgeState: StormworksXmlTreeElement = {
@@ -1275,7 +1286,7 @@ function buildBridgeObjectElement(
       "@_y": formatXmlNumber(position.y),
     };
   } else {
-    warnings.push(`No bridge position was found for project node ${projectNode.document.id}.`);
+    pushExportWarning(warnings, `No bridge position was found for project node ${projectNode.document.id}.`);
   }
 
   if (projectNode.direction === "output") {
@@ -1283,7 +1294,7 @@ function buildBridgeObjectElement(
 
     // Output bridges point from the project pin back into the logic body through component_id/node_index pairs.
     if (producers.length === 0) {
-      warnings.push(`Project output ${projectNode.document.id} is not driven by any sw-net output assignment.`);
+      pushExportWarning(warnings, `Project output ${projectNode.document.id} is not driven by any sw-net output assignment.`);
     }
 
     producers.forEach((producer, producerIndex) => {
@@ -1408,7 +1419,7 @@ function applyXmlWriteTarget(
   componentElement: StormworksXmlTreeElement,
   writeTarget: NodePropertyWriteTarget,
   value: IrScalarValue,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): void {
   const segments = writeTarget.xmlPath.split(".").filter((segment) => segment.length > 0);
   let current: StormworksXmlTreeElement = componentElement;
@@ -1451,10 +1462,10 @@ function applyItemListWriteTarget(
   current: StormworksXmlTreeElement,
   segment: string,
   value: IrScalarValue,
-  warnings: string[],
+  warnings: Diagnostic[],
 ): void {
   if (typeof value !== "string") {
-    warnings.push(`Expected a JSON string for item-list target ${segment}.`);
+    pushExportWarning(warnings, `Expected a JSON string for item-list target ${segment}.`);
     return;
   }
 
@@ -1463,12 +1474,12 @@ function applyItemListWriteTarget(
   try {
     items = JSON.parse(value);
   } catch {
-    warnings.push(`Failed to parse JSON for item-list target ${segment}; left unset.`);
+    pushExportWarning(warnings, `Failed to parse JSON for item-list target ${segment}; left unset.`);
     return;
   }
 
   if (!Array.isArray(items)) {
-    warnings.push(`Expected a JSON array for item-list target ${segment}; left unset.`);
+    pushExportWarning(warnings, `Expected a JSON array for item-list target ${segment}; left unset.`);
     return;
   }
 

@@ -4,15 +4,22 @@
 
 ## 今回実施したこと
 
-- `REFACTOR_PLAN_v0.9.0.md` §3.6 に従い、XML importer の logic link と project/bridge link で重複していた `component_id` から IR source endpoint を解決する処理を `resolveLinkSourceEndpoint(...)` に集約しました。
-- `resolveLinkSourceEndpoint(...)` では、logic node が見つかる場合は既存の `resolveSourcePortKey(...)` を使い、見つからない場合は `ensureSubmoduleInputPort(...)` による合成 submodule input を必ず経由するようにして、従来の「リンクを落とさない」挙動を保っています。
-- `REFACTOR_PLAN_v0.9.0.md` §3.7 に従い、auto-layout と XML tree exporter に重複していた "first producer wins" の重複 net 判定を `src/core/shared/producer-index.ts` の `registerFirstProducer(...)` に切り出しました。
-- 呼び出し側の入力形状や warning 文言は維持し、重複 net を検出したら既存 producer を残して後続 producer を無視する判定のみを共有化しました。
-- `pnpm check`、`pnpm build`、`npm pack --dry-run` は通過済みです。
+- `REFACTOR_PLAN_v0.9.0.md` §4 に従い、公開診断型を `Diagnostic` として定義し、既存の `StormworksLibraryDiagnostic` は互換エイリアスにしました。`source` は今後の exporter/importer などの層名追加で型更新漏れが出ないよう `string` にしています。
+- `IrProgramMetadata.warnings`、XML importer の warnings、XML tree exporter の warnings を `Diagnostic[]` に寄せました。`project.json` / `sw-mcl` の既存ファイル形式では `warnings: string[]` がスキーマとして残っているため、シリアライズ境界で `message` へ落としています。
+- `REFACTOR_PLAN_v0.9.0.md` §5 に従い、throw するパーサ/リゾルバを診断結果へ包む `runToDiagnostics(...)` / `runAsyncToDiagnostics(...)` を追加し、`parseSourceDocumentTexts(...)` と sw-net graph resolution に適用しました。
+- CLI のトップレベル catch は漏れてきた例外を `[error] INTERNAL_ERROR` 診断として表示するようにしました。
+- `xml2dsl` の入力 XML 読み込みは Node.js 生例外を漏らさず、存在しないファイルを `[error] FILE_NOT_FOUND` 診断として表示するようにしました。
+- CLI/MCP は既存の共有 `formatDiagnostic(s)` を引き続き使う形にしています。
 
-## 未実施・次担当者への注意
+## 読み替え・注意点
 
-- §4 の診断型統一は一部土台（`src/core/diagnostics.ts` と CLI/MCP フォーマッタ共有）が既に入っていますが、`IrProgramMetadata.warnings`、`xml-tree.ts`、`importers/xml.ts` にはまだ `string[]` / importer 固有 warning 型が残っています。
-- §5 のエラー伝播規約は完全統一されていません。CLI のトップレベル try/catch とファイル I/O 診断化は再確認してください。
-- §6 の `IrNode` 型付きフィールド昇格、§8 の MCP `spec` / `layout_dsl` tool 追加は未実施です。
-- `src/core/shared/scalar-coercion.ts` は importer の既存挙動を保つため、`null` を string に強制する場合は `"null"` にします。一方 serializer 側は DSL の `null` literal を維持するため `{ preserveNull: true }` を渡しています。この差を不用意に取り除かないでください。
+- §4 は「`StormworksXmlImportWarning` を削除」とありますが、npm 公開直前の公開 API 破壊を避けるため、今回は名前付きの旧 warning interface は削除しつつ、戻り値の `warnings` は `Diagnostic[]` として公開しました。
+- `project.json` / `sw-mcl` の `warnings: string[]` はユーザーが編集・保存するファイル形式なので、今回の診断統一の対象にはせず、IR/内部結果からドキュメントへ書く時だけ文字列化しています。
+- XML importer 内の各 warning には sourceName を細かく引き回していません。必要なら次回、`warnings` を受け取る importer helper 群に `documentId` を追加で通すと、診断位置情報をさらに改善できます。
+
+## 検証済み
+
+- `pnpm check`
+- `pnpm build`
+- `npm pack --dry-run`（npm の `Unknown env config "http-proxy"` 警告は表示されましたが、dry-run 自体は成功）
+- `pnpm cli xml2dsl /tmp/does-not-exist.xml`（期待どおり exit 1 かつ `[error] FILE_NOT_FOUND ...` を表示）

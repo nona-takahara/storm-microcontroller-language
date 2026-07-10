@@ -1,4 +1,5 @@
 // Shared intermediate representation used to decouple XML parsing from DSL/project serialization and export.
+import { type Diagnostic } from "./diagnostics.js";
 export type IrScalarValue = boolean | number | string | null;
 
 export type IrSignalKind = "number" | "boolean" | "composite" | "video" | "audio" | "execute" | "unknown";
@@ -39,7 +40,7 @@ export interface IrProgramMetadata {
   sourceFormat: "stormworks-xml" | "sw-net" | "unknown";
   sourceName?: string;
   microprocessor?: IrMicroprocessorMetadata;
-  warnings: string[];
+  warnings: Diagnostic[];
 }
 
 export interface IrMicroprocessorMetadata {

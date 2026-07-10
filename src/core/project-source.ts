@@ -19,9 +19,10 @@ import {
 import { importStormworksXml } from "./importers/xml.js";
 import {
   createErrorDiagnostic,
-  createInfoDiagnostic,
   createWarningDiagnostic,
   hasErrorDiagnostics,
+  runAsyncToDiagnostics,
+  runToDiagnostics,
   type StormworksLibraryDiagnostic,
   type StormworksLibraryResult,
 } from "./diagnostics.js";
@@ -67,7 +68,7 @@ export interface StormworksProjectSource {
   entryDocument: StormworksSourceDocument;
   entryModuleId: string;
   sourceName?: string;
-  warnings: string[];
+  warnings: StormworksLibraryDiagnostic[];
 }
 
 export interface StormworksDocumentLoader {
@@ -132,35 +133,31 @@ export interface ValidateProjectSourceResult {
 export function parseSourceDocumentTexts(
   input: StormworksSourceDocumentTextInput,
 ): StormworksLibraryResult<StormworksSourceDocument> {
-  const diagnostics: StormworksLibraryDiagnostic[] = [];
+  const parsed = runToDiagnostics(
+    () => ({
+      swNet: parseSwNetDocument(input.swNetText, {
+        sourceName: input.documentId,
+      }),
+      swMcl: parseStormworksSwMclText(input.swMclText),
+    }),
+    "library",
+    "DOCUMENT_PARSE_FAILED",
+    input.documentId,
+  );
 
-  try {
-    const swNet = parseSwNetDocument(input.swNetText, {
-      sourceName: input.documentId,
-    });
-    const swMcl = parseStormworksSwMclText(input.swMclText);
-
-    return {
-      value: {
-        documentId: input.documentId,
-        swNet,
-        swMcl,
-        scripts: { ...(input.scripts ?? {}) },
-      },
-      diagnostics,
-    };
-  } catch (error) {
-    diagnostics.push(
-      createErrorDiagnostic(
-        "DOCUMENT_PARSE_FAILED",
-        error instanceof Error ? error.message : String(error),
-        "library",
-        input.documentId,
-      ),
-    );
-
-    return { diagnostics };
+  if (!parsed.value) {
+    return { diagnostics: parsed.diagnostics };
   }
+
+  return {
+    value: {
+      documentId: input.documentId,
+      swNet: parsed.value.swNet,
+      swMcl: parsed.value.swMcl,
+      scripts: { ...(input.scripts ?? {}) },
+    },
+    diagnostics: parsed.diagnostics,
+  };
 }
 
 // Serialize one in-memory source document back to the standard CLI text-file shape.
@@ -202,13 +199,7 @@ export function importStormworksXmlToProjectSource(
       scripts: collectLocalScriptsFromProgram(imported.program),
     });
 
-    diagnostics.push(
-      ...imported.warnings.map((warning) =>
-        warning.severity === "info"
-          ? createInfoDiagnostic(warning.code, warning.message, "xml", options.sourceName, warning.path)
-          : createWarningDiagnostic(warning.code, warning.message, "xml", options.sourceName, warning.path),
-      ),
-    );
+    diagnostics.push(...imported.warnings);
     diagnostics.push(...parsedSourceDocument.diagnostics);
 
     if (!parsedSourceDocument.value) {
@@ -276,31 +267,23 @@ async function resolveSwNetGraphFromPreload(
   projectSource: StormworksProjectSource,
   preloadResult: { documentsById: Map<string, StormworksSourceDocument>; resolvedImports: Map<string, string> },
 ): Promise<StormworksLibraryResult<SwNetResolutionResult>> {
-  try {
-    // The actual sw-net resolver stays file-system agnostic; this facade only adapts preloaded documents to it.
-    const entryHandle: SwNetDocumentHandle = {
-      path: projectSource.entryDocument.documentId,
-      document: projectSource.entryDocument.swNet,
-    };
-    const resolver = createProjectSourceSwNetResolver(
-      preloadResult.documentsById,
-      preloadResult.resolvedImports,
-    );
-    const swNet = await resolveSwNetDocumentGraph(entryHandle, resolver);
-
-    return { value: swNet, diagnostics: [] };
-  } catch (error) {
-    return {
-      diagnostics: [
-        createErrorDiagnostic(
-          "PROJECT_SOURCE_RESOLVE_FAILED",
-          error instanceof Error ? error.message : String(error),
-          "library",
-          projectSource.entryDocument.documentId,
-        ),
-      ],
-    };
-  }
+  // The actual sw-net resolver stays file-system agnostic; this facade only adapts preloaded documents to it.
+  return runAsyncToDiagnostics(
+    async () => {
+      const entryHandle: SwNetDocumentHandle = {
+        path: projectSource.entryDocument.documentId,
+        document: projectSource.entryDocument.swNet,
+      };
+      const resolver = createProjectSourceSwNetResolver(
+        preloadResult.documentsById,
+        preloadResult.resolvedImports,
+      );
+      return resolveSwNetDocumentGraph(entryHandle, resolver);
+    },
+    "library",
+    "PROJECT_SOURCE_RESOLVE_FAILED",
+    projectSource.entryDocument.documentId,
+  );
 }
 
 // Run structural validation across project.json, reachable sw-net documents, sw-mcl, and scripts.
@@ -350,11 +333,7 @@ export async function buildStormworksXmlTreeFromProjectSource(
       },
     );
 
-    diagnostics.push(
-      ...result.warnings.map((warning) =>
-        createWarningDiagnostic("XML_TREE_BUILD_WARNING", warning, "xml", projectSource.entryDocument.documentId),
-      ),
-    );
+    diagnostics.push(...result.warnings);
 
     return {
       value: result,
@@ -404,11 +383,7 @@ export async function buildStormworksXmlFromProjectSource(
       },
     );
 
-    diagnostics.push(
-      ...result.warnings.map((warning) =>
-        createWarningDiagnostic("XML_BUILD_WARNING", warning, "xml", projectSource.entryDocument.documentId),
-      ),
-    );
+    diagnostics.push(...result.warnings);
 
     return {
       value: result,
