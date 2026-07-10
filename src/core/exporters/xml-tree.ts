@@ -621,7 +621,7 @@ function resolveFlattenExpr(
   namespace: string,
   portBindings: Map<string, SwNetExpression>,
   isEntryModule: boolean,
-  modulePortDirections: ReadonlyMap<string, "in" | "out">,
+  modulePorts: ModulePortNameSets,
   contextLabel: string,
   warnings: Diagnostic[],
 ): SwNetExpression | undefined {
@@ -637,7 +637,7 @@ function resolveFlattenExpr(
       return expr;
     }
 
-    const portDirection = modulePortDirections.get(expr.value) ?? direction;
+    const portDirection = resolveStringPortDirection(expr.value, direction, modulePorts);
     const resolved = portBindings.get(formatPortBindingKey(portDirection, expr.value));
 
     if (!resolved) {
@@ -651,11 +651,46 @@ function resolveFlattenExpr(
   return expr;
 }
 
-// Build a name -> declared-direction map for the ports of the module currently being flattened, so a
-// quoted string port reference resolves against the caller's binding for that port's own declared
-// direction, regardless of which direction it's used in locally.
-function buildModulePortDirections(ports: SwNetPort[]): ReadonlyMap<string, "in" | "out"> {
-  return new Map(ports.map((port) => [port.name, port.direction]));
+// Port names declared by the module currently being flattened, split by direction. A module may
+// legally (if unusually) declare the same name in both directions — the parser and rest of the
+// exporter don't reject it — so direction lookups must stay direction-keyed rather than collapsing
+// to a single name -> direction map, which would silently let one direction's declaration shadow
+// the other's.
+interface ModulePortNameSets {
+  in: ReadonlySet<string>;
+  out: ReadonlySet<string>;
+}
+
+function buildModulePortNameSets(ports: SwNetPort[]): ModulePortNameSets {
+  return {
+    in: new Set(ports.filter((port) => port.direction === "in").map((port) => port.name)),
+    out: new Set(ports.filter((port) => port.direction === "out").map((port) => port.name)),
+  };
+}
+
+// Decide which of the module's own declared ports a quoted string reference means. A reference that
+// matches a port declared in the local usage direction is unambiguous and always wins, even if the
+// same name is also declared in the other direction — this is what makes an ambiguous same-named
+// in/out pair resolve predictably instead of silently picking whichever declaration happened to be
+// registered last. Only when there's no port in the local usage direction do we fall back to the
+// other direction, for a module reading its own output port back as an internal feedback input (or
+// symmetrically for an input port referenced from an output-direction assignment).
+function resolveStringPortDirection(
+  portName: string,
+  usageDirection: "in" | "out",
+  modulePorts: ModulePortNameSets,
+): "in" | "out" {
+  if (modulePorts[usageDirection].has(portName)) {
+    return usageDirection;
+  }
+
+  const otherDirection = usageDirection === "in" ? "out" : "in";
+
+  if (modulePorts[otherDirection].has(portName)) {
+    return otherDirection;
+  }
+
+  return usageDirection;
 }
 
 // Resolve a whole inst/use pin-assignment list through resolveFlattenExpr, dropping assignments that
@@ -666,7 +701,7 @@ function resolveAssignmentList(
   namespace: string,
   portBindings: Map<string, SwNetExpression>,
   isEntryModule: boolean,
-  modulePortDirections: ReadonlyMap<string, "in" | "out">,
+  modulePorts: ModulePortNameSets,
   contextLabel: string,
   warnings: Diagnostic[],
 ): SwNetAssignment[] {
@@ -679,7 +714,7 @@ function resolveAssignmentList(
       namespace,
       portBindings,
       isEntryModule,
-      modulePortDirections,
+      modulePorts,
       contextLabel,
       warnings,
     );
@@ -719,7 +754,7 @@ function flattenModule(
 
   assertUniqueStatementInstanceIds(resolvedModule.module, moduleKey);
 
-  const modulePortDirections = buildModulePortDirections(resolvedModule.module.ports);
+  const modulePorts = buildModulePortNameSets(resolvedModule.module.ports);
 
   for (const statement of resolvedModule.module.statements) {
     const namespacedInstanceId = namespace ? `${namespace}$${statement.instanceId}` : statement.instanceId;
@@ -738,7 +773,7 @@ function flattenModule(
             namespace,
             portBindings,
             isEntryModule,
-            modulePortDirections,
+            modulePorts,
             contextLabel,
             warnings,
           ),
@@ -748,7 +783,7 @@ function flattenModule(
             namespace,
             portBindings,
             isEntryModule,
-            modulePortDirections,
+            modulePorts,
             contextLabel,
             warnings,
           ),
@@ -770,7 +805,7 @@ function flattenModule(
         namespace,
         portBindings,
         isEntryModule,
-        modulePortDirections,
+        modulePorts,
         contextLabel,
         warnings,
       );
@@ -787,7 +822,7 @@ function flattenModule(
         namespace,
         portBindings,
         isEntryModule,
-        modulePortDirections,
+        modulePorts,
         contextLabel,
         warnings,
       );
