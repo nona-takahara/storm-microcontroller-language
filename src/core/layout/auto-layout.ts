@@ -196,10 +196,15 @@ export function computeModuleFootprint(
 
     const rowCount = Math.max(1, statement.inputs.length, statement.outputs.length);
     const nested = nestedFootprints.get(statement.instanceId);
+    // instance.position is an anchor, not the content's top-left, whenever the statement is
+    // itself a real-layout `use`: the anchor-correction step in computeSwNetModuleLayout writes
+    // `anchor = elkPos - nested.origin`, so the real content starts at `anchor + nested.origin`.
+    const offsetX = nested?.originX ?? 0;
+    const offsetY = nested?.originY ?? 0;
 
     expand(
-      instance.position.x,
-      instance.position.y,
+      instance.position.x + offsetX,
+      instance.position.y + offsetY,
       nested?.width ?? INSTANCE_NODE_WIDTH,
       nested?.height ?? rowCount * INSTANCE_NODE_ROW_HEIGHT,
     );
