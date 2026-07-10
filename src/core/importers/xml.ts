@@ -5,6 +5,7 @@ import {
   createEmptyIrProgram,
   type IrMicroprocessorMetadata,
   type IrNode,
+  type IrPortEndpoint,
   type IrProgram,
   type IrScalarValue,
   type IrSignalKind,
@@ -581,21 +582,19 @@ function importLogicLinks(
         continue;
       }
 
-      const logicSourceNode = logicNodes.get(sourceRawId);
-      const sourceSubmodulePort =
-        logicSourceNode === undefined
-          ? ensureSubmoduleInputPort(submodulePorts, sourceRawId, program, warnings, inputRecord)
-          : undefined;
+      const sourceEndpoint = resolveLinkSourceEndpoint(
+        sourceRawId,
+        logicNodes,
+        submodulePorts,
+        definitions,
+        program,
+        warnings,
+        inputRecord,
+      );
 
       program.links.push({
         id: `logic:${sourceRawId}->${rawId}:${childName}`,
-        from: {
-          nodeId: logicSourceNode?.id ?? sourceSubmodulePort?.irNode.id ?? `submodule:${sourceRawId}`,
-          portKey:
-            logicSourceNode !== undefined
-              ? resolveSourcePortKey(logicSourceNode, definitions, inputRecord)
-              : sourceSubmodulePort?.logicFacingPortKey ?? SUBMODULE_INPUT_TO_LOGIC_PORT_KEY,
-        },
+        from: sourceEndpoint,
         to: {
           nodeId: targetNode.id,
           portKey: resolveTargetPortKey(targetDefinition, childName),
@@ -672,21 +671,19 @@ function importProjectAndBridgeLinks(
         continue;
       }
 
-      const logicSourceNode = logicNodes.get(sourceRawId);
-      const sourceSubmodulePort =
-        logicSourceNode === undefined
-          ? ensureSubmoduleInputPort(submodulePorts, sourceRawId, program, warnings, binding.record)
-          : undefined;
+      const sourceEndpoint = resolveLinkSourceEndpoint(
+        sourceRawId,
+        logicNodes,
+        submodulePorts,
+        definitions,
+        program,
+        warnings,
+        binding.record,
+      );
 
       program.links.push({
         id: `submodule-binding:${sourceRawId}->${rawId}:${binding.tagName}`,
-        from: {
-          nodeId: logicSourceNode?.id ?? sourceSubmodulePort?.irNode.id ?? `submodule:${sourceRawId}`,
-          portKey:
-            logicSourceNode !== undefined
-              ? resolveSourcePortKey(logicSourceNode, definitions, binding.record)
-              : sourceSubmodulePort?.logicFacingPortKey ?? SUBMODULE_INPUT_TO_LOGIC_PORT_KEY,
-        },
+        from: sourceEndpoint,
         to: {
           nodeId: submodulePort.irNode.id,
           portKey: submodulePort.logicFacingPortKey,
@@ -714,6 +711,33 @@ function importProjectAndBridgeLinks(
       },
     });
   }
+}
+
+// Resolve an XML component_id reference into the IR source endpoint used by link import paths.
+function resolveLinkSourceEndpoint(
+  sourceRawId: string,
+  logicNodes: Map<string, IrNode>,
+  submodulePorts: Map<string, SubmodulePortContext>,
+  definitions: NodeDefinitionRegistry,
+  program: IrProgram,
+  warnings: StormworksXmlImportWarning[],
+  inputRecord: Record<string, unknown>,
+): IrPortEndpoint {
+  const logicSourceNode = logicNodes.get(sourceRawId);
+
+  if (logicSourceNode) {
+    return {
+      nodeId: logicSourceNode.id,
+      portKey: resolveSourcePortKey(logicSourceNode, definitions, inputRecord),
+    };
+  }
+
+  // Missing logic nodes can be legitimate project-boundary inputs; synthesize exactly once so links survive.
+  const sourceSubmodulePort = ensureSubmoduleInputPort(submodulePorts, sourceRawId, program, warnings, inputRecord);
+  return {
+    nodeId: sourceSubmodulePort.irNode.id,
+    portKey: sourceSubmodulePort.logicFacingPortKey,
+  };
 }
 
 // Register the single implicit submodule that XML import exposes to the DSL side.
