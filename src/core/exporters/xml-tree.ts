@@ -606,13 +606,15 @@ function tryResolveModuleSwMcl(
 }
 
 // Resolve one sw-net expression from the module currently being flattened into a global, entry-scope
-// expression: identifiers that name one of the current module's own ports get substituted with
-// whatever the caller bound that port to (same as quoted string port references) — looked up by the
-// port's own declared direction, not the usage site's, since a module may read its own output port
-// back internally as a feedback input. Every other identifier is just a module-local net, namespaced
-// accordingly. String port references get substituted with whatever the caller already bound that
-// port to (or passed through unchanged at the entry module, where strings still name real
-// project.json ports).
+// expression: identifiers always get namespaced into module-local net names — per this tool's
+// documented convention (src/core/spec/tool-conventions.ts), a bare identifier is always an internal
+// net local to the module, even if its text happens to match a declared port name; only a quoted
+// string references the module's own declared port. String port references get substituted with
+// whatever the caller already bound that port to, looked up by the port's own declared direction
+// rather than the local usage site's, since a module may read its own output port back internally as
+// a feedback input (or, symmetrically, expose one of its own input ports as an output — unusual, but
+// not disallowed). At the entry module, strings still name real project.json ports and pass through
+// unchanged.
 function resolveFlattenExpr(
   expr: SwNetExpression,
   direction: "in" | "out",
@@ -624,19 +626,6 @@ function resolveFlattenExpr(
   warnings: Diagnostic[],
 ): SwNetExpression | undefined {
   if (expr.kind === "identifier") {
-    const portDirection = isEntryModule ? undefined : modulePortDirections.get(expr.value);
-
-    if (portDirection !== undefined) {
-      const resolved = portBindings.get(formatPortBindingKey(portDirection, expr.value));
-
-      if (!resolved) {
-        pushExportWarning(warnings, `${contextLabel} references module port "${expr.value}" that the caller never bound.`);
-        return undefined;
-      }
-
-      return resolved;
-    }
-
     return {
       kind: "identifier",
       value: namespace ? `${namespace}$${expr.value}` : expr.value,
@@ -648,7 +637,8 @@ function resolveFlattenExpr(
       return expr;
     }
 
-    const resolved = portBindings.get(formatPortBindingKey(direction, expr.value));
+    const portDirection = modulePortDirections.get(expr.value) ?? direction;
+    const resolved = portBindings.get(formatPortBindingKey(portDirection, expr.value));
 
     if (!resolved) {
       pushExportWarning(warnings, `${contextLabel} references undeclared module port "${expr.value}".`);
@@ -661,9 +651,9 @@ function resolveFlattenExpr(
   return expr;
 }
 
-// Build a name -> declared-direction map for the ports of the module currently being flattened, so
-// identifier references can be told apart from ordinary module-local nets that merely share their
-// name syntax, and resolved via the port's own direction regardless of how it's used locally.
+// Build a name -> declared-direction map for the ports of the module currently being flattened, so a
+// quoted string port reference resolves against the caller's binding for that port's own declared
+// direction, regardless of which direction it's used in locally.
 function buildModulePortDirections(ports: SwNetPort[]): ReadonlyMap<string, "in" | "out"> {
   return new Map(ports.map((port) => [port.name, port.direction]));
 }
