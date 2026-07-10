@@ -1,7 +1,7 @@
 {
   "name": "storm-microcontroller-language",
-  "version": "0.1.0",
-  "description": "Stormworks microcontroller conversion tool skeleton",
+  "version": "0.9.0",
+  "description": "Stormworks microcontroller XML and DSL conversion toolkit",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -43,7 +43,6 @@
     "fast-xml-parser": "^4.5.3"
   },
   "devDependencies": {
-    "@esbuild/linux-x64": "^0.28.1",
     "@types/node": "^24.0.0",
     "tsx": "^4.20.0",
     "typescript": "^5.8.2"

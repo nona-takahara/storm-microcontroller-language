@@ -55,6 +55,9 @@ pnpm cli check-dsl <project.json>
 # DSL の型チェック（ポートの signal 種別の整合性確認）
 pnpm cli typecheck-dsl <project.json>
 
+# .sw-mcl レイアウトを自動生成・検証する
+pnpm cli layout-dsl <project.json> [--all-submodules] [--force] [--dry-run] [--grid-size <n>]
+
 # ゲート仕様・本ツールの挙動を引く（引数無しだとツール規約とStormworks全体仕様の概要）
 pnpm cli spec
 pnpm cli spec --list                 # 全ゲートID一覧

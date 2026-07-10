@@ -278,25 +278,6 @@ function resolveSubmoduleCanvasOrigin(
   return matchingSubmodule.position;
 }
 
-// Reuse numeric hints from DSL instance ids when allocating XML object ids.
-function collectPreferredLogicObjectIds(statements: SwNetResolvedModule["module"]["statements"]): number[] {
-  const ids: number[] = [];
-
-  for (const statement of statements) {
-    if (statement.kind !== "inst") {
-      continue;
-    }
-
-    const preferred = tryParseInstanceObjectId(statement.instanceId);
-
-    if (preferred !== undefined) {
-      ids.push(preferred);
-    }
-  }
-
-  return ids;
-}
-
 // Allocate XML ids deterministically while avoiding collisions between regenerated nodes.
 function createXmlIdAllocator(preferredIds: number[]): XmlIdAllocator {
   const used = new Set<number>(preferredIds.filter((value) => value > 0));
@@ -1597,24 +1578,12 @@ function formatXmlScalarValue(value: IrScalarValue, valueType?: DefinitionValueT
 
 // Format numbers compactly while preserving integer-looking output.
 function formatXmlNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(value);
+  return String(value);
 }
 
 // Reuse n123-style instance ids as preferred XML object ids when available.
 function tryParseInstanceObjectId(instanceId: string): number | undefined {
   const match = /^n(\d+)$/.exec(instanceId);
-
-  if (!match?.[1]) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(match[1], 10);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-// Parse a trailing decimal suffix for natural sorting and id heuristics.
-function tryParseTrailingNumber(value: string): number | undefined {
-  const match = /(\d+)$/.exec(value);
 
   if (!match?.[1]) {
     return undefined;

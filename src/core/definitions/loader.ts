@@ -61,11 +61,6 @@ export function createNodeDefinitionRegistry(document: NodeDefinitionsDocument):
   };
 }
 
-// Parse an unknown in-memory value and immediately index it as a definitions registry.
-export function loadNodeDefinitionsDocument(input: unknown): NodeDefinitionRegistry {
-  return createNodeDefinitionRegistry(parseNodeDefinitionsDocument(input));
-}
-
 // Parse JSON text and immediately index it as a definitions registry.
 export function loadNodeDefinitionsJson(jsonText: string): NodeDefinitionRegistry {
   return createNodeDefinitionRegistry(parseNodeDefinitionsJson(jsonText));

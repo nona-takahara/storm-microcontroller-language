@@ -1,19 +1,22 @@
 // Node-side helper that resolves and loads the bundled definitions.json file from the built package.
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  NODE_DEFINITIONS_SCHEMA_VERSION,
+  parseNodeDefinitionsDocument,
+} from "../../core/definitions/schema.js";
+import { createNodeDefinitionRegistry, type NodeDefinitionRegistry } from "../../core/definitions/loader.js";
+import { getBundledJsonPath, loadBundledJson } from "./bundled-json-loader.js";
 
-import { type NodeDefinitionRegistry } from "../../core/definitions/loader.js";
-import { loadNodeDefinitionsFromFile } from "./definitions-file-loader.js";
+const DEFINITIONS_FILE = "definitions.json";
 
-const moduleDir = dirname(fileURLToPath(import.meta.url));
-const bundledDefinitionsPath = resolve(moduleDir, "../../definitions.json");
-
-// Return the resolved on-disk path of the bundled definitions file.
 export function getBundledDefinitionsPath(): string {
-  return bundledDefinitionsPath;
+  return getBundledJsonPath(DEFINITIONS_FILE);
 }
 
-// Load the bundled definitions file from disk into the indexed registry format.
 export async function loadBundledNodeDefinitions(): Promise<NodeDefinitionRegistry> {
-  return loadNodeDefinitionsFromFile(bundledDefinitionsPath);
+  const document = await loadBundledJson(
+    DEFINITIONS_FILE,
+    parseNodeDefinitionsDocument,
+    NODE_DEFINITIONS_SCHEMA_VERSION,
+  );
+  return createNodeDefinitionRegistry(document);
 }

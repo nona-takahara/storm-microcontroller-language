@@ -52,7 +52,7 @@ export function buildStormworksSwMclDocument(
     sourceName: program.metadata.sourceName,
     moduleId,
     ports: submodule ? buildSwMclPorts(submodule, nodeById) : [],
-    instances: submodule ? buildSwMclInstances(submodule, nodeById) : buildFallbackSwMclInstances(program, nodeById),
+    instances: submodule ? buildSwMclInstances(submodule, nodeById) : buildFallbackSwMclInstances(program),
     warnings: [...program.metadata.warnings],
   };
 }
@@ -122,10 +122,7 @@ function buildSwMclInstances(
 }
 
 // Fall back to raw logic-node positions when the IR does not expose an explicit submodule.
-function buildFallbackSwMclInstances(
-  program: IrProgram,
-  nodeById: Map<string, IrNode>,
-): SwMclInstanceDocument[] {
+function buildFallbackSwMclInstances(program: IrProgram): SwMclInstanceDocument[] {
   return program.nodes
     .filter((node) => node.layer === "logic" && node.position !== undefined)
     .map((node) => ({

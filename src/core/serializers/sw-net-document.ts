@@ -6,6 +6,7 @@ import {
   type SwNetModule,
   type SwNetStatement,
 } from "../parsers/sw-net.js";
+import { quoteIdentifierIfNeeded } from "./sw-net-shared.js";
 
 export interface SerializeSwNetDocumentOptions {
   newlineAtEnd?: boolean;
@@ -117,5 +118,5 @@ function serializeExpression(expression: SwNetExpression): string {
 
 // Quote port names only when a bare identifier would not preserve the original text.
 function formatPortName(name: string): string {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : JSON.stringify(name);
+  return quoteIdentifierIfNeeded(name);
 }

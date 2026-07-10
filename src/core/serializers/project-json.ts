@@ -1,4 +1,5 @@
 // Project-surface serializer that writes external pins, submodule references, and surface constants to JSON.
+import { compareSwNetIdentifier, tryParseSwNetTrailingNumber } from "./sw-net-shared.js";
 import { type IrLink, type IrNode, type IrProgram, type IrScalarValue, type IrSubmodule, type IrVector2 } from "../ir.js";
 
 export const STORMWORKS_PROJECT_JSON_FORMAT_VERSION = "stormworks-project-json-v10";
@@ -156,7 +157,7 @@ function buildConstantIdMap(nodes: IrNode[]): Map<string, string> {
 
   for (const node of nodes) {
     const rawObjectId = typeof node.properties.objectId === "string" ? node.properties.objectId : undefined;
-    const trailingId = rawObjectId ?? tryParseTrailingNumber(node.id)?.toString() ?? node.id;
+    const trailingId = rawObjectId ?? tryParseSwNetTrailingNumber(node.id)?.toString() ?? node.id;
     idMap.set(node.id, `const_${trailingId}`);
   }
 
@@ -194,7 +195,7 @@ function chooseProjectNodeId(node: IrNode): string {
     return preferred;
   }
 
-  const trailingId = tryParseTrailingNumber(node.id);
+  const trailingId = tryParseSwNetTrailingNumber(node.id);
   return trailingId !== undefined ? `node_${trailingId}` : node.id;
 }
 
@@ -318,26 +319,7 @@ function compareById<T extends { id: string }>(left: T, right: T): number {
   return compareIdentifier(left.id, right.id);
 }
 
-// Compare identifiers numerically where trailing numbers exist to keep generated output stable.
+// Compare identifiers using the shared natural ordering helper.
 function compareIdentifier(left: string, right: string): number {
-  const leftNumeric = tryParseTrailingNumber(left);
-  const rightNumeric = tryParseTrailingNumber(right);
-
-  if (leftNumeric !== undefined && rightNumeric !== undefined && leftNumeric !== rightNumeric) {
-    return leftNumeric - rightNumeric;
-  }
-
-  return left.localeCompare(right);
-}
-
-// Parse a trailing decimal suffix so human-readable ids sort naturally.
-function tryParseTrailingNumber(value: string): number | undefined {
-  const match = /(\d+)$/.exec(value);
-
-  if (!match?.[1]) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(match[1], 10);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  return compareSwNetIdentifier(left, right);
 }
