@@ -354,13 +354,22 @@ async function handleLayoutDsl(args: {
   let hasErrors = false;
 
   for (const target of targets) {
-    const result = await runLayoutDslForTarget(target, {
-      force: args.force ?? false,
-      dryRun: args.dry_run ?? false,
-      gridSize: args.grid_size,
-    });
-
     const lines = [`${target.swMclPath}:`];
+
+    let result: Awaited<ReturnType<typeof runLayoutDslForTarget>>;
+
+    try {
+      result = await runLayoutDslForTarget(target, {
+        force: args.force ?? false,
+        dryRun: args.dry_run ?? false,
+        gridSize: args.grid_size,
+      });
+    } catch (error) {
+      hasErrors = true;
+      lines.push(`  error: ${error instanceof Error ? error.message : String(error)}`);
+      sections.push(lines.join("\n"));
+      continue;
+    }
 
     if (!result.ok) {
       hasErrors = true;
