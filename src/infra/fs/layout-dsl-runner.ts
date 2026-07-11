@@ -351,9 +351,20 @@ export function applyProjectSourceLayoutOverrides(
   projectSource: StormworksProjectSource,
   overridesByDocumentId: Map<string, StormworksSwMclDocument>,
 ): StormworksProjectSource {
+  // When no .sw-mcl file exists on disk and project.json doesn't declare an explicit entry submodule,
+  // loadProjectSourceFromProjectJsonFile can only guess entryModuleId from the generated stub (the
+  // entry .sw-net file's basename), which is wrong whenever the file's sole/entry module has a
+  // different real id. The old write-then-reload flow picked up the correct id automatically because
+  // it re-read the freshly written .sw-mcl; now that nothing is written, adopt the override's real
+  // moduleId ourselves so collectProjectSourceDiagnostics's entry-module/layout-moduleId check doesn't
+  // fire spuriously against the stub's guess.
+  const wasGenerated = projectSource.entryDocument.swMclOrigin === "generated";
+  const entryDocument = applyLayoutOverride(projectSource.entryDocument, overridesByDocumentId);
+
   return {
     ...projectSource,
-    entryDocument: applyLayoutOverride(projectSource.entryDocument, overridesByDocumentId),
+    entryDocument,
+    entryModuleId: wasGenerated ? entryDocument.swMcl.moduleId : projectSource.entryModuleId,
   };
 }
 
