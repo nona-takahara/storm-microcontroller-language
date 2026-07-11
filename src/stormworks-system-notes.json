@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "1",
+  "description": "Knowledge base for platform-wide Stormworks microcontroller behavior that isn't tied to one specific gate/node (tick rate, execution order, composite channel layout, etc.). Uses the same note shape as node-behavior-notes.json.",
+  "entries": {
+    "tick-rate": {
+      "title": "Microcontroller execution rate (tick rate)",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "text": "Stormworks' internal processing runs at 60 Hz.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "execution-order": {
+      "title": "Evaluation order between components",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "text": "Components other than Video/Audio are each evaluated exactly once per tick. The previous tick's output values are used as this tick's inputs -- a feedback loop's value propagates with a 1-tick delay.",
+          "confidence": "verified"
+        },
+        {
+          "text": "When a monitor is connected, Video components are re-evaluated every rendered frame.",
+          "confidence": "verified"
+        },
+        {
+          "text": "Audio components are also re-evaluated every rendered frame, matching Video.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "composite-signal-layout": {
+      "title": "Composite signal channel count and layout",
+      "status": "done",
+      "relatedIssues": [
+        3,
+        4
+      ],
+      "notes": [
+        {
+          "text": "DSL-side composite channel numbers are 1-origin, matching the in-game UI and the Lua API.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "lua-script-api": {
+      "title": "LUA component script API",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "text": "A Lua script runs once (as initialization) when the vehicle loads, then its onTick is called once per tick thereafter.",
+          "confidence": "verified"
+        },
+        {
+          "text": "onDraw is called once per rendered frame, but only while a monitor is connected. onDraw and onTick are not necessarily synchronized with each other.",
+          "confidence": "verified"
+        },
+        {
+          "text": "A chain of Lua drawing (video) components triggers a \"loop\" error once the chain length exceeds a threshold.",
+          "confidence": "verified"
+        },
+        {
+          "text": "The loop-detection threshold is 32 components.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "project-io-limits": {
+      "title": "Microcontroller input/output pin limits, by type",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "text": "Stormworks' own in-game pin-layout panel for the microcontroller (not storm-mcl) only offers a 6x6 grid of slots, so 36 pins is the effective ceiling per signal-type group. `Composite` pins are one group with its own 36-pin ceiling; On/Off (boolean) and Number pins together share a second, separate 36-pin ceiling.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "xml-serialization-conventions": {
+      "title": "General omission rules when saving XML",
+      "status": "done",
+      "relatedIssues": [
+        1,
+        11,
+        13
+      ],
+      "notes": [
+        {
+          "text": "Whether a default-valued property is written explicitly or omitted from exported XML varies by property. This variation is normal, not a bug: whichever form appears, it decodes back to the same value.",
+          "confidence": "verified"
+        }
+      ]
+    }
+  }
+}

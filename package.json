@@ -1,0 +1,50 @@
+{
+  "name": "storm-microcontroller-language",
+  "version": "0.9.0",
+  "description": "Stormworks microcontroller XML and DSL conversion toolkit",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    }
+  },
+  "bin": {
+    "storm-mcl": "./dist/cli/main.js",
+    "storm-mcl-mcp": "./dist/mcp/server.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node ./scripts/postbuild.mjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "cli": "node --import tsx ./src/cli/main.ts",
+    "mcp": "node --import tsx ./src/mcp/server.ts",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "stormworks",
+    "typescript",
+    "cli"
+  ],
+  "author": "Nona Takahara",
+  "license": "MIT",
+  "packageManager": "pnpm@10.28.2",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "elkjs": "^0.11.1",
+    "fast-xml-parser": "^4.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,0 +1,1423 @@
+{
+  "schemaVersion": "10",
+  "nodes": [
+    {
+      "id": "composite_in",
+      "displayName": "Project Input Composite",
+      "category": "project",
+      "stormworks": {
+        "type": "5",
+        "mode": "1",
+        "bridgeType": "4"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "composite",
+            "signal": "composite",
+            "label": "Composite"
+          }
+        ]
+      }
+    },
+    {
+      "id": "composite_out",
+      "displayName": "Project Output Composite",
+      "category": "project",
+      "stormworks": {
+        "type": "5",
+        "bridgeType": "5"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "composite",
+            "signal": "composite",
+            "label": "Composite"
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "video_in",
+      "displayName": "Project Input Video",
+      "category": "project",
+      "stormworks": {
+        "type": "6",
+        "mode": "1",
+        "bridgeType": "6"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "video",
+            "signal": "video",
+            "label": "Video"
+          }
+        ]
+      }
+    },
+    {
+      "id": "video_out",
+      "displayName": "Project Output Video",
+      "category": "project",
+      "stormworks": {
+        "type": "6",
+        "bridgeType": "7"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "video",
+            "signal": "video",
+            "label": "Video"
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "number_in",
+      "displayName": "Project Input Number",
+      "category": "project",
+      "stormworks": {
+        "type": "1",
+        "mode": "1",
+        "bridgeType": "2"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "number",
+            "signal": "number",
+            "label": "Number"
+          }
+        ]
+      }
+    },
+    {
+      "id": "number_out",
+      "displayName": "Project Output Number",
+      "category": "project",
+      "stormworks": {
+        "type": "1",
+        "bridgeType": "3"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "number",
+            "signal": "number",
+            "label": "Number"
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "boolean_in",
+      "displayName": "Project Input Boolean",
+      "category": "project",
+      "stormworks": {
+        "type": "0",
+        "mode": "1",
+        "bridgeType": "0"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "boolean",
+            "signal": "boolean",
+            "label": "Boolean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boolean_out",
+      "displayName": "Project Output Boolean",
+      "category": "project",
+      "stormworks": {
+        "type": "0",
+        "bridgeType": "1"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "boolean",
+            "signal": "boolean",
+            "label": "Boolean"
+          }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "NOT",
+      "displayName": "NOT",
+      "category": "logic-bool",
+      "stormworks": { "type": "0" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "boolean", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "AND",
+      "displayName": "AND",
+      "category": "logic-bool",
+      "stormworks": { "type": "1" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "OR",
+      "displayName": "OR",
+      "category": "logic-bool",
+      "stormworks": { "type": "2" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "XOR",
+      "displayName": "XOR",
+      "category": "logic-bool",
+      "stormworks": { "type": "3" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "NAND",
+      "displayName": "NAND",
+      "category": "logic-bool",
+      "stormworks": { "type": "4" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "NOR",
+      "displayName": "NOR",
+      "category": "logic-bool",
+      "stormworks": { "type": "5" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "boolean", "label": "A" },
+          { "key": "b", "signal": "boolean", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "CONST_BOOL",
+      "displayName": "Constant On",
+      "category": "value",
+      "stormworks": { "type": "16" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "SR_LATCH",
+      "displayName": "SR Latch",
+      "category": "logic-flip-flop",
+      "stormworks": { "type": "24" },
+      "ports": {
+        "inputs": [
+          { "key": "s", "signal": "boolean", "label": "S" },
+          { "key": "r", "signal": "boolean", "label": "R" }
+        ],
+        "outputs": [
+          { "key": "q", "signal": "boolean", "label": "Q" },
+          { "key": "not_q", "signal": "boolean", "label": "not Q", "stormworks": { "nodeIndex": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "JK_FF",
+      "displayName": "JK Flip-Flop",
+      "category": "logic-flip-flop",
+      "stormworks": { "type": "25" },
+      "ports": {
+        "inputs": [
+          { "key": "j", "signal": "boolean", "label": "J" },
+          { "key": "k", "signal": "boolean", "label": "K" }
+        ],
+        "outputs": [
+          { "key": "q", "signal": "boolean", "label": "Q" },
+          { "key": "not_q", "signal": "boolean", "label": "not Q", "stormworks": { "nodeIndex": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "TOGGLE",
+      "displayName": "Toggle",
+      "category": "logic-bool",
+      "stormworks": { "type": "28" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "boolean", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "BOOL_FUNC_4",
+      "displayName": "Boolean Function (4 inputs)",
+      "category": "logic-bool",
+      "stormworks": { "type": "46" },
+      "ports": {
+        "inputs": [
+          { "key": "x", "signal": "boolean", "label": "x" },
+          { "key": "y", "signal": "boolean", "label": "y" },
+          { "key": "z", "signal": "boolean", "label": "z" },
+          { "key": "w", "signal": "boolean", "label": "w" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "BOOL_FUNC_8",
+      "displayName": "Boolean Function (8 inputs)",
+      "category": "logic-bool",
+      "stormworks": { "type": "47" },
+      "ports": {
+        "inputs": [
+          { "key": "x", "signal": "boolean", "label": "x" },
+          { "key": "y", "signal": "boolean", "label": "y" },
+          { "key": "z", "signal": "boolean", "label": "z" },
+          { "key": "w", "signal": "boolean", "label": "w" },
+          { "key": "a", "signal": "boolean", "label": "a" },
+          { "key": "b", "signal": "boolean", "label": "b" },
+          { "key": "c", "signal": "boolean", "label": "c" },
+          { "key": "d", "signal": "boolean", "label": "d" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "PULSE",
+      "displayName": "Pulse",
+      "category": "logic-bool",
+      "stormworks": { "type": "48" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "boolean", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "mode",
+          "valueType": "string",
+          "required": false,
+          "source": { "xmlPath": "object.@m" },
+          "enum": { "fall": 0, "both": 2 }
+        }
+      ],
+      "defaults": { "mode": "rise" }
+    },
+    {
+      "id": "GREATER_THAN",
+      "displayName": "Greater Than",
+      "category": "comparison",
+      "stormworks": { "type": "17" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "LESS_THAN",
+      "displayName": "Less Than",
+      "category": "comparison",
+      "stormworks": { "type": "18" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      }
+    },
+    {
+      "id": "THRESHOLD",
+      "displayName": "Threshold",
+      "category": "comparison",
+      "stormworks": { "type": "12" },
+      "ports": {
+        "inputs": [{ "key": "value", "signal": "number", "label": "Value" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "min",
+          "valueType": "number",
+          "required": true,
+          "source": { "xmlPath": "object.min.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.min.@text", "valueType": "string" },
+            { "xmlPath": "object.min.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "max",
+          "valueType": "number",
+          "required": true,
+          "source": { "xmlPath": "object.max.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.max.@text", "valueType": "string" },
+            { "xmlPath": "object.max.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "min": 0, "max": 1 }
+    },
+    {
+      "id": "MEMORY_REGISTER",
+      "displayName": "Memory Register",
+      "category": "control",
+      "stormworks": { "type": "13" },
+      "ports": {
+        "inputs": [
+          { "key": "set", "signal": "boolean", "label": "Set" },
+          { "key": "reset", "signal": "boolean", "label": "Reset" },
+          { "key": "value", "signal": "number", "label": "Value" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "reset_value",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.r.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.r.@text", "valueType": "string" },
+            { "xmlPath": "object.r.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "reset_value": 0 }
+    },
+    {
+      "id": "NUM_JUNCTION",
+      "displayName": "Numerical Junction",
+      "category": "control",
+      "stormworks": { "type": "21" },
+      "ports": {
+        "inputs": [
+          { "key": "value", "signal": "number", "label": "Value" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [
+          { "key": "on", "signal": "number", "label": "On Path" },
+          { "key": "off", "signal": "number", "label": "Off Path", "stormworks": { "nodeIndex": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "NUM_SWITCHBOX",
+      "displayName": "Numerical Switchbox",
+      "category": "control",
+      "stormworks": { "type": "22" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "BLINKER",
+      "displayName": "Blinker",
+      "category": "control",
+      "stormworks": { "type": "27" },
+      "ports": {
+        "inputs": [{ "key": "enable", "signal": "boolean", "label": "Enable" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "on_time",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@on" }
+        },
+        {
+          "key": "off_time",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@off" }
+        }
+      ],
+      "defaults": { "on_time": 0.5, "off_time": 0.5 }
+    },
+    {
+      "id": "CAPACITOR",
+      "displayName": "Capacitor",
+      "category": "control",
+      "stormworks": { "type": "26" },
+      "ports": {
+        "inputs": [{ "key": "enable", "signal": "boolean", "label": "Enable" }],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "charge_time",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@ct" }
+        },
+        {
+          "key": "discharge_time",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@dt" }
+        }
+      ],
+      "defaults": { "charge_time": 1.0, "discharge_time": 1.0 }
+    },
+    {
+      "id": "PID",
+      "displayName": "PID Controller",
+      "category": "control",
+      "stormworks": { "type": "23" },
+      "ports": {
+        "inputs": [
+          { "key": "setpoint", "signal": "number", "label": "Setpoint" },
+          { "key": "pv", "signal": "number", "label": "Process Value" },
+          { "key": "active", "signal": "boolean", "label": "Active" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "kp",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.kp.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.kp.@text", "valueType": "string" },
+            { "xmlPath": "object.kp.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "ki",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.ki.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.ki.@text", "valueType": "string" },
+            { "xmlPath": "object.ki.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "kd",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.kd.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.kd.@text", "valueType": "string" },
+            { "xmlPath": "object.kd.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "kp": 1, "ki": 0, "kd": 0 }
+    },
+    {
+      "id": "PID_ADVANCED",
+      "displayName": "PID Controller (Advanced)",
+      "category": "control",
+      "stormworks": { "type": "39" },
+      "ports": {
+        "inputs": [
+          { "key": "setpoint", "signal": "number", "label": "Setpoint" },
+          { "key": "pv", "signal": "number", "label": "Process Value" },
+          { "key": "kp", "signal": "number", "label": "P Gain" },
+          { "key": "ki", "signal": "number", "label": "I Gain" },
+          { "key": "kd", "signal": "number", "label": "D Gain" },
+          { "key": "active", "signal": "boolean", "label": "Active" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "TIMER_TON",
+      "displayName": "Timer (TON)",
+      "category": "control",
+      "stormworks": { "type": "49" },
+      "ports": {
+        "inputs": [
+          { "key": "enable", "signal": "boolean", "label": "Enable" },
+          { "key": "duration", "signal": "number", "label": "Duration" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "units", "valueType": "string", "required": false, "source": { "xmlPath": "object.@u" }, "enum": { "ticks": 1 } }
+      ],
+      "defaults": { "units": "seconds" }
+    },
+    {
+      "id": "TIMER_TOF",
+      "displayName": "Timer (TOF)",
+      "category": "control",
+      "stormworks": { "type": "50" },
+      "ports": {
+        "inputs": [
+          { "key": "enable", "signal": "boolean", "label": "Enable" },
+          { "key": "duration", "signal": "number", "label": "Duration" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "units", "valueType": "string", "required": false, "source": { "xmlPath": "object.@u" }, "enum": { "ticks": 1 } }
+      ],
+      "defaults": { "units": "seconds" }
+    },
+    {
+      "id": "TIMER_RTO",
+      "displayName": "Timer (RTO)",
+      "category": "control",
+      "stormworks": { "type": "51" },
+      "ports": {
+        "inputs": [
+          { "key": "enable", "signal": "boolean", "label": "Enable" },
+          { "key": "duration", "signal": "number", "label": "Duration" },
+          { "key": "reset", "signal": "boolean", "label": "Reset" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "units", "valueType": "string", "required": false, "source": { "xmlPath": "object.@u" }, "enum": { "ticks": 1 } }
+      ],
+      "defaults": { "units": "seconds" }
+    },
+    {
+      "id": "TIMER_RTF",
+      "displayName": "Timer (RTF)",
+      "category": "control",
+      "stormworks": { "type": "52" },
+      "ports": {
+        "inputs": [
+          { "key": "enable", "signal": "boolean", "label": "Enable" },
+          { "key": "duration", "signal": "number", "label": "Duration" },
+          { "key": "reset", "signal": "boolean", "label": "Reset" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "units", "valueType": "string", "required": false, "source": { "xmlPath": "object.@u" }, "enum": { "ticks": 1 } }
+      ],
+      "defaults": { "units": "seconds" }
+    },
+    {
+      "id": "COUNTER",
+      "displayName": "Up/Down Counter",
+      "category": "control",
+      "stormworks": { "type": "37" },
+      "ports": {
+        "inputs": [
+          { "key": "up", "signal": "boolean", "label": "Up" },
+          { "key": "down", "signal": "boolean", "label": "Down" },
+          { "key": "reset", "signal": "boolean", "label": "Reset" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "reset_value",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.r.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.r.@text", "valueType": "string" },
+            { "xmlPath": "object.r.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "increment",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.i.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.i.@text", "valueType": "string" },
+            { "xmlPath": "object.i.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "min",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.min.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.min.@text", "valueType": "string" },
+            { "xmlPath": "object.min.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "max",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.max.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.max.@text", "valueType": "string" },
+            { "xmlPath": "object.max.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "reset_value": 0, "increment": 1, "min": 0, "max": 100 }
+    },
+    {
+      "id": "ADD",
+      "displayName": "Add",
+      "category": "arithmetic",
+      "stormworks": { "type": "6" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "SUBTRACT",
+      "displayName": "Subtract",
+      "category": "arithmetic",
+      "stormworks": { "type": "7" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "MULTIPLY",
+      "displayName": "Multiply",
+      "category": "arithmetic",
+      "stormworks": { "type": "8" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "DIVIDE",
+      "displayName": "Divide",
+      "category": "arithmetic",
+      "stormworks": { "type": "9" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [
+          { "key": "out", "signal": "number", "label": "Out" },
+          { "key": "error", "signal": "boolean", "label": "Divide by Zero", "stormworks": { "nodeIndex": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "FUNC_NUM_1",
+      "displayName": "Function (x)",
+      "category": "arithmetic",
+      "stormworks": { "type": "45" },
+      "ports": {
+        "inputs": [{ "key": "x", "signal": "number", "label": "x" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "FUNC_NUM_3",
+      "displayName": "Function (x,y,z)",
+      "category": "arithmetic",
+      "stormworks": { "type": "10" },
+      "ports": {
+        "inputs": [
+          { "key": "x", "signal": "number", "label": "x" },
+          { "key": "y", "signal": "number", "label": "y" },
+          { "key": "z", "signal": "number", "label": "z" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        },
+        {
+          "key": "p1",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@p1" }
+        },
+        {
+          "key": "p2",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@p2" }
+        },
+        {
+          "key": "p3",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.@p3" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "FUNC_NUM_8",
+      "displayName": "Function (x,y,z,w,a,b,c,d)",
+      "category": "arithmetic",
+      "stormworks": { "type": "36" },
+      "ports": {
+        "inputs": [
+          { "key": "x", "signal": "number", "label": "x" },
+          { "key": "y", "signal": "number", "label": "y" },
+          { "key": "z", "signal": "number", "label": "z" },
+          { "key": "w", "signal": "number", "label": "w" },
+          { "key": "a", "signal": "number", "label": "a" },
+          { "key": "b", "signal": "number", "label": "b" },
+          { "key": "c", "signal": "number", "label": "c" },
+          { "key": "d", "signal": "number", "label": "d" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "expression",
+          "valueType": "string",
+          "required": true,
+          "source": { "xmlPath": "object.@e" }
+        }
+      ],
+      "defaults": { "expression": "x" }
+    },
+    {
+      "id": "CLAMP",
+      "displayName": "Clamp",
+      "category": "arithmetic",
+      "stormworks": { "type": "11" },
+      "ports": {
+        "inputs": [{ "key": "value", "signal": "number", "label": "Value" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "min",
+          "valueType": "number",
+          "required": true,
+          "source": { "xmlPath": "object.min.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.min.@text", "valueType": "string" },
+            { "xmlPath": "object.min.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "max",
+          "valueType": "number",
+          "required": true,
+          "source": { "xmlPath": "object.max.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.max.@text", "valueType": "string" },
+            { "xmlPath": "object.max.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "min": 0, "max": 1 }
+    },
+    {
+      "id": "ABS",
+      "displayName": "Abs",
+      "category": "arithmetic",
+      "stormworks": { "type": "14" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "number", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "DELTA",
+      "displayName": "Delta",
+      "category": "arithmetic",
+      "stormworks": { "type": "35" },
+      "ports": {
+        "inputs": [{ "key": "a", "signal": "number", "label": "A" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "MODULO",
+      "displayName": "Modulo",
+      "category": "arithmetic",
+      "stormworks": { "type": "38" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "EQUAL",
+      "displayName": "Equal",
+      "category": "arithmetic",
+      "stormworks": { "type": "42" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "number", "label": "A" },
+          { "key": "b", "signal": "number", "label": "B" }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "epsilon",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.e.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.e.@text", "valueType": "string" },
+            { "xmlPath": "object.e.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "epsilon": 0.0001 }
+    },
+    {
+      "id": "COMPOSITE_READ_NUMBER",
+      "displayName": "Composite Read Number",
+      "category": "composite-read",
+      "stormworks": { "type": "31" },
+      "ports": {
+        "inputs": [
+          { "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } },
+          { "key": "channel_input", "signal": "number", "label": "Start Channel", "stormworks": { "xmlKey": "inoff" } }
+        ],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" }, "xmlDelta": -1, "xmlDeltaExcept": -1 }
+      ],
+      "defaults": { "channel": 1 }
+    },
+    {
+      "id": "COMPOSITE_READ_BOOLEAN",
+      "displayName": "Composite Read Boolean",
+      "category": "composite-read",
+      "stormworks": { "type": "29" },
+      "ports": {
+        "inputs": [
+          { "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } },
+          { "key": "channel_input", "signal": "number", "label": "Start Channel", "stormworks": { "xmlKey": "inoff" } }
+        ],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "channel", "valueType": "number", "required": false, "source": { "xmlPath": "object.@i" }, "xmlDelta": -1, "xmlDeltaExcept": -1 }
+      ],
+      "defaults": { "channel": 1 }
+    },
+    {
+      "id": "COMPOSITE_SWITCHBOX",
+      "displayName": "Composite Switchbox",
+      "category": "composite",
+      "stormworks": { "type": "53" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "composite", "label": "A" },
+          { "key": "b", "signal": "composite", "label": "B" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [{ "key": "out", "signal": "composite", "label": "Out" }]
+      }
+    },
+    {
+      "id": "COMPOSITE_TO_NUMBER",
+      "displayName": "Composite Binary to Number",
+      "category": "composite",
+      "stormworks": { "type": "55" },
+      "ports": {
+        "inputs": [{ "key": "composite", "signal": "composite", "label": "Composite" }],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      }
+    },
+    {
+      "id": "NUMBER_TO_COMPOSITE",
+      "displayName": "Number to Composite Binary",
+      "category": "composite",
+      "stormworks": { "type": "54" },
+      "ports": {
+        "inputs": [{ "key": "number", "signal": "number", "label": "Number" }],
+        "outputs": [{ "key": "out", "signal": "composite", "label": "Out" }]
+      }
+    },
+    {
+      "id": "AUDIO_SWITCHBOX",
+      "displayName": "Audio Switchbox",
+      "category": "composite",
+      "stormworks": { "type": "59" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "audio", "label": "A" },
+          { "key": "b", "signal": "audio", "label": "B" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [{ "key": "out", "signal": "audio", "label": "Out" }]
+      }
+    },
+    {
+      "id": "VIDEO_SWITCHBOX",
+      "displayName": "Video Switchbox",
+      "category": "composite",
+      "stormworks": { "type": "57" },
+      "ports": {
+        "inputs": [
+          { "key": "a", "signal": "video", "label": "A" },
+          { "key": "b", "signal": "video", "label": "B" },
+          { "key": "switch", "signal": "boolean", "label": "Switch" }
+        ],
+        "outputs": [{ "key": "out", "signal": "video", "label": "Out" }]
+      }
+    },
+    {
+      "id": "PROPERTY_NUMBER",
+      "displayName": "Property Number",
+      "category": "property",
+      "stormworks": { "type": "34" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "value",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.v.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.v.@text", "valueType": "string" },
+            { "xmlPath": "object.v.@value", "valueType": "number" }
+          ]
+        }
+      ],
+      "defaults": { "value": 0 }
+    },
+    {
+      "id": "PROPERTY_SLIDER",
+      "displayName": "Property Slider",
+      "category": "property",
+      "stormworks": { "type": "19" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "min",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.min.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.min.@text", "valueType": "string" },
+            { "xmlPath": "object.min.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "max",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.max.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.max.@text", "valueType": "string" },
+            { "xmlPath": "object.max.@value", "valueType": "number" }
+          ]
+        },
+        {
+          "key": "increment",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.int.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.int.@text", "valueType": "string" }
+          ]
+        },
+        {
+          "key": "value",
+          "valueType": "number",
+          "required": false,
+          "source": { "xmlPath": "object.v.@text" },
+          "writeTargets": [
+            { "xmlPath": "object.v.@text", "valueType": "string" }
+          ]
+        }
+      ],
+      "defaults": { "min": 0, "max": 1, "increment": 0.1, "value": 0 }
+    },
+    {
+      "id": "PROPERTY_TOGGLE",
+      "displayName": "Property Toggle",
+      "category": "property",
+      "stormworks": { "type": "33" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
+      },
+      "properties": [
+        { "key": "label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@l" } },
+        { "key": "on_label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@on" } },
+        { "key": "off_label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@off" } }
+      ],
+      "defaults": { "label": "", "on_label": "On", "off_label": "Off" }
+    },
+    {
+      "id": "PROPERTY_TEXT",
+      "displayName": "Property Text",
+      "category": "property",
+      "stormworks": { "type": "58" },
+      "ports": { "inputs": [], "outputs": [] },
+      "properties": [
+        { "key": "name", "valueType": "string", "required": false, "source": { "xmlPath": "object.@n" } }
+      ],
+      "defaults": { "name": "" }
+    },
+    {
+      "id": "PROPERTY_DROPDOWN",
+      "displayName": "Property Dropdown",
+      "category": "property",
+      "stormworks": { "type": "20" },
+      "ports": {
+        "inputs": [],
+        "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
+      },
+      "properties": [
+        {
+          "key": "items",
+          "valueType": "string",
+          "required": false,
+          "source": { "xmlPath": "object.items", "itemList": true }
+        }
+      ]
+    },
+    {
+      "id": "TOOLTIP_NUMBER",
+      "displayName": "Tooltip Number",
+      "category": "debug",
+      "stormworks": { "type": "43" },
+      "ports": {
+        "inputs": [
+          { "key": "value", "signal": "number", "label": "Value" },
+          { "key": "error", "signal": "boolean", "label": "Is Error" }
+        ],
+        "outputs": []
+      },
+      "properties": [
+        { "key": "label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@l" } }
+      ],
+      "defaults": { "label": "" }
+    },
+    {
+      "id": "TOOLTIP_BOOLEAN",
+      "displayName": "Tooltip On/Off",
+      "category": "debug",
+      "stormworks": { "type": "44" },
+      "ports": {
+        "inputs": [
+          { "key": "value", "signal": "boolean", "label": "Value" }
+        ],
+        "outputs": []
+      },
+      "properties": [
+        { "key": "label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@l" } },
+        { "key": "on_label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@on" } },
+        { "key": "off_label", "valueType": "string", "required": false, "source": { "xmlPath": "object.@off" } }
+      ],
+      "defaults": { "label": "", "on_label": "On", "off_label": "Off" }
+    },
+    {
+      "id": "COMPOSITE_WRITE_BOOLEAN",
+      "displayName": "Composite Write Boolean",
+      "category": "composite-write",
+      "stormworks": {
+        "type": "41",
+        "dynamicInputs": {
+          "prefix": "in",
+          "countProperty": "count",
+          "startIndex": 1,
+          "signal": "boolean"
+        }
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "inc",
+            "signal": "composite",
+            "label": "Composite",
+            "stormworks": {
+              "xmlKey": "inc"
+            }
+          }
+        ],
+        "outputs": [
+          { "key": "out", "signal": "composite", "label": "Out" }
+        ]
+      },
+      "properties": [
+        {
+          "key": "count",
+          "valueType": "number",
+          "required": true,
+          "source": {
+            "xmlPath": "object.@count"
+          }
+        },
+        {
+          "key": "offset",
+          "valueType": "number",
+          "required": false,
+          "source": {
+            "xmlPath": "object.@offset"
+          },
+          "xmlDelta": -1,
+          "xmlDeltaExcept": -1
+        }
+      ],
+      "defaults": {
+        "count": 1,
+        "offset": 1
+      }
+    },
+    {
+      "id": "COMPOSITE_WRITE_NUMBER",
+      "displayName": "Composite Write Number",
+      "category": "composite-write",
+      "stormworks": {
+        "type": "40",
+        "dynamicInputs": {
+          "prefix": "in",
+          "countProperty": "count",
+          "startIndex": 1,
+          "signal": "number"
+        }
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "inc",
+            "signal": "composite",
+            "label": "Composite",
+            "stormworks": {
+              "xmlKey": "inc"
+            }
+          }
+        ],
+        "outputs": [
+          { "key": "out", "signal": "composite", "label": "Out" }
+        ]
+      },
+      "properties": [
+        {
+          "key": "count",
+          "valueType": "number",
+          "required": true,
+          "source": {
+            "xmlPath": "object.@count"
+          }
+        },
+        {
+          "key": "offset",
+          "valueType": "number",
+          "required": false,
+          "source": {
+            "xmlPath": "object.@offset"
+          },
+          "xmlDelta": -1,
+          "xmlDeltaExcept": -1
+        }
+      ],
+      "defaults": {
+        "count": 1,
+        "offset": 1
+      }
+    },
+    {
+      "id": "CONST",
+      "displayName": "Constant Number",
+      "category": "value",
+      "stormworks": {
+        "type": "15"
+      },
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "key": "value",
+            "signal": "number",
+            "label": "Value"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "key": "value",
+          "valueType": "number",
+          "required": true,
+          "dsl": {
+            "emit": false
+          },
+          "source": {
+            "xmlPath": "object.n.@value"
+          }
+        },
+        {
+          "key": "text",
+          "valueType": "string",
+          "required": false,
+          "dsl": {
+            "key": "value",
+            "valueType": "number"
+          },
+          "source": {
+            "xmlPath": "object.n.@text"
+          },
+          "writeTargets": [
+            {
+              "xmlPath": "object.n.@text",
+              "valueType": "string"
+            },
+            {
+              "xmlPath": "object.n.@value",
+              "valueType": "number"
+            }
+          ]
+        }
+      ],
+      "defaults": {
+        "value": 0,
+        "text": "0"
+      }
+    },
+    {
+      "id": "LUA",
+      "displayName": "Lua Script",
+      "category": "script",
+      "stormworks": {
+        "type": "56"
+      },
+      "ports": {
+        "inputs": [
+          {
+            "key": "composite",
+            "signal": "composite",
+            "label": "Composite",
+            "stormworks": {
+              "xmlKey": "in1"
+            }
+          },
+          {
+            "key": "video",
+            "signal": "video",
+            "label": "Video",
+            "stormworks": {
+              "xmlKey": "in2"
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "key": "composite",
+            "signal": "composite",
+            "label": "Composite"
+          },
+          {
+            "key": "video",
+            "signal": "video",
+            "label": "Video",
+            "stormworks": {
+              "nodeIndex": 1
+            }
+          }
+        ]
+      },
+      "properties": [
+        {
+          "key": "script",
+          "valueType": "string",
+          "required": true,
+          "source": {
+            "xmlPath": "object.@script"
+          }
+        }
+      ],
+      "defaults": {
+        "script": ""
+      }
+    }
+  ]
+}

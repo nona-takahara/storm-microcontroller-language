@@ -1,0 +1,779 @@
+{
+  "schemaVersion": "1",
+  "generatedFrom": "src/definitions.json (schemaVersion 10)",
+  "entries": {
+    "ABS": {
+      "displayName": "Abs",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "ADD": {
+      "displayName": "Add",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "AND": {
+      "displayName": "AND",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "AUDIO_SWITCHBOX": {
+      "displayName": "Audio Switchbox",
+      "category": "composite",
+      "status": "done",
+      "relatedIssues": [
+        4
+      ],
+      "notes": [
+        {
+          "category": "truth-table",
+          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
+          "confidence": "unconfirmed"
+        },
+        {
+          "category": "edge-case",
+          "text": "An unconnected `switch` input is treated as a constant `false`.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    "BLINKER": {
+      "displayName": "Blinker",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "timing",
+          "text": "While `enable` stays true, `out` alternates On/Off/On on a repeating cycle. `on_time`/`off_time` (default 0.5/0.5) are quantized to 0.1 s steps -- exactly 6 ticks at the 60 Hz tick rate.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "BOOL_FUNC_4": {
+      "displayName": "Boolean Function (4 inputs)",
+      "category": "logic-bool",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "The `expression` property is a small boolean-formula language: variable `x` (also `y`/`z`/`w` for this gate's other inputs), constants `true`/`false`, and operators `&` (AND), `|` (OR), `^` (XOR), `!` (NOT, usable as prefix or postfix).",
+          "confidence": "inferred",
+          "source": "Reproduced from the Stormworks community wiki (Japanese)."
+        }
+      ]
+    },
+    "BOOL_FUNC_8": {
+      "displayName": "Boolean Function (8 inputs)",
+      "category": "logic-bool",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "BOOL_FUNC_8 is the 8-input version of BOOL_FUNC_4: its `expression` variables are `x`,`y`,`z`,`w`,`a`,`b`,`c`,`d`. The expression syntax is otherwise identical to BOOL_FUNC_4.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "boolean_in": {
+      "displayName": "Project Input Boolean",
+      "category": "project",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "boolean_out": {
+      "displayName": "Project Output Boolean",
+      "category": "project",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "CAPACITOR": {
+      "displayName": "Capacitor",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [
+        4
+      ],
+      "notes": [
+        {
+          "category": "timing",
+          "text": "If `out` is Off and `enable` is held On continuously for `charge_time` seconds, `out` turns On. If `out` is On and `enable` is held Off continuously for `discharge_time` seconds, `out` turns Off. It functions as an On/Off buffer with time hysteresis.",
+          "confidence": "verified"
+        },
+        {
+          "category": "timing",
+          "text": "Despite the name, CAPACITOR has no analog charge/discharge curve. It is simply an On/Off input buffer with turn-on and turn-off delays.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "CLAMP": {
+      "displayName": "Clamp",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "composite_in": {
+      "displayName": "Project Input Composite",
+      "category": "project",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "composite_out": {
+      "displayName": "Project Output Composite",
+      "category": "project",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "COMPOSITE_READ_BOOLEAN": {
+      "displayName": "Composite Read Boolean",
+      "category": "composite-read",
+      "status": "todo",
+      "relatedIssues": [
+        3
+      ],
+      "notes": []
+    },
+    "COMPOSITE_READ_NUMBER": {
+      "displayName": "Composite Read Number",
+      "category": "composite-read",
+      "status": "todo",
+      "relatedIssues": [
+        3
+      ],
+      "notes": []
+    },
+    "COMPOSITE_SWITCHBOX": {
+      "displayName": "Composite Switchbox",
+      "category": "composite",
+      "status": "done",
+      "relatedIssues": [
+        4
+      ],
+      "notes": [
+        {
+          "category": "truth-table",
+          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
+          "confidence": "unconfirmed"
+        },
+        {
+          "category": "edge-case",
+          "text": "An unconnected `switch` input is treated as a constant `false`.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    "COMPOSITE_TO_NUMBER": {
+      "displayName": "Composite Binary to Number",
+      "category": "composite",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "COMPOSITE_TO_NUMBER treats its 32 composite input bits as bit 0 (LSB) through bit 31 (MSB) of a 32-bit pattern, then reinterprets that bit pattern as an IEEE-754 float. It is not a simple binary-to-integer conversion.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "COMPOSITE_WRITE_BOOLEAN": {
+      "displayName": "Composite Write Boolean",
+      "category": "composite-write",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "edge-case",
+          "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged, matching COMPOSITE_WRITE_NUMBER's confirmed behavior.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    "COMPOSITE_WRITE_NUMBER": {
+      "displayName": "Composite Write Number",
+      "category": "composite-write",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "edge-case",
+          "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "CONST": {
+      "displayName": "Constant Number",
+      "category": "value",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "CONST_BOOL": {
+      "displayName": "Constant On",
+      "category": "value",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "COUNTER": {
+      "displayName": "Up/Down Counter",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "COUNTER's three inputs are `up`, `down`, `reset` (booleans) -- there is no separate 'enable' input. Its properties are `increment` (default 1), `min`/`max` (default 0/100), and `reset_value` (default 0).",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "`out` changes by `increment` on every tick that `up` or `down` is held true -- continuously, not just on a rising edge -- clamped to [`min`, `max`].",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    "DELTA": {
+      "displayName": "Delta",
+      "category": "arithmetic",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "DELTA outputs the difference between the current tick's `a` and the previous tick's `a` (this tick minus previous tick).",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "DIVIDE": {
+      "displayName": "Divide",
+      "category": "arithmetic",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "edge-case",
+          "text": "DIVIDE has a second output, `error` (\"Divide by Zero\") (boolean), in addition to `out` (number). Wire `error` explicitly if divide-by-zero must be detected -- `out`'s numeric value alone cannot signal that it happened.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "When `b` is 0, `out` reads 0.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "EQUAL": {
+      "displayName": "Equal",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [
+        11
+      ],
+      "notes": []
+    },
+    "FUNC_NUM_1": {
+      "displayName": "Function (x)",
+      "category": "arithmetic",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "edge-case",
+          "text": "Division by zero inside `expression` yields 0 (not an error or Infinity). Modulo (`%`) by zero also yields 0.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "`expression`'s formula language has one variable, `x` (bound to input `x`), constants `pi`/`pi2`, operators `+ - * / % ^`, and functions sin/cos/tan/asin/acos/atan/atan2/max/min/ceil/floor/round/abs/sgn/sqrt/len/len2/lerp/clamp. Trigonometric functions take/return radians. `sgn(0)` returns 1, not 0 (unlike the mathematical convention). `sqrt` of a negative number returns 0.",
+          "confidence": "verified",
+          "source": "Reproduced from the Stormworks community wiki (Japanese)."
+        }
+      ]
+    },
+    "FUNC_NUM_3": {
+      "displayName": "Function (x,y,z)",
+      "category": "arithmetic",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "FUNC_NUM_3 extends FUNC_NUM_1's `expression` variables to `x`,`y`,`z` (bound to inputs `x`,`y`,`z`). The formula syntax is otherwise identical to FUNC_NUM_1.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "FUNC_NUM_3 also has three numeric properties, `p1`/`p2`/`p3`, usable inside `expression` as extra constants alongside `x`/`y`/`z`.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "FUNC_NUM_8": {
+      "displayName": "Function (x,y,z,w,a,b,c,d)",
+      "category": "arithmetic",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "FUNC_NUM_8 extends FUNC_NUM_1's `expression` variables to `x`,`y`,`z`,`w`,`a`,`b`,`c`,`d` (bound to the 8 like-named inputs). The formula syntax is otherwise identical to FUNC_NUM_1.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "GREATER_THAN": {
+      "displayName": "Greater Than",
+      "category": "comparison",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "JK_FF": {
+      "displayName": "JK Flip-Flop",
+      "category": "logic-flip-flop",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "initial-state",
+          "text": "At startup (load time), `q` is false.",
+          "confidence": "verified"
+        },
+        {
+          "category": "priority",
+          "text": "When `j` and `k` are both true, `q` toggles every tick, matching the textbook JK-FF truth table. JK_FF has no separate clock input -- each tick's evaluation plays that role.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "LESS_THAN": {
+      "displayName": "Less Than",
+      "category": "comparison",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "LUA": {
+      "displayName": "Lua Script",
+      "category": "script",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "edge-case",
+          "text": "The `script` property is limited to ASCII characters and at most 8192 characters.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "MEMORY_REGISTER": {
+      "displayName": "Memory Register",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [
+        4
+      ],
+      "notes": [
+        {
+          "category": "initial-state",
+          "text": "At startup (load time), `out` equals the `reset_value` property (default 0) -- the DSL makes this value explicit rather than leaving it implicit.",
+          "confidence": "verified"
+        },
+        {
+          "category": "priority",
+          "text": "Reset takes priority over Set when `set` and `reset` are both true in the same tick.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "MODULO": {
+      "displayName": "Modulo",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "MULTIPLY": {
+      "displayName": "Multiply",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "NAND": {
+      "displayName": "NAND",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "NOR": {
+      "displayName": "NOR",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "NOT": {
+      "displayName": "NOT",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "NUM_JUNCTION": {
+      "displayName": "Numerical Junction",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "edge-case",
+          "text": "NUM_JUNCTION routes `value` to exactly one of its two outputs, `on` or `off`, selected by `switch`. The non-selected output reads 0.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "NUM_SWITCHBOX": {
+      "displayName": "Numerical Switchbox",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "edge-case",
+          "text": "An unconnected `switch` input is treated as a constant `false`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "truth-table",
+          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "number_in": {
+      "displayName": "Project Input Number",
+      "category": "project",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "number_out": {
+      "displayName": "Project Output Number",
+      "category": "project",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "NUMBER_TO_COMPOSITE": {
+      "displayName": "Number to Composite Binary",
+      "category": "composite",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "NUMBER_TO_COMPOSITE is the inverse of COMPOSITE_TO_NUMBER: it reinterprets `number`'s IEEE-754 float bit pattern as 32 composite boolean channels (bit 0 -> LSB through bit 31 -> MSB).",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "OR": {
+      "displayName": "OR",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "PID": {
+      "displayName": "PID Controller",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "initial-state",
+          "text": "While `active` is false, the internal integral term is held at 0 and `out` is 0.",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "PID_ADVANCED": {
+      "displayName": "PID Controller (Advanced)",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "initial-state",
+          "text": "While `active` is false, the internal integral term is held at 0 and `out` is 0, matching PID.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "The integral term accumulates `e * ki` (error times the `ki` input) each tick.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "PROPERTY_DROPDOWN": {
+      "displayName": "Property Dropdown",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "PROPERTY_NUMBER": {
+      "displayName": "Property Number",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "PROPERTY_SLIDER": {
+      "displayName": "Property Slider",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "PROPERTY_TEXT": {
+      "displayName": "Property Text",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "PROPERTY_TOGGLE": {
+      "displayName": "Property Toggle",
+      "category": "property",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "PULSE": {
+      "displayName": "Pulse",
+      "category": "logic-bool",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "timing",
+          "text": "PULSE's output pulse width is 1 tick.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "The `mode` property (default \"rise\") selects the trigger edge: \"rise\" (default), \"fall\", or \"both\".",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "SR_LATCH": {
+      "displayName": "SR Latch",
+      "category": "logic-flip-flop",
+      "status": "done",
+      "relatedIssues": [
+        4
+      ],
+      "notes": [
+        {
+          "category": "initial-state",
+          "text": "At startup (load time), `q` is false.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "SR_LATCH has two outputs, `q` and `not_q`. When `s` and `r` are both true, `q` is false and `not_q` is also false -- `not_q` does not equal `!q` in this case, breaking the usual complementary relationship.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    "SUBTRACT": {
+      "displayName": "Subtract",
+      "category": "arithmetic",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "THRESHOLD": {
+      "displayName": "Threshold",
+      "category": "comparison",
+      "status": "done",
+      "relatedIssues": [
+        1
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "text": "Setting `min` equal to `max` makes THRESHOLD behave like an exact-equality check (EQUAL without an epsilon tolerance).",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "TIMER_RTF": {
+      "displayName": "Timer (RTF)",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "TIMER_RTO": {
+      "displayName": "Timer (RTO)",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "TIMER_TOF": {
+      "displayName": "Timer (TOF)",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "TIMER_TON": {
+      "displayName": "Timer (TON)",
+      "category": "control",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "confidence": "verified"
+        }
+      ]
+    },
+    "TOGGLE": {
+      "displayName": "Toggle",
+      "category": "logic-bool",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "TOGGLE has no properties -- its trigger edge is not configurable, unlike PULSE (whose `mode` property selects rise/fall/both). Do not expect a `mode`-style property on TOGGLE.",
+          "confidence": "verified"
+        },
+        {
+          "category": "timing",
+          "text": "Toggling is tied to the rising edge of `a`: each false-to-true transition flips `out`.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "TOOLTIP_BOOLEAN": {
+      "displayName": "Tooltip On/Off",
+      "category": "debug",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "TOOLTIP_BOOLEAN has `on_label`/`off_label` properties (default \"On\"/\"Off\") in addition to `label`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "The tooltip text switches between `on_label` and `off_label` depending on the boolean `value` input -- this is the closest thing this gate has to conditional display; it is not a general expression-based condition.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    "TOOLTIP_NUMBER": {
+      "displayName": "Tooltip Number",
+      "category": "debug",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": [
+        {
+          "category": "other",
+          "text": "TOOLTIP_NUMBER has an `error` (\"Is Error\") boolean input in addition to `value`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "When `error` is true, the tooltip renders an error/invalid state instead of the numeric value.",
+          "confidence": "unconfirmed"
+        }
+      ]
+    },
+    "video_in": {
+      "displayName": "Project Input Video",
+      "category": "project",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "video_out": {
+      "displayName": "Project Output Video",
+      "category": "project",
+      "status": "done",
+      "relatedIssues": [],
+      "notes": []
+    },
+    "VIDEO_SWITCHBOX": {
+      "displayName": "Video Switchbox",
+      "category": "composite",
+      "status": "done",
+      "relatedIssues": [
+        4
+      ],
+      "notes": [
+        {
+          "category": "truth-table",
+          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
+          "confidence": "unconfirmed"
+        },
+        {
+          "category": "edge-case",
+          "text": "An unconnected `switch` input is treated as a constant `false`.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    "XOR": {
+      "displayName": "XOR",
+      "category": "logic-bool",
+      "status": "todo",
+      "relatedIssues": [],
+      "notes": []
+    }
+  }
+}
