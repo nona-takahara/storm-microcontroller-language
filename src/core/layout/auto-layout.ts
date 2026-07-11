@@ -437,6 +437,10 @@ function buildElkGraph(structure: ElkGraphStructure, options: AutoLayoutOptions,
     "elk.spacing.edgeEdge": String(nodeSpacing),
     "elk.layered.spacing.edgeNodeBetweenLayers": String(layerSpacing),
     "elk.layered.spacing.edgeEdgeBetweenLayers": String(layerSpacing),
+    // A gate reading its own output (a supported self-feedback pattern in this DSL) is a self-loop
+    // edge in ELK's graph; this defaults to 10 like the other spacing options above and isn't
+    // exercised by any of our test graphs, but pin it too rather than leave a gap in the audit.
+    "elk.spacing.nodeSelfLoop": String(nodeSpacing),
   };
 
   if (wrapping) {
