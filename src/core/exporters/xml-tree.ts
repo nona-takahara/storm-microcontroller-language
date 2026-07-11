@@ -21,6 +21,7 @@ import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule, type SwNetResolvedModuleKey } from "../resolvers/sw-net.js";
 import { buildModulePortNameSets, type ModulePortNameSets } from "../shared/module-port-directions.js";
+import { microprocessorIconToSymValues } from "../shared/microprocessor-icon.js";
 import { registerFirstProducer } from "../shared/producer-index.js";
 
 export type StormworksXmlTreeScalar = string | number | boolean | null;
@@ -1362,6 +1363,17 @@ function buildMicroprocessorElement(
 
   if (project.length !== null) {
     microprocessor["@_length"] = String(project.length);
+  }
+
+  if (project.icon !== null) {
+    const symValuesByIndex = microprocessorIconToSymValues(project.icon);
+
+    symValuesByIndex.forEach((symValue, symIndex) => {
+      // Stormworks omits sym* attributes for pins left at their default (blank) icon; mirror that.
+      if (symValue !== 0) {
+        microprocessor[`@_sym${symIndex}`] = String(symValue);
+      }
+    });
   }
 
   return microprocessor;

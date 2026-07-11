@@ -53,6 +53,9 @@ export interface IrMicroprocessorMetadata {
   description?: string;
   width?: number;
   length?: number;
+  // 16-row "#"/"." icon decoded from the root sym0..sym15 attributes (see microprocessor-icon.ts
+  // for the row/bit layout). Always present with all 16 rows once any microprocessor metadata exists.
+  icon?: string[];
 }
 
 export interface IrSubmodule {

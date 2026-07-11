@@ -47,6 +47,9 @@ export interface ProjectJsonDocument {
   description: string | null;
   width: number | null;
   length: number | null;
+  // 16-row "#"/"." icon (see shared/microprocessor-icon.ts); null only when no microprocessor
+  // metadata was present at all in the source.
+  icon: string[] | null;
   nodes: ProjectJsonNodeDocument[];
   constants: ProjectJsonConstantDocument[];
   submodules: ProjectJsonSubmoduleDocument[];
@@ -74,6 +77,7 @@ export function buildProjectJsonDocument(program: IrProgram): ProjectJsonDocumen
     description: asNullableString(program.metadata.microprocessor?.description),
     width: asNullableNumber(program.metadata.microprocessor?.width),
     length: asNullableNumber(program.metadata.microprocessor?.length),
+    icon: program.metadata.microprocessor?.icon ?? null,
     nodes: projectNodes.map((node) => ({
       id: projectNodeIdByIrId.get(node.id) ?? node.id,
       type: node.definitionId,
