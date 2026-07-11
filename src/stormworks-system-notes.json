@@ -90,9 +90,8 @@
       ],
       "notes": [
         {
-          "text": "storm-mcl explicitly emits every property's value to XML, including values equal to their declared default -- it does not silently rely on Stormworks' own defaulting. Two narrow, evidence-based exceptions omit a matching-default value instead: (a) xmlDelta-encoded properties (e.g. composite channel/offset), and (b) empty-string defaults (e.g. PROPERTY_TOGGLE's label). Separately and unconditionally, for `@text`/`@value` property pairs (e.g. THRESHOLD's min/max, PID's kp/ki/kd, EQUAL's epsilon), the numeric `@value` mirror is dropped whenever the value is exactly 0, regardless of that property's own default; `@text` is always written and is the only one storm-mcl reads back on import.",
-          "confidence": "verified",
-          "source": "See src/core/exporters/xml-tree.ts and src/core/spec/tool-conventions.ts for the exact rules."
+          "text": "Whether a default-valued property is written explicitly or omitted from exported XML varies by property. This variation is normal, not a bug: whichever form appears, it decodes back to the same value.",
+          "confidence": "verified"
         }
       ]
     }

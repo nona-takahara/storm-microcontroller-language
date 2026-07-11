@@ -141,34 +141,20 @@
     "COMPOSITE_READ_BOOLEAN": {
       "displayName": "Composite Read Boolean",
       "category": "composite-read",
-      "status": "done",
+      "status": "todo",
       "relatedIssues": [
         3
       ],
-      "notes": [
-        {
-          "category": "serialization-omission",
-          "text": "The `channel` property is xmlDelta-encoded to the XML `@i` attribute and defaults to 1. storm-mcl omits `@i` entirely when `channel` is left at 1; round-tripping such a file through Stormworks itself (loading it and letting the game re-save it) reproduces the same omission, confirming Stormworks also treats an absent `@i` as channel 1.",
-          "confidence": "verified",
-          "source": "See the property-omission logic in src/core/exporters/xml-tree.ts."
-        }
-      ]
+      "notes": []
     },
     "COMPOSITE_READ_NUMBER": {
       "displayName": "Composite Read Number",
       "category": "composite-read",
-      "status": "done",
+      "status": "todo",
       "relatedIssues": [
         3
       ],
-      "notes": [
-        {
-          "category": "serialization-omission",
-          "text": "The `channel` property is xmlDelta-encoded to the XML `@i` attribute and defaults to 1. storm-mcl omits `@i` entirely when `channel` is left at 1; round-tripping such a file through Stormworks itself (loading it and letting the game re-save it) reproduces the same omission, confirming Stormworks also treats an absent `@i` as channel 1.",
-          "confidence": "verified",
-          "source": "See the property-omission logic in src/core/exporters/xml-tree.ts."
-        }
-      ]
+      "notes": []
     },
     "COMPOSITE_SWITCHBOX": {
       "displayName": "Composite Switchbox",
