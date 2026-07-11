@@ -26,6 +26,12 @@ export interface AutoLayoutOptions {
   nodeSpacing?: number;
   layerSpacing?: number;
   gridSize?: number;
+  // Half-width of the target output area, centered on the origin (so the layout is meant to land
+  // within [-maxExtent, +maxExtent] on each axis). Stormworks' in-game microcontroller logic canvas
+  // is only comfortably reachable/editable within roughly this range of its origin; ELK's layered
+  // algorithm otherwise grows one axis unboundedly with graph size. See computeSwNetModuleLayout's
+  // post-layout fit step.
+  maxExtent?: number;
   // Real footprints for `use` statements whose target module already has its own layout, keyed
   // by this module's use-statement instanceId. See computeModuleFootprint.
   submoduleFootprints?: Map<string, ModuleFootprint>;
@@ -69,9 +75,12 @@ interface NetProducer {
 const DEFAULT_NODE_SPACING = 0.25;
 const DEFAULT_LAYER_SPACING = 0.25;
 const DEFAULT_GRID_SIZE = 0.25;
+// Default half-width of the fit target: roughly ±32 around the origin (see AutoLayoutOptions.maxExtent).
+const DEFAULT_MAX_EXTENT = 32;
 const PORT_NODE_SIZE = 0.25;
 const INSTANCE_NODE_WIDTH = 1.0;
 const INSTANCE_NODE_ROW_HEIGHT = 0.25;
+const INSTANCE_NODE_MIN_HEIGHT = 0.5;
 
 const PORT_NODE_ID_PREFIX = "p$";
 const INSTANCE_NODE_ID_PREFIX = "n$";
@@ -89,16 +98,37 @@ export async function computeSwNetModuleLayout(
   const warnings: string[] = [];
   const portSlots = buildPortSlots(module);
   const netProducers = buildNetProducerIndex(module.statements, warnings);
-  const graph = buildElkGraph(portSlots, module.statements, netProducers, options, warnings);
+  const structure = buildElkGraphStructure(portSlots, module.statements, netProducers, warnings, options.submoduleFootprints);
 
   const elk = new ElkConstructor();
-  const laidOut = await elk.layout(graph);
+  const maxExtent = options.maxExtent ?? DEFAULT_MAX_EXTENT;
+
+  // Try the plain (unwrapped) layout first: wrapping's own row-to-row spacing still comes out
+  // several times larger than nodeSpacing even with every spacing option pinned (an ELK wrapping
+  // quirk — see buildElkGraph), so it's only worth paying for graphs that actually need wrapping to
+  // fit ±maxExtent. Most modules don't.
+  let rawPositionById = collectPositions(await elk.layout(buildElkGraph(structure, options, false)));
+
+  if (exceedsExtent(rawPositionById, maxExtent)) {
+    rawPositionById = collectPositions(await elk.layout(buildElkGraph(structure, options, true)));
+  }
+
+  // Fill mode keeps every existing entry verbatim (see the ports/instances mapping below) and only
+  // writes computed positions for genuinely missing ones, so re-centering/scaling the *computed*
+  // frame here would detach newly-filled entries from the untouched existing ones instead of fitting
+  // the module as a whole. Only safe to apply when there's no existing frame to clash with: a full
+  // "force" regeneration, or a fill on a module that has no existing positions at all yet.
+  if (options.mode === "force" || !hasAnyExistingPositions(options.existing)) {
+    fitPositionsWithinExtent(rawPositionById, maxExtent, warnings);
+  } else {
+    warnIfBoundingBoxExceedsExtent(rawPositionById, maxExtent, warnings);
+  }
 
   const gridSize = options.gridSize ?? DEFAULT_GRID_SIZE;
   const positionById = new Map<string, IrVector2>();
 
-  for (const child of laidOut.children ?? []) {
-    positionById.set(child.id, snapVector({ x: child.x ?? 0, y: child.y ?? 0 }, gridSize));
+  for (const [id, position] of rawPositionById) {
+    positionById.set(id, snapVector(position, gridSize));
   }
 
   const ports: SwMclPortDocument[] = portSlots.map((slot) => {
@@ -152,6 +182,14 @@ function buildPortSlots(module: SwNetModule): PortSlot[] {
   });
 }
 
+// Estimate an inst/use statement's node height in .sw-mcl grid units from its pin count, calibrated
+// against real Stormworks block measurements (see the scale-constants comment above): half a grid
+// cell minimum, growing by one row per pin beyond the block's built-in first row.
+function estimateInstanceHeight(statement: SwNetStatement): number {
+  const pinCount = Math.max(statement.inputs.length, statement.outputs.length);
+  return Math.max(INSTANCE_NODE_MIN_HEIGHT, (pinCount + 1) * INSTANCE_NODE_ROW_HEIGHT);
+}
+
 // Compute the bounding box of a module that already has a real .sw-mcl layout, so a `use`
 // statement referencing it from another module can be sized to its real footprint instead of a
 // generic placeholder box. Ports/instances without a matching swMcl entry are skipped rather than
@@ -194,7 +232,6 @@ export function computeModuleFootprint(
       continue;
     }
 
-    const rowCount = Math.max(1, statement.inputs.length, statement.outputs.length);
     const nested = nestedFootprints.get(statement.instanceId);
     // instance.position is an anchor, not the content's top-left, whenever the statement is
     // itself a real-layout `use`: the anchor-correction step in computeSwNetModuleLayout writes
@@ -206,7 +243,7 @@ export function computeModuleFootprint(
       instance.position.x + offsetX,
       instance.position.y + offsetY,
       nested?.width ?? INSTANCE_NODE_WIDTH,
-      nested?.height ?? rowCount * INSTANCE_NODE_ROW_HEIGHT,
+      nested?.height ?? estimateInstanceHeight(statement),
     );
   }
 
@@ -269,17 +306,21 @@ function groupPortSlotsByName(portSlots: PortSlot[], direction: "in" | "out"): M
   return map;
 }
 
-// Build the ELK input graph: port slots pinned to the first/last rank, instances as ordinary layered nodes.
-function buildElkGraph(
+interface ElkGraphStructure {
+  children: ElkNode[];
+  edges: ElkExtendedEdge[];
+}
+
+// Build the ELK input graph's nodes/edges: port slots pinned to the first/last rank, instances as
+// ordinary layered nodes. Structure only — computeSwNetModuleLayout may lay this out twice (see
+// buildElkGraph below), and unknown-net/unknown-port warnings must only be emitted once regardless.
+function buildElkGraphStructure(
   portSlots: PortSlot[],
   statements: SwNetStatement[],
   netProducers: Map<string, NetProducer>,
-  options: AutoLayoutOptions,
   warnings: string[],
-): ElkNode {
-  const direction = options.direction ?? "RIGHT";
-  const nodeSpacing = options.nodeSpacing ?? DEFAULT_NODE_SPACING;
-  const layerSpacing = options.layerSpacing ?? DEFAULT_LAYER_SPACING;
+  submoduleFootprints: Map<string, ModuleFootprint> | undefined,
+): ElkGraphStructure {
   const inPortSlotsByName = groupPortSlotsByName(portSlots, "in");
   const outPortSlotsByName = groupPortSlotsByName(portSlots, "out");
 
@@ -293,13 +334,12 @@ function buildElkGraph(
   }));
 
   for (const statement of statements) {
-    const rowCount = Math.max(1, statement.inputs.length, statement.outputs.length);
-    const footprint = options.submoduleFootprints?.get(statement.instanceId);
+    const footprint = submoduleFootprints?.get(statement.instanceId);
 
     children.push({
       id: INSTANCE_NODE_ID_PREFIX + statement.instanceId,
       width: footprint?.width ?? INSTANCE_NODE_WIDTH,
-      height: footprint?.height ?? rowCount * INSTANCE_NODE_ROW_HEIGHT,
+      height: footprint?.height ?? estimateInstanceHeight(statement),
     });
   }
 
@@ -371,24 +411,191 @@ function buildElkGraph(
     }
   }
 
+  return { children, edges };
+}
+
+// Wrap a graph structure with per-pass layout options. `wrapping` toggles the aspect-ratio/wrapping
+// options (see the comment below); computeSwNetModuleLayout only turns it on for a second pass when
+// a first, unwrapped pass actually needs it, since wrapping's own row-to-row spacing is
+// disproportionately large next to our calibrated 0.25 grid and isn't worth paying for graphs that
+// fit without it. Clones each node/edge so a second pass doesn't inherit x/y/routing that ELK wrote
+// onto the first pass's objects in place.
+function buildElkGraph(structure: ElkGraphStructure, options: AutoLayoutOptions, wrapping: boolean): ElkNode {
+  const direction = options.direction ?? "RIGHT";
+  const nodeSpacing = options.nodeSpacing ?? DEFAULT_NODE_SPACING;
+  const layerSpacing = options.layerSpacing ?? DEFAULT_LAYER_SPACING;
+
+  const layoutOptions: Record<string, string> = {
+    "elk.algorithm": "layered",
+    "elk.direction": direction,
+    "elk.spacing.nodeNode": String(nodeSpacing),
+    "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
+    // These edge-routing spacing options reserve room so rendered edges stay visually distinct from
+    // each other and from unrelated nodes — meaningless here, since we only ever read back node
+    // positions (collectPositions), never ELK's edge bend points, and Stormworks' own in-game wires
+    // cross and overlap freely with no visual penalty. Left at ELK's pixel-scale defaults (10, vs.
+    // our calibrated 0.25-1.0 grid), they don't just widen the local area around a busy node: ELK
+    // places each layer boundary at one shared x (or y), so a single densely-wired connection (e.g.
+    // a boundary port with hundreds of edges) inflates the gap for every node on that boundary, not
+    // just the busy one — reported as unrelated low-degree blocks getting pushed far apart. Zeroing
+    // these collapses every layer boundary back to nodeNode/layerSpacing's own pitch regardless of
+    // how many edges cross it.
+    "elk.spacing.edgeNode": "0",
+    "elk.spacing.edgeEdge": "0",
+    "elk.layered.spacing.edgeNodeBetweenLayers": "0",
+    "elk.layered.spacing.edgeEdgeBetweenLayers": "0",
+    // A gate reading its own output (a supported self-feedback pattern in this DSL) is a self-loop
+    // edge in ELK's graph; this defaults to 10 like the other spacing options above and isn't
+    // exercised by any of our test graphs, but pin it too rather than leave a gap in the audit.
+    "elk.spacing.nodeSelfLoop": String(nodeSpacing),
+  };
+
+  if (wrapping) {
+    // Without wrapping, a long chain of instances grows the layer axis unboundedly with graph
+    // size. Wrapping folds long chains back on themselves toward a roughly square bounding box.
+    // ELK treats each wrapped chunk like a separate weakly-connected component and packs them
+    // using elk.spacing.componentComponent (real node-to-node spacing, pinned to our grid scale
+    // like nodeNode above). elk.layered.wrapping.additionalEdgeSpacing is the same kind of
+    // edge-visual-separation spacing as edgeNode/edgeEdge above — zeroed for the same reason.
+    layoutOptions["elk.aspectRatio"] = "1.0";
+    layoutOptions["elk.layered.wrapping.strategy"] = "MULTI_EDGE";
+    layoutOptions["elk.spacing.componentComponent"] = String(nodeSpacing);
+    layoutOptions["elk.layered.wrapping.additionalEdgeSpacing"] = "0";
+  }
+
   return {
     id: "root",
-    layoutOptions: {
-      "elk.algorithm": "layered",
-      "elk.direction": direction,
-      "elk.spacing.nodeNode": String(nodeSpacing),
-      "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
-      // ELK's edge-routing spacing options default to values tuned for pixel-scale diagrams
-      // (roughly 10-20x our calibrated 0.25-1.0 grid), which dominates node/layer spacing on any
-      // graph with many edges unless pinned to the same scale explicitly.
-      "elk.spacing.edgeNode": String(nodeSpacing),
-      "elk.spacing.edgeEdge": String(nodeSpacing),
-      "elk.layered.spacing.edgeNodeBetweenLayers": String(layerSpacing),
-      "elk.layered.spacing.edgeEdgeBetweenLayers": String(layerSpacing),
-    },
-    children,
-    edges,
+    layoutOptions,
+    children: structure.children.map((child) => ({ ...child })),
+    edges: structure.edges.map((edge) => ({ ...edge })),
   };
+}
+
+// Whether any port/instance in this fill-mode layout already has a real, preserved position —
+// i.e. whether there's an established coordinate frame that a global re-center/rescale could
+// detach newly-computed positions from. See the guard in computeSwNetModuleLayout.
+function hasAnyExistingPositions(existing: AutoLayoutExistingPositions | undefined): boolean {
+  return existing !== undefined && (existing.ports.size > 0 || existing.instances.size > 0);
+}
+
+// Collect one ELK layout result's computed positions, keyed by node id.
+function collectPositions(laidOut: ElkNode): Map<string, IrVector2> {
+  const positionById = new Map<string, IrVector2>();
+
+  for (const child of laidOut.children ?? []) {
+    positionById.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
+  }
+
+  return positionById;
+}
+
+// Whether a layout's bounding box already exceeds [-maxExtent, +maxExtent] on either axis, used to
+// decide whether the unwrapped ELK pass needs a second, wrapped pass at all.
+function exceedsExtent(positionById: Map<string, IrVector2>, maxExtent: number): boolean {
+  const box = computeBoundingBox(positionById);
+
+  if (!box) {
+    return false;
+  }
+
+  const targetSpan = maxExtent * 2;
+  return box.maxX - box.minX > targetSpan || box.maxY - box.minY > targetSpan;
+}
+
+function computeBoundingBox(
+  positionById: Map<string, IrVector2>,
+): { minX: number; minY: number; maxX: number; maxY: number } | undefined {
+  if (positionById.size === 0) {
+    return undefined;
+  }
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const position of positionById.values()) {
+    minX = Math.min(minX, position.x);
+    minY = Math.min(minY, position.y);
+    maxX = Math.max(maxX, position.x);
+    maxY = Math.max(maxY, position.y);
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
+// A fill-mode layout with existing entries can't safely be re-centered/rescaled (see the guard in
+// computeSwNetModuleLayout), but the module may still end up bigger than maxExtent once the
+// genuinely-missing entries this call computed are combined with the preserved existing ones. Warn
+// instead of silently leaving the module oversized.
+function warnIfBoundingBoxExceedsExtent(
+  positionById: Map<string, IrVector2>,
+  maxExtent: number,
+  warnings: string[],
+): void {
+  const box = computeBoundingBox(positionById);
+
+  if (!box || maxExtent <= 0) {
+    return;
+  }
+
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  const targetSpan = maxExtent * 2;
+
+  if (width > targetSpan || height > targetSpan) {
+    warnings.push(
+      `Newly computed positions span ${width.toFixed(2)}x${height.toFixed(2)}, exceeding the ±${maxExtent} target ` +
+        `area; left unscaled because this module keeps existing hand-placed positions, and rescaling only the new ` +
+        `ones would detach them from the preserved layout. Re-run with --force/--regenerate to fully regenerate ` +
+        `within ±${maxExtent}.`,
+    );
+  }
+}
+
+// Re-center a freshly computed layout on the origin and, if its bounding box still exceeds
+// [-maxExtent, +maxExtent] on either axis, scale that axis down (independently, since this is a
+// schematic grid layout rather than a proportionally-drawn diagram) so it fits. This is a
+// best-effort safety net on top of buildElkGraph's aspect-ratio wrapping: wrapping keeps a long
+// chain from widening (or a tall stack of layers from heightening) unboundedly by folding it toward
+// a square, but it only cuts along the layering axis — it can't help a graph that's wide because a
+// single layer has many parallel nodes, and even squared, a large enough graph can still exceed
+// maxExtent. Heavy compression from this fallback can visually overlap densely-packed nodes, hence
+// the warning below. Only safe to call when there's no existing frame to detach from — see the
+// guard in computeSwNetModuleLayout. Mutates `positionById` in place.
+function fitPositionsWithinExtent(positionById: Map<string, IrVector2>, maxExtent: number, warnings: string[]): void {
+  const box = computeBoundingBox(positionById);
+
+  if (!box || maxExtent <= 0) {
+    return;
+  }
+
+  const { minX, minY, maxX, maxY } = box;
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const targetSpan = maxExtent * 2;
+  const scaleX = width > targetSpan ? targetSpan / width : 1;
+  const scaleY = height > targetSpan ? targetSpan / height : 1;
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  if (scaleX === 1 && scaleY === 1 && centerX === 0 && centerY === 0) {
+    return;
+  }
+
+  for (const [id, position] of positionById) {
+    positionById.set(id, {
+      x: (position.x - centerX) * scaleX,
+      y: (position.y - centerY) * scaleY,
+    });
+  }
+
+  if (scaleX < 1 || scaleY < 1) {
+    warnings.push(
+      `Computed layout bounding box (${width.toFixed(2)}x${height.toFixed(2)}) exceeded the ±${maxExtent} target ` +
+        `area; scaled down (x${scaleX.toFixed(3)}, y${scaleY.toFixed(3)}) to fit, which may compress spacing.`,
+    );
+  }
 }
 
 // Snap one computed coordinate to the requested grid unit; a non-positive grid size disables snapping.
