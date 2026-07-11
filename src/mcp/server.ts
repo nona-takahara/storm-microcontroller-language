@@ -6,11 +6,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 import {
+  applyProjectSourceLayoutOverrides,
   buildGateSpec,
   buildSpecOverview,
   buildStormworksXmlFromProjectSource,
+  computeProjectLayoutOverrides,
   createFileSystemProjectSourceDocumentLoader,
-  ensureProjectLayoutIsComplete,
+  createLayoutOverridingDocumentLoader,
   formatGateSpecListText,
   formatGateSpecText,
   formatSpecOverviewText,
@@ -66,7 +68,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "dsl_to_xml",
       description:
-        "Convert the DSL file set (project.json + .sw-net + .sw-mcl) into Stormworks microcontroller XML.",
+        "Convert the DSL file set (project.json + .sw-net + .sw-mcl) into Stormworks microcontroller XML. Any module with a missing or incomplete .sw-mcl gets ELK auto-layout computed in memory for this conversion only; no .sw-mcl file is created or modified on disk (use layout_dsl to persist a layout).",
       inputSchema: {
         type: "object",
         properties: {
@@ -246,7 +248,7 @@ async function handleXmlToDsl(args: { xml_path: string; out_dir: string }) {
 }
 
 async function handleDslToXml(args: { project_json_path: string; out_path?: string }) {
-  const layoutResult = await ensureProjectLayoutIsComplete(args.project_json_path);
+  const layoutResult = await computeProjectLayoutOverrides(args.project_json_path);
   const loadResult = await loadProjectSourceFromProjectJsonFile(args.project_json_path);
   const diagnostics = [...loadResult.diagnostics];
 
@@ -254,10 +256,14 @@ async function handleDslToXml(args: { project_json_path: string; out_path?: stri
     return errorResult(`Failed to load DSL.\n${formatDiagnostics(diagnostics)}`);
   }
 
+  const projectSource = applyProjectSourceLayoutOverrides(loadResult.value, layoutResult.overridesByDocumentId);
   const definitions = await loadBundledNodeDefinitions();
-  const buildResult = await buildStormworksXmlFromProjectSource(loadResult.value, {
+  const buildResult = await buildStormworksXmlFromProjectSource(projectSource, {
     definitions,
-    loadImportedDocument: createFileSystemProjectSourceDocumentLoader(),
+    loadImportedDocument: createLayoutOverridingDocumentLoader(
+      createFileSystemProjectSourceDocumentLoader(),
+      layoutResult.overridesByDocumentId,
+    ),
   });
   diagnostics.push(...buildResult.diagnostics);
 

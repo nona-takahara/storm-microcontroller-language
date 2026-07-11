@@ -59,9 +59,13 @@ export interface StormworksSourceDocument {
   swNet: SwNetDocument;
   swMcl: StormworksSwMclDocument;
   scripts: Record<string, string>;
-  // "generated" means no .sw-mcl file existed on disk and swMcl is a placeholder stub; undefined/"file"
-  // means swMcl reflects real (possibly hand-authored) layout data. Only file loaders set this.
-  swMclOrigin?: "file" | "generated";
+  // "generated" means no .sw-mcl file existed on disk and swMcl is a placeholder stub (treated as "no
+  // layout data" by buildSwMclByDocumentPath below); "computed" means an implicit auto-layout pass
+  // filled the module in memory for this export only (see computeProjectLayoutOverrides in
+  // layout-dsl-runner.ts) and should be treated as real layout data even though nothing was written
+  // back to disk; undefined/"file" means swMcl reflects real (possibly hand-authored) layout data read
+  // from disk. Only file loaders and applyLayoutOverride set this.
+  swMclOrigin?: "file" | "generated" | "computed";
 }
 
 export interface StormworksProjectSource {
@@ -1193,8 +1197,10 @@ function compareSourceDocuments(left: StormworksSourceDocument, right: Stormwork
 
 // Give the XML tree exporter access to every resolved document's own sw-mcl, keyed by document path,
 // so `use` statements that pull in a module from another document can resolve its layout too.
-// Documents whose sw-mcl was auto-generated (no real file on disk) are omitted so the exporter treats
-// them as "no layout data" and falls back to its existing degraded shared-anchor placement.
+// Documents whose sw-mcl was auto-generated (no real file on disk, and no in-memory auto-layout
+// override applied either) are omitted so the exporter treats them as "no layout data" and falls back
+// to its existing degraded shared-anchor placement. "computed" documents (an override was applied) are
+// kept, same as "file", since they carry real (if not persisted) layout data.
 function buildSwMclByDocumentPath(documents: StormworksSourceDocument[]): Map<string, StormworksSwMclDocument> {
   return new Map(
     documents
