@@ -102,12 +102,6 @@
         "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "sym*(アイコン)はマイコン全体(プロジェクト)に紐づく情報であり、個々のピン(このゲート自体)には関連しない。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/project.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "boolean_out": {
@@ -119,12 +113,6 @@
         "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "sym*(アイコン)はマイコン全体(プロジェクト)に紐づく情報であり、個々のピン(このゲート自体)には関連しない。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/project.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "CAPACITOR": {
@@ -173,12 +161,6 @@
         "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "sym*(アイコン)はマイコン全体(プロジェクト)に紐づく情報であり、個々のピン(このゲート自体)には関連しない。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/project.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "composite_out": {
@@ -190,12 +172,6 @@
         "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "sym*(アイコン)はマイコン全体(プロジェクト)に紐づく情報であり、個々のピン(このゲート自体)には関連しない。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/project.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "COMPOSITE_READ_BOOLEAN": {
@@ -225,7 +201,7 @@
       "notes": [
         {
           "category": "channel-semantics",
-          "text": "@i属性(channel)が欠落する条件については、現行コードは既に正しい挙動になっていると思われる。ただしツール実装側の未検証の推測であり、要継続調査。",
+          "text": "@i属性(channel)が欠落する条件については、現行コードは既に正しい挙動になっていると思われる。ただしツール実装側の未検証の推測であり、要継続調査。※",
           "confidence": "unconfirmed",
           "source": "notes/gate-behavior/composite-read.md（プレイ経験に基づく記入、2026-07-09）"
         }
@@ -246,7 +222,7 @@
       "notes": [
         {
           "category": "truth-table",
-          "text": "NUM_SWITCHBOXと同様の切替挙動(switch入力でa/bを選択)と考えてよい。詳細はNUM_SWITCHBOXの記述を参照。",
+          "text": "NUM_SWITCHBOXと同様の切替挙動(switch入力でa/bを選択)である。詳細はNUM_SWITCHBOXの記述を参照。※畳み込み",
           "confidence": "inferred",
           "source": "notes/gate-behavior/composite.md（プレイ経験に基づく記入、2026-07-09）"
         }
@@ -281,7 +257,7 @@
       "notes": [
         {
           "category": "round-trip-loss",
-          "text": "書き込み先として指定しなかったピンは新たな値で上書きされないらしい(未確認)。Composite側の元の入力値がそのまま出力される。",
+          "text": "書き込み先として指定しなかったピンは新たな値で上書きされない。Composite側の元の入力値がそのまま出力される。※",
           "confidence": "unconfirmed",
           "source": "notes/gate-behavior/composite-write.md（プレイ経験に基づく記入、2026-07-09）"
         }
@@ -298,7 +274,7 @@
       "notes": [
         {
           "category": "round-trip-loss",
-          "text": "書き込み先として指定しなかったピンは新たな値で上書きされない(確認済み)。Composite側の元の入力値がそのまま出力される。",
+          "text": "書き込み先として指定しなかったピンは新たな値で上書きされない。Composite側の元の入力値がそのまま出力される。※",
           "confidence": "verified",
           "source": "notes/gate-behavior/composite-write.md（プレイ経験に基づく記入、2026-07-09）"
         }
@@ -409,7 +385,7 @@
         },
         {
           "category": "other",
-          "text": "プロパティに書く数式の変数はx(他パーツごとにy,z,w等)。定数pi/pi2。演算子 + - * / % ^。関数 sin/cos/tan/asin/acos/atan/atan2/max/min/ceil/floor/round/abs/sgn/sqrt/len/len2/lerp/clamp が使える。三角関数の入出力はラジアン。sgn(0)は0ではなく1を返す(一般的な定義と異なる)。sqrt(負数)は0を返す。角度・角速度系センサは360°を1とする[回転]単位を使うため、ラジアンに変換するには x*pi2 (度からは x*(pi/180)) の換算が必要。単位換算定数として m/s→km/h(*3.6)、m/s→mph(*2.236936)、m/s→knot(*1.943844)なども使える。",
+          "text": "変数はx。定数pi/pi2。演算子 + - * / % ^。関数 sin/cos/tan/asin/acos/atan/atan2/max/min/ceil/floor/round/abs/sgn/sqrt/len/len2/lerp/clamp が使える。三角関数の入出力はラジアン。sgn(0)は0ではなく1を返す(一般的な定義と異なる)。sqrt(負数)は0を返す。",
           "confidence": "verified",
           "source": "Stormworks 日本語Wikiからの転載（ユーザー提供、原文の体裁は未整形）"
         }
@@ -802,14 +778,8 @@
           "source": "notes/gate-behavior/logic-flip-flop.md（プレイ経験に基づく記入、2026-07-09）"
         },
         {
-          "category": "priority",
-          "text": "Set/Resetが同時に真になった場合、Q=falseになる(NOR型SRラッチの挙動)。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/logic-flip-flop.md（実機動作確認、2026-07-09）"
-        },
-        {
           "category": "edge-case",
-          "text": "SR_LATCHには q(Q) と not_q(not Q) の2つの出力ポートがある。S=R=trueのとき、Q=falseだけでなくnot_Qもfalseになる(=not_Qは¬Qと一致しなくなり、通常の相補関係が崩れる)。",
+          "text": "SR_LATCHには q(Q) と not_q(not Q) の2つの出力ポートがある。S=R=trueのとき、Q=falseになり、not_Qもfalseになる(=not_Qは¬Qと一致しなくなり、通常の相補関係が崩れる)。",
           "confidence": "inferred",
           "source": "notes/gate-behavior/logic-flip-flop.md（記憶に基づく記述、要再確認、2026-07-09）"
         }
@@ -838,7 +808,7 @@
       "notes": [
         {
           "category": "other",
-          "text": "min/maxの値を揃えると、epsilon無しのEQUALとして機能する。この用途でよく使われる。",
+          "text": "min/maxの値を揃えると、epsilon無しのEQUALとして機能する。",
           "confidence": "verified",
           "source": "notes/gate-behavior/comparison.md（プレイ経験に基づく記入、2026-07-09）"
         }
@@ -854,12 +824,6 @@
         "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "普段使わないため未調査。既知の情報なし。",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "TIMER_RTO": {
@@ -872,12 +836,6 @@
         "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "普段使わないため未調査。既知の情報なし。",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "TIMER_TOF": {
@@ -890,12 +848,6 @@
         "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "普段使わないため未調査。既知の情報なし。",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "TIMER_TON": {
@@ -908,12 +860,6 @@
         "interval/charge_time等の時間パラメータの単位（秒かtickか）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "普段使わないため未調査。既知の情報なし。",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "TOGGLE": {
@@ -972,12 +918,6 @@
         "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "sym*(アイコン)はマイコン全体(プロジェクト)に紐づく情報であり、個々のピン(このゲート自体)には関連しない。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/project.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "video_out": {
@@ -989,12 +929,6 @@
         "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
       ],
       "notes": [
-        {
-          "category": "other",
-          "text": "sym*(アイコン)はマイコン全体(プロジェクト)に紐づく情報であり、個々のピン(このゲート自体)には関連しない。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/project.md（プレイ経験に基づく記入、2026-07-09）"
-        }
       ]
     },
     "VIDEO_SWITCHBOX": {
@@ -1006,7 +940,9 @@
         "switch入力による切替の対応（aとbどちらが出力されるか）",
         "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
       ],
-      "notes": []
+      "notes": [
+        "※ほかのSWITCHBOXと同じ挙動"
+      ]
     },
     "XOR": {
       "displayName": "XOR",
