@@ -295,18 +295,11 @@
     "EQUAL": {
       "displayName": "Equal",
       "category": "arithmetic",
-      "status": "done",
+      "status": "todo",
       "relatedIssues": [
         11
       ],
-      "notes": [
-        {
-          "category": "serialization-omission",
-          "text": "`epsilon`'s XML representation is a `@text`/`@value` pair: `@text` is always written and is the only attribute storm-mcl reads back on import. The numeric `@value` mirror is omitted specifically when the value is exactly 0 -- not when it equals epsilon's own default (0.0001). The default 0.0001 is written explicitly, unlike xmlDelta-encoded properties such as composite channel/offset.",
-          "confidence": "verified",
-          "source": "See the property-omission logic in src/core/exporters/xml-tree.ts."
-        }
-      ]
+      "notes": []
     },
     "FUNC_NUM_1": {
       "displayName": "Function (x)",
@@ -646,12 +639,6 @@
           "category": "other",
           "text": "Setting `min` equal to `max` makes THRESHOLD behave like an exact-equality check (EQUAL without an epsilon tolerance).",
           "confidence": "verified"
-        },
-        {
-          "category": "serialization-omission",
-          "text": "`min`/`max` are `@text`/`@value` XML pairs, like COUNTER's `min`/`max`/`increment`/`reset_value`, PID's `kp`/`ki`/`kd`, and EQUAL's `epsilon`. storm-mcl always reads such properties from `@text` on import; the paired `@value` numeric attribute is write-only bookkeeping (a mirror emitted on export, dropped only when the value is exactly 0) and is never read back in.",
-          "confidence": "verified",
-          "source": "See the property-omission logic in src/core/exporters/xml-tree.ts."
         }
       ]
     },
