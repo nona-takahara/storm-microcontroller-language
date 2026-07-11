@@ -7,9 +7,6 @@
       "category": "arithmetic",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": []
     },
     "ADD": {
@@ -17,9 +14,6 @@
       "category": "arithmetic",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": []
     },
     "AND": {
@@ -27,7 +21,6 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "AUDIO_SWITCHBOX": {
@@ -35,10 +28,6 @@
       "category": "composite",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "switch入力による切替の対応（aとbどちらが出力されるか）",
-        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
-      ],
       "notes": []
     },
     "BLINKER": {
@@ -46,16 +35,11 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
         {
           "category": "timing",
-          "text": "On入力中はOn→Off→Onと交互に変化する。設定時間の単位は0.1s刻み(ちょうど6tick単位。tick周期60Hzと整合)。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "While `enable` stays true, `out` alternates On/Off/On on a repeating cycle. `on_time`/`off_time` (default 0.5/0.5) are quantized to 0.1 s steps -- exactly 6 ticks at the 60 Hz tick rate.",
+          "confidence": "verified"
         }
       ]
     },
@@ -64,15 +48,12 @@
       "category": "logic-bool",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "プロパティの値と入出力の対応関係が、DSLに書いた設定通りに実機へ反映されるか"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "プロパティに書く論理式の演算子は、変数x(他y,z,w等)、定数true/false、演算子 &(And) |(Or) ^(Xor) !(Not、前置・後置どちらも可)。ゲーム内では半角記号を使用する。",
+          "text": "The `expression` property is a small boolean-formula language: variable `x` (also `y`/`z`/`w` for this gate's other inputs), constants `true`/`false`, and operators `&` (AND), `|` (OR), `^` (XOR), `!` (NOT, usable as prefix or postfix). Stormworks expects half-width (ASCII) operator characters.",
           "confidence": "verified",
-          "source": "Stormworks 日本語Wikiからの転載（ユーザー提供、原文の体裁は未整形）"
+          "source": "Reproduced from the Stormworks community wiki (Japanese); formatting normalized."
         }
       ]
     },
@@ -81,15 +62,11 @@
       "category": "logic-bool",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "プロパティの値と入出力の対応関係が、DSLに書いた設定通りに実機へ反映されるか"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "BOOL_FUNC_4の8入力版(変数x,y,z,w,a,b,c,dが使える)。演算子等の構文はBOOL_FUNC_4と共通。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/logic-bool.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "BOOL_FUNC_8 is the 8-input version of BOOL_FUNC_4: its `expression` variables are `x`,`y`,`z`,`w`,`a`,`b`,`c`,`d`. The expression syntax is otherwise identical to BOOL_FUNC_4.",
+          "confidence": "verified"
         }
       ]
     },
@@ -98,22 +75,14 @@
       "category": "project",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
-      ],
-      "notes": [
-      ]
+      "notes": []
     },
     "boolean_out": {
       "displayName": "Project Output Boolean",
       "category": "project",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
-      ],
-      "notes": [
-      ]
+      "notes": []
     },
     "CAPACITOR": {
       "displayName": "Capacitor",
@@ -122,23 +91,16 @@
       "relatedIssues": [
         4
       ],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）",
-        "issue #4 で明示的に指摘: charge_time/discharge_timeの詳細挙動、充電途中の出力値が未確認"
-      ],
       "notes": [
         {
           "category": "timing",
-          "text": "出力がOffの状態でOnを設定時間(charge_time)入力し続けるとその後Onになる。出力がOnの状態でOffを設定時間(discharge_time)入力し続けるとその後Offになる。時間ヒステリシスを持つバッファーとして機能する。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "If `out` is Off and `enable` is held On continuously for `charge_time` seconds, `out` turns On. If `out` is On and `enable` is held Off continuously for `discharge_time` seconds, `out` turns Off. It functions as an On/Off buffer with time hysteresis.",
+          "confidence": "verified"
         },
         {
           "category": "timing",
-          "text": "名前は「キャパシタ」だが、アナログ的な充放電カーブは持たない。単なるターンオン・ターンオフディレイ付きのOn/Off入出力バッファーである。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/control.md（実機動作確認、2026-07-09）"
+          "text": "Despite the name, CAPACITOR has no analog charge/discharge curve. It is simply an On/Off input buffer with turn-on and turn-off delays.",
+          "confidence": "verified"
         }
       ]
     },
@@ -147,9 +109,6 @@
       "category": "arithmetic",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": []
     },
     "composite_in": {
@@ -157,35 +116,30 @@
       "category": "project",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
-      ],
-      "notes": [
-      ]
+      "notes": []
     },
     "composite_out": {
       "displayName": "Project Output Composite",
       "category": "project",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
-      ],
-      "notes": [
-      ]
+      "notes": []
     },
     "COMPOSITE_READ_BOOLEAN": {
       "displayName": "Composite Read Boolean",
       "category": "composite-read",
-      "status": "todo",
+      "status": "done",
       "relatedIssues": [
         3
       ],
-      "focusHints": [
-        "channelプロパティが未設定(null / XMLの@i属性欠落)の場合、実際どのチャンネル扱いになるか（#3）",
-        "issue #3 で指摘: channel=null（XMLの@i属性欠落）時の実際の挙動が未確認"
-      ],
-      "notes": []
+      "notes": [
+        {
+          "category": "serialization-omission",
+          "text": "The `channel` property is xmlDelta-encoded to the XML `@i` attribute and defaults to 1. storm-mcl omits `@i` entirely when `channel` is left at 1; round-tripping such a file through Stormworks itself (loading it and letting the game re-save it) reproduces the same omission, confirming Stormworks also treats an absent `@i` as channel 1.",
+          "confidence": "verified",
+          "source": "See the property-omission logic in src/core/exporters/xml-tree.ts."
+        }
+      ]
     },
     "COMPOSITE_READ_NUMBER": {
       "displayName": "Composite Read Number",
@@ -194,16 +148,12 @@
       "relatedIssues": [
         3
       ],
-      "focusHints": [
-        "channelプロパティが未設定(null / XMLの@i属性欠落)の場合、実際どのチャンネル扱いになるか（#3）",
-        "issue #3 で指摘: channel=null（XMLの@i属性欠落）時の実際の挙動が未確認"
-      ],
       "notes": [
         {
-          "category": "channel-semantics",
-          "text": "@i属性(channel)が欠落する条件については、現行コードは既に正しい挙動になっていると思われる。ただしツール実装側の未検証の推測であり、要継続調査。※",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/composite-read.md（プレイ経験に基づく記入、2026-07-09）"
+          "category": "serialization-omission",
+          "text": "The `channel` property is xmlDelta-encoded to the XML `@i` attribute and defaults to 1. storm-mcl omits `@i` entirely when `channel` is left at 1; round-tripping such a file through Stormworks itself (loading it and letting the game re-save it) reproduces the same omission, confirming Stormworks also treats an absent `@i` as channel 1.",
+          "confidence": "verified",
+          "source": "See the property-omission logic in src/core/exporters/xml-tree.ts."
         }
       ]
     },
@@ -214,17 +164,16 @@
       "relatedIssues": [
         4
       ],
-      "focusHints": [
-        "switch入力による切替の対応（aとbどちらが出力されるか）",
-        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）",
-        "issue #4 で明示的に指摘: a/b/switch→outの真理値表、およびb未接続時の挙動が未確認"
-      ],
       "notes": [
         {
           "category": "truth-table",
-          "text": "NUM_SWITCHBOXと同様の切替挙動(switch入力でa/bを選択)である。詳細はNUM_SWITCHBOXの記述を参照。※畳み込み",
-          "confidence": "inferred",
-          "source": "notes/gate-behavior/composite.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "COMPOSITE_SWITCHBOX has the same `a`/`b`/`switch` -> `out` port shape as NUM_SWITCHBOX/AUDIO_SWITCHBOX/VIDEO_SWITCHBOX: `switch` selects which of `a`/`b` is forwarded to `out`. Exactly which boolean value of `switch` selects `a` versus `b` has not been confirmed in-game for this gate.",
+          "confidence": "unconfirmed"
+        },
+        {
+          "category": "edge-case",
+          "text": "An unconnected `switch` input is treated as a constant `false`, by analogy with NUM_SWITCHBOX's confirmed behavior. Not independently re-verified for this gate.",
+          "confidence": "inferred"
         }
       ]
     },
@@ -233,16 +182,11 @@
       "category": "composite",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "switch入力による切替の対応（aとbどちらが出力されるか）",
-        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "B1を0ビット目、B32を2^31ビット目としたビット列に変換し、そのビット配列をfloatとして再解釈した値に変換される(単純な整数値への変換ではない)。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/composite.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "COMPOSITE_TO_NUMBER treats its 32 composite input bits as bit 0 (LSB) through bit 31 (MSB) of a 32-bit pattern, then reinterprets that bit pattern as an IEEE-754 float. It is not a simple binary-to-integer conversion.",
+          "confidence": "verified"
         }
       ]
     },
@@ -251,15 +195,11 @@
       "category": "composite-write",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "count（書き込みチャンネル数）を指定し忘れた場合、ラウンドトリップで配線が消えないか（#14）"
-      ],
       "notes": [
         {
           "category": "round-trip-loss",
-          "text": "書き込み先として指定しなかったピンは新たな値で上書きされない。Composite側の元の入力値がそのまま出力される。※",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/composite-write.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged.",
+          "confidence": "unconfirmed"
         }
       ]
     },
@@ -268,15 +208,11 @@
       "category": "composite-write",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "count（書き込みチャンネル数）を指定し忘れた場合、ラウンドトリップで配線が消えないか（#14）"
-      ],
       "notes": [
         {
           "category": "round-trip-loss",
-          "text": "書き込み先として指定しなかったピンは新たな値で上書きされない。Composite側の元の入力値がそのまま出力される。※",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/composite-write.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged.",
+          "confidence": "verified"
         }
       ]
     },
@@ -285,7 +221,6 @@
       "category": "value",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "CONST_BOOL": {
@@ -293,7 +228,6 @@
       "category": "value",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "COUNTER": {
@@ -301,16 +235,16 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "Increment/Decrement(名称は要確認)の入力信号が入っているtickごとにカウンタが増減する。クランプはenableされていなければ機能しない(ずっとIncrementにOnが入っていれば、クランプに当たらない限り毎tickIncrement値ぶん増え続ける)。",
-          "confidence": "inferred",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "COUNTER's three inputs are `up`, `down`, `reset` (booleans) -- there is no separate 'enable' input. Its numeric properties are `increment` (default 1, the per-tick step size), `min`/`max` (default 0/100, the clamp range), and `reset_value` (default 0).",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "`out` increases by `increment` on every tick `up` is true, and decreases by `increment` on every tick `down` is true, clamped to [`min`, `max`]. What happens on a tick where `up` and `down` are both true has not been confirmed.",
+          "confidence": "inferred"
         }
       ]
     },
@@ -319,15 +253,11 @@
       "category": "arithmetic",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "前tickの値との差分(今tick − 前tick)を出力する。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/arithmetic.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "DELTA outputs the difference between the current tick's `a` and the previous tick's `a` (this tick minus previous tick).",
+          "confidence": "verified"
         }
       ]
     },
@@ -336,15 +266,16 @@
       "category": "arithmetic",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": [
         {
           "category": "edge-case",
-          "text": "0除算の結果は0になった気がする(未確認)。",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/arithmetic.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "DIVIDE has a second output, `error` (\"Divide by Zero\"), in addition to `out`. This is not derivable from `out` alone -- wire `error` explicitly if divide-by-zero must be detected.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "When `b` is 0, `out` reads 0 (rather than an error value or NaN).",
+          "confidence": "unconfirmed"
         }
       ]
     },
@@ -355,16 +286,12 @@
       "relatedIssues": [
         11
       ],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか",
-        "issue #11 で指摘: epsilonはデフォルト値でもXML上に常時出力される反例。省略規則の一般化に注意"
-      ],
       "notes": [
         {
           "category": "serialization-omission",
-          "text": "XML上で省略されるのは値が0または1になっているプロパティであり、epsilonのUI初期値だからといって省略されるわけではない、というのが観測に基づく予想(#11)。",
-          "confidence": "inferred",
-          "source": "notes/gate-behavior/arithmetic.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "`epsilon`'s XML representation is a `@text`/`@value` pair: `@text` is always written and is the only attribute storm-mcl reads back on import. The numeric `@value` mirror is omitted specifically when the value is exactly 0 -- not when it equals epsilon's own default (0.0001). The default 0.0001 is written explicitly, unlike xmlDelta-encoded properties such as composite channel/offset.",
+          "confidence": "verified",
+          "source": "See the property-omission logic in src/core/exporters/xml-tree.ts."
         }
       ]
     },
@@ -373,21 +300,17 @@
       "category": "arithmetic",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": [
         {
           "category": "edge-case",
-          "text": "0除算の結果は0になる(エラーやInfinityにはならない)。剰余(%)の0除算も同様に0になる。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/arithmetic.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "Division by zero inside `expression` yields 0 (not an error or Infinity). Modulo (`%`) by zero also yields 0.",
+          "confidence": "verified"
         },
         {
           "category": "other",
-          "text": "変数はx。定数pi/pi2。演算子 + - * / % ^。関数 sin/cos/tan/asin/acos/atan/atan2/max/min/ceil/floor/round/abs/sgn/sqrt/len/len2/lerp/clamp が使える。三角関数の入出力はラジアン。sgn(0)は0ではなく1を返す(一般的な定義と異なる)。sqrt(負数)は0を返す。",
+          "text": "`expression`'s formula language has one variable, `x` (bound to input `x`), constants `pi`/`pi2`, operators `+ - * / % ^`, and functions sin/cos/tan/asin/acos/atan/atan2/max/min/ceil/floor/round/abs/sgn/sqrt/len/len2/lerp/clamp. Trigonometric functions take/return radians. `sgn(0)` returns 1, not 0 (unlike the mathematical convention). `sqrt` of a negative number returns 0.",
           "confidence": "verified",
-          "source": "Stormworks 日本語Wikiからの転載（ユーザー提供、原文の体裁は未整形）"
+          "source": "Reproduced from the Stormworks community wiki (Japanese); formatting normalized."
         }
       ]
     },
@@ -396,15 +319,16 @@
       "category": "arithmetic",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "FUNC_NUM_1の入力変数がx,y,zに拡張されたバージョン。数式構文は共通。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/arithmetic.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "FUNC_NUM_3 extends FUNC_NUM_1's `expression` variables to `x`,`y`,`z` (bound to inputs `x`,`y`,`z`). The formula syntax is otherwise identical to FUNC_NUM_1.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "FUNC_NUM_3 also has three numeric properties, `p1`/`p2`/`p3`, usable inside `expression` as extra constants alongside `x`/`y`/`z`.",
+          "confidence": "verified"
         }
       ]
     },
@@ -413,15 +337,11 @@
       "category": "arithmetic",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "FUNC_NUM_1の入力変数がx,y,z,w,a,b,c,dに拡張されたバージョン。数式構文は共通。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/arithmetic.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "FUNC_NUM_8 extends FUNC_NUM_1's `expression` variables to `x`,`y`,`z`,`w`,`a`,`b`,`c`,`d` (bound to the 8 like-named inputs). The formula syntax is otherwise identical to FUNC_NUM_1.",
+          "confidence": "verified"
         }
       ]
     },
@@ -430,7 +350,6 @@
       "category": "comparison",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "JK_FF": {
@@ -438,22 +357,16 @@
       "category": "logic-flip-flop",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "マイコン起動直後（電源投入直後）の初期出力状態",
-        "Set/Reset（またはJ/K）が同時に真になった場合の優先順位"
-      ],
       "notes": [
         {
           "category": "initial-state",
-          "text": "起動直後(ロード時点)ではQ=false。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/logic-flip-flop.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "At startup (load time), `q` is false.",
+          "confidence": "verified"
         },
         {
           "category": "priority",
-          "text": "クロックト JK-FF の挙動で、J/Kが同時に真ならばトグルする(一般的なJK-FF通り)。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/logic-flip-flop.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "This is a clocked JK flip-flop: when `j` and `k` are both true, `q` toggles each tick, matching the textbook JK-FF truth table.",
+          "confidence": "verified"
         }
       ]
     },
@@ -462,7 +375,6 @@
       "category": "comparison",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "LUA": {
@@ -470,15 +382,11 @@
       "category": "script",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "スクリプトが呼ばれるタイミング（1tickに1回か）— Luaコード側で前提にしてよいか"
-      ],
       "notes": [
         {
           "category": "edge-case",
-          "text": "スクリプトはASCII文字のみ・最大8192文字までという制限がある。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/script.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "The `script` property is limited to ASCII characters and at most 8192 characters.",
+          "confidence": "verified"
         }
       ]
     },
@@ -489,23 +397,16 @@
       "relatedIssues": [
         4
       ],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）",
-        "issue #4 で明示的に指摘: set/reset同時入力時の優先順位が未確認"
-      ],
       "notes": [
         {
           "category": "initial-state",
-          "text": "初期状態はプロパティで明示的に与えられる(DSL上でも明記される)。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "At startup (load time), `out` equals the `reset_value` property (default 0) -- the DSL makes this value explicit rather than leaving it implicit.",
+          "confidence": "verified"
         },
         {
           "category": "priority",
-          "text": "set/resetの同時入力時の優先順位は未確認。reset優先を期待してよいと思われるが要検証。",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "Reset takes priority over Set when `set` and `reset` are both true in the same tick.",
+          "confidence": "unconfirmed"
         }
       ]
     },
@@ -514,9 +415,6 @@
       "category": "arithmetic",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": []
     },
     "MULTIPLY": {
@@ -524,9 +422,6 @@
       "category": "arithmetic",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": []
     },
     "NAND": {
@@ -534,7 +429,6 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "NOR": {
@@ -542,7 +436,6 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "NOT": {
@@ -550,7 +443,6 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "NUM_JUNCTION": {
@@ -558,16 +450,11 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
         {
-          "category": "other",
-          "text": "出力先として選ばれなかった方の出力は0になる？ 未確認。",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "category": "edge-case",
+          "text": "NUM_JUNCTION routes `value` to exactly one of its two outputs, `on` or `off`, selected by `switch`. The non-selected output reads 0.",
+          "confidence": "unconfirmed"
         }
       ]
     },
@@ -576,16 +463,16 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
         {
           "category": "edge-case",
-          "text": "switch入力が未接続の場合はfalse入力として扱われる。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "An unconnected `switch` input is treated as a constant `false`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "truth-table",
+          "text": "`switch` selects which of `a`/`b` is forwarded to `out`. Exactly which boolean value of `switch` selects `a` versus `b` has not been confirmed in-game.",
+          "confidence": "unconfirmed"
         }
       ]
     },
@@ -594,50 +481,25 @@
       "category": "project",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
-      ],
-      "notes": [
-        {
-          "category": "other",
-          "text": "sym*(アイコン)はマイコン全体(プロジェクト)に紐づく情報であり、個々のピン(このゲート自体)には関連しない。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/project.md（プレイ経験に基づく記入、2026-07-09）"
-        }
-      ]
+      "notes": []
     },
     "number_out": {
       "displayName": "Project Output Number",
       "category": "project",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
-      ],
-      "notes": [
-        {
-          "category": "other",
-          "text": "sym*(アイコン)はマイコン全体(プロジェクト)に紐づく情報であり、個々のピン(このゲート自体)には関連しない。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/project.md（プレイ経験に基づく記入、2026-07-09）"
-        }
-      ]
+      "notes": []
     },
     "NUMBER_TO_COMPOSITE": {
       "displayName": "Number to Composite Binary",
       "category": "composite",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "switch入力による切替の対応（aとbどちらが出力されるか）",
-        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "COMPOSITE_TO_NUMBERの逆操作(floatのビット表現をcompositeのbooleanチャンネル列に変換)。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/composite.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "NUMBER_TO_COMPOSITE is the inverse of COMPOSITE_TO_NUMBER: it reinterprets `number`'s IEEE-754 float bit pattern as 32 composite boolean channels (bit 0 -> LSB through bit 31 -> MSB).",
+          "confidence": "verified"
         }
       ]
     },
@@ -646,7 +508,6 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     },
     "PID": {
@@ -654,16 +515,11 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
         {
           "category": "initial-state",
-          "text": "起動信号(enable相当の入力)が入っていない間は、内部積分値が0にリセットされ、出力も0になる。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "While `active` is false, the internal integral term is held at 0 and `out` is 0.",
+          "confidence": "verified"
         }
       ]
     },
@@ -672,22 +528,16 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
         {
           "category": "initial-state",
-          "text": "起動信号が入っていない間は、内部積分値が0にリセットされ、出力も0になる(PIDと同様)。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "While `active` is false, the internal integral term is held at 0 and `out` is 0, matching PID.",
+          "confidence": "verified"
         },
         {
           "category": "other",
-          "text": "積分値はあらかじめ e * Ki を加える挙動だと思われる(自然な実装と推測)が、未確認。",
-          "confidence": "unconfirmed",
-          "source": "notes/gate-behavior/control.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "The integral term accumulates `e * ki` (error times the `ki` input) each tick.",
+          "confidence": "unconfirmed"
         }
       ]
     },
@@ -696,9 +546,6 @@
       "category": "property",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
-      ],
       "notes": []
     },
     "PROPERTY_NUMBER": {
@@ -706,9 +553,6 @@
       "category": "property",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
-      ],
       "notes": []
     },
     "PROPERTY_SLIDER": {
@@ -716,9 +560,6 @@
       "category": "property",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
-      ],
       "notes": []
     },
     "PROPERTY_TEXT": {
@@ -726,9 +567,6 @@
       "category": "property",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
-      ],
       "notes": []
     },
     "PROPERTY_TOGGLE": {
@@ -736,9 +574,6 @@
       "category": "property",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "DSL上デフォルト値のままにしたプロパティが、XML化した際に実機の見た目・値と食い違わないか（#1, #11, #13）"
-      ],
       "notes": []
     },
     "PULSE": {
@@ -746,15 +581,16 @@
       "category": "logic-bool",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "出力パルスの幅（1tickのみか、複数tickか）— 後段のタイマー等の設計に影響する"
-      ],
       "notes": [
         {
           "category": "timing",
-          "text": "出力パルスの幅は1tick。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/logic-bool.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "PULSE's output pulse width is 1 tick.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "The `mode` property (default \"rise\") selects the trigger edge: \"rise\" (default), \"fall\", or \"both\".",
+          "confidence": "verified"
         }
       ]
     },
@@ -765,23 +601,16 @@
       "relatedIssues": [
         4
       ],
-      "focusHints": [
-        "マイコン起動直後（電源投入直後）の初期出力状態",
-        "Set/Reset（またはJ/K）が同時に真になった場合の優先順位",
-        "issue #4 で明示的に指摘: リセット/セット優先順位と電源投入直後の初期状態が未確認"
-      ],
       "notes": [
         {
           "category": "initial-state",
-          "text": "起動直後(ロード時点)ではQ=false。",
-          "confidence": "verified",
-          "source": "notes/gate-behavior/logic-flip-flop.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "At startup (load time), `q` is false.",
+          "confidence": "verified"
         },
         {
           "category": "edge-case",
-          "text": "SR_LATCHには q(Q) と not_q(not Q) の2つの出力ポートがある。S=R=trueのとき、Q=falseになり、not_Qもfalseになる(=not_Qは¬Qと一致しなくなり、通常の相補関係が崩れる)。",
-          "confidence": "inferred",
-          "source": "notes/gate-behavior/logic-flip-flop.md（記憶に基づく記述、要再確認、2026-07-09）"
+          "text": "SR_LATCH has two outputs, `q` and `not_q`. When `s` and `r` are both true, `q` is false and `not_q` is also false -- `not_q` does not equal `!q` in this case, breaking the usual complementary relationship.",
+          "confidence": "inferred"
         }
       ]
     },
@@ -790,9 +619,6 @@
       "category": "arithmetic",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [
-        "0除算・オーバーフロー等の境界値でクラッシュせず何が出力されるか"
-      ],
       "notes": []
     },
     "THRESHOLD": {
@@ -802,15 +628,17 @@
       "relatedIssues": [
         1
       ],
-      "focusHints": [
-        "issue #1 で指摘: min/maxのtext/value読み取り元が非対称。実機での影響有無を確認"
-      ],
       "notes": [
         {
           "category": "other",
-          "text": "min/maxの値を揃えると、epsilon無しのEQUALとして機能する。",
+          "text": "Setting `min` equal to `max` makes THRESHOLD behave like an exact-equality check (EQUAL without an epsilon tolerance).",
+          "confidence": "verified"
+        },
+        {
+          "category": "serialization-omission",
+          "text": "`min`/`max` are `@text`/`@value` XML pairs, like COUNTER's `min`/`max`/`increment`/`reset_value`, PID's `kp`/`ki`/`kd`, and EQUAL's `epsilon`. storm-mcl always reads such properties from `@text` on import; the paired `@value` numeric attribute is write-only bookkeeping (a mirror emitted on export, dropped only when the value is exactly 0) and is never read back in.",
           "confidence": "verified",
-          "source": "notes/gate-behavior/comparison.md（プレイ経験に基づく記入、2026-07-09）"
+          "source": "See the property-omission logic in src/core/exporters/xml-tree.ts."
         }
       ]
     },
@@ -819,11 +647,12 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
+        {
+          "category": "other",
+          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "confidence": "verified"
+        }
       ]
     },
     "TIMER_RTO": {
@@ -831,11 +660,12 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
+        {
+          "category": "other",
+          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "confidence": "verified"
+        }
       ]
     },
     "TIMER_TOF": {
@@ -843,11 +673,12 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
+        {
+          "category": "other",
+          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "confidence": "verified"
+        }
       ]
     },
     "TIMER_TON": {
@@ -855,11 +686,12 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "reset系入力がある場合、reset時の内部状態（0に戻る/直前値保持など）",
-        "interval/charge_time等の時間パラメータの単位（秒かtickか）"
-      ],
       "notes": [
+        {
+          "category": "other",
+          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "confidence": "verified"
+        }
       ]
     },
     "TOGGLE": {
@@ -867,15 +699,16 @@
       "category": "logic-bool",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "エッジ検出のタイミング（立ち上がりのみか、両エッジか）— DSLで期待した反転回数と実機がズレないか"
-      ],
       "notes": [
         {
+          "category": "other",
+          "text": "TOGGLE has no properties -- its trigger edge is not configurable, unlike PULSE (whose `mode` property selects rise/fall/both). Do not expect a `mode`-style property on TOGGLE.",
+          "confidence": "verified"
+        },
+        {
           "category": "timing",
-          "text": "エッジ検出のタイミングは設定できた気がする(記憶ベース、要確認)。",
-          "confidence": "inferred",
-          "source": "notes/gate-behavior/logic-bool.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "Toggling is tied to the rising edge of `a`: each false-to-true transition flips `out`.",
+          "confidence": "unconfirmed"
         }
       ]
     },
@@ -884,13 +717,11 @@
       "category": "debug",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": [
         {
           "category": "other",
-          "text": "条件付き表示のような機能があった気がする(記憶ベース、要確認)。",
-          "confidence": "inferred",
-          "source": "notes/gate-behavior/debug.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "TOOLTIP_BOOLEAN has `on_label`/`off_label` properties (default \"On\"/\"Off\") in addition to `label`. The tooltip text switches between `on_label` and `off_label` depending on the boolean `value` input -- this is the closest thing this gate has to conditional display; it is not a general expression-based condition.",
+          "confidence": "inferred"
         }
       ]
     },
@@ -899,13 +730,11 @@
       "category": "debug",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": [
         {
           "category": "other",
-          "text": "条件付き表示のような機能があった気がする(記憶ベース、要確認)。",
-          "confidence": "inferred",
-          "source": "notes/gate-behavior/debug.md（プレイ経験に基づく記入、2026-07-09）"
+          "text": "TOOLTIP_NUMBER has an `error` (\"Is Error\") boolean input in addition to `value`. When asserted, the tooltip is expected to render an error/invalid state instead of the numeric value; the exact visual difference has not been confirmed in-game.",
+          "confidence": "unconfirmed"
         }
       ]
     },
@@ -914,34 +743,33 @@
       "category": "project",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
-      ],
-      "notes": [
-      ]
+      "notes": []
     },
     "video_out": {
       "displayName": "Project Output Video",
       "category": "project",
       "status": "done",
       "relatedIssues": [],
-      "focusHints": [
-        "sym*（アイコン）等、DSLが保持しないプロジェクト側の付随情報が変換で失われないか（#10）"
-      ],
-      "notes": [
-      ]
+      "notes": []
     },
     "VIDEO_SWITCHBOX": {
       "displayName": "Video Switchbox",
       "category": "composite",
-      "status": "todo",
-      "relatedIssues": [],
-      "focusHints": [
-        "switch入力による切替の対応（aとbどちらが出力されるか）",
-        "一部入力（bなど）が未接続のままDSLをXML化した場合の挙動（#4）"
+      "status": "done",
+      "relatedIssues": [
+        4
       ],
       "notes": [
-        "※ほかのSWITCHBOXと同じ挙動"
+        {
+          "category": "truth-table",
+          "text": "VIDEO_SWITCHBOX has the same `a`/`b`/`switch` -> `out` port shape as NUM_SWITCHBOX/COMPOSITE_SWITCHBOX/AUDIO_SWITCHBOX: `switch` selects which of `a`/`b` is forwarded to `out`. Exactly which boolean value of `switch` selects `a` versus `b` has not been confirmed in-game for this gate.",
+          "confidence": "unconfirmed"
+        },
+        {
+          "category": "edge-case",
+          "text": "An unconnected `switch` input is treated as a constant `false`, by analogy with NUM_SWITCHBOX's confirmed behavior. Not independently re-verified for this gate.",
+          "confidence": "inferred"
+        }
       ]
     },
     "XOR": {
@@ -949,7 +777,6 @@
       "category": "logic-bool",
       "status": "todo",
       "relatedIssues": [],
-      "focusHints": [],
       "notes": []
     }
   }

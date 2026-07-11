@@ -57,7 +57,6 @@ export interface GateSpec {
   properties: GateSpecProperty[];
   notes: BehaviorNote[];
   status: BehaviorNoteStatus;
-  focusHints: string[];
   relatedIssues: number[];
   usageExample: string;
 }
@@ -108,7 +107,6 @@ export function buildGateSpec(
     properties,
     notes: behaviorEntry?.notes ?? [],
     status: behaviorEntry?.status ?? "todo",
-    focusHints: behaviorEntry?.focusHints ?? [],
     relatedIssues: behaviorEntry?.relatedIssues ?? [],
     usageExample: buildUsageExample(
       definition.id,
@@ -248,15 +246,6 @@ export function formatGateSpecText(spec: GateSpec): string {
     lines.push("  No documented behavior notes for this gate yet. This does not mean it behaves");
     lines.push('  exactly as a "textbook" gate would -- it means nobody has recorded a note for it.');
     lines.push("  If precise behavior matters for your task, verify in-game rather than assuming.");
-
-    if (spec.focusHints.length > 0) {
-      lines.push("");
-      lines.push("  Open questions nobody has confirmed yet (worth checking if precise behavior matters):");
-
-      for (const hint of spec.focusHints) {
-        lines.push(`    - ${hint}`);
-      }
-    }
   } else {
     for (const note of spec.notes) {
       lines.push(formatNoteLine(note));

@@ -27,7 +27,6 @@ export interface GateBehaviorEntry {
   category: string;
   status: BehaviorNoteStatus;
   relatedIssues: number[];
-  focusHints: string[];
   notes: BehaviorNote[];
 }
 
@@ -41,7 +40,6 @@ export interface SystemTopicEntry {
   title: string;
   status: BehaviorNoteStatus;
   relatedIssues: number[];
-  focusHints: string[];
   notes: BehaviorNote[];
 }
 
@@ -105,9 +103,6 @@ function parseGateBehaviorEntry(input: unknown, path: string): GateBehaviorEntry
     relatedIssues: expectArray(record.relatedIssues, `${path}.relatedIssues`).map((value, index) =>
       expectInteger(value, `${path}.relatedIssues[${index}]`),
     ),
-    focusHints: expectArray(record.focusHints, `${path}.focusHints`).map((value, index) =>
-      expectString(value, `${path}.focusHints[${index}]`),
-    ),
     notes: expectArray(record.notes, `${path}.notes`).map((value, index) => parseBehaviorNote(value, `${path}.notes[${index}]`)),
   };
 }
@@ -120,9 +115,6 @@ function parseSystemTopicEntry(input: unknown, path: string): SystemTopicEntry {
     status: parseStatus(record.status, `${path}.status`),
     relatedIssues: expectArray(record.relatedIssues, `${path}.relatedIssues`).map((value, index) =>
       expectInteger(value, `${path}.relatedIssues[${index}]`),
-    ),
-    focusHints: expectArray(record.focusHints, `${path}.focusHints`).map((value, index) =>
-      expectString(value, `${path}.focusHints[${index}]`),
     ),
     notes: expectArray(record.notes, `${path}.notes`).map((value, index) => parseBehaviorNote(value, `${path}.notes[${index}]`)),
   };
