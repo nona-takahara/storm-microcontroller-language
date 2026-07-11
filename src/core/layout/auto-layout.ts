@@ -103,10 +103,10 @@ export async function computeSwNetModuleLayout(
   const elk = new ElkConstructor();
   const maxExtent = options.maxExtent ?? DEFAULT_MAX_EXTENT;
 
-  // Try the plain (unwrapped) layout first: wrapping's own row-to-row spacing comes out several
-  // times larger than our calibrated grid regardless of which spacing option we pin (an ELK
-  // wrapping quirk — see buildElkGraph), so it's only worth paying for graphs that actually need
-  // wrapping to fit ±maxExtent. Most modules don't.
+  // Try the plain (unwrapped) layout first: wrapping's own row-to-row spacing still comes out
+  // several times larger than nodeSpacing even with every spacing option pinned (an ELK wrapping
+  // quirk — see buildElkGraph), so it's only worth paying for graphs that actually need wrapping to
+  // fit ±maxExtent. Most modules don't.
   let rawPositionById = collectPositions(await elk.layout(buildElkGraph(structure, options, false)));
 
   if (exceedsExtent(rawPositionById, maxExtent)) {
@@ -430,13 +430,20 @@ function buildElkGraph(structure: ElkGraphStructure, options: AutoLayoutOptions,
     "elk.direction": direction,
     "elk.spacing.nodeNode": String(nodeSpacing),
     "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
-    // ELK's edge-routing spacing options default to values tuned for pixel-scale diagrams
-    // (roughly 10-20x our calibrated 0.25-1.0 grid), which dominates node/layer spacing on any
-    // graph with many edges unless pinned to the same scale explicitly.
-    "elk.spacing.edgeNode": String(nodeSpacing),
-    "elk.spacing.edgeEdge": String(nodeSpacing),
-    "elk.layered.spacing.edgeNodeBetweenLayers": String(layerSpacing),
-    "elk.layered.spacing.edgeEdgeBetweenLayers": String(layerSpacing),
+    // These edge-routing spacing options reserve room so rendered edges stay visually distinct from
+    // each other and from unrelated nodes — meaningless here, since we only ever read back node
+    // positions (collectPositions), never ELK's edge bend points, and Stormworks' own in-game wires
+    // cross and overlap freely with no visual penalty. Left at ELK's pixel-scale defaults (10, vs.
+    // our calibrated 0.25-1.0 grid), they don't just widen the local area around a busy node: ELK
+    // places each layer boundary at one shared x (or y), so a single densely-wired connection (e.g.
+    // a boundary port with hundreds of edges) inflates the gap for every node on that boundary, not
+    // just the busy one — reported as unrelated low-degree blocks getting pushed far apart. Zeroing
+    // these collapses every layer boundary back to nodeNode/layerSpacing's own pitch regardless of
+    // how many edges cross it.
+    "elk.spacing.edgeNode": "0",
+    "elk.spacing.edgeEdge": "0",
+    "elk.layered.spacing.edgeNodeBetweenLayers": "0",
+    "elk.layered.spacing.edgeEdgeBetweenLayers": "0",
     // A gate reading its own output (a supported self-feedback pattern in this DSL) is a self-loop
     // edge in ELK's graph; this defaults to 10 like the other spacing options above and isn't
     // exercised by any of our test graphs, but pin it too rather than leave a gap in the audit.
@@ -447,17 +454,13 @@ function buildElkGraph(structure: ElkGraphStructure, options: AutoLayoutOptions,
     // Without wrapping, a long chain of instances grows the layer axis unboundedly with graph
     // size. Wrapping folds long chains back on themselves toward a roughly square bounding box.
     // ELK treats each wrapped chunk like a separate weakly-connected component and packs them
-    // using elk.spacing.componentComponent, and spaces wrapped edges via
-    // elk.layered.wrapping.additionalEdgeSpacing — both default to a pixel-diagram scale (~20),
-    // which (unpinned) blew up a 300-node chain from width 375/height 0 to width 14/height 587 in
-    // testing. Pinning both to our calibrated grid scale shrinks that blowup a lot, but the gap
-    // between wrapped rows still comes out several times larger than nodeSpacing regardless (an
-    // ELK wrapping quirk we haven't found a spacing option to fully tame) — which is why this is
-    // only turned on for graphs that actually need it, rather than unconditionally.
+    // using elk.spacing.componentComponent (real node-to-node spacing, pinned to our grid scale
+    // like nodeNode above). elk.layered.wrapping.additionalEdgeSpacing is the same kind of
+    // edge-visual-separation spacing as edgeNode/edgeEdge above — zeroed for the same reason.
     layoutOptions["elk.aspectRatio"] = "1.0";
     layoutOptions["elk.layered.wrapping.strategy"] = "MULTI_EDGE";
     layoutOptions["elk.spacing.componentComponent"] = String(nodeSpacing);
-    layoutOptions["elk.layered.wrapping.additionalEdgeSpacing"] = String(nodeSpacing);
+    layoutOptions["elk.layered.wrapping.additionalEdgeSpacing"] = "0";
   }
 
   return {
