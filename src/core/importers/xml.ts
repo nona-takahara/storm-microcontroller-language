@@ -25,6 +25,7 @@ import {
 } from "../definitions/schema.js";
 import { createInfoDiagnostic, createWarningDiagnostic, type Diagnostic } from "../diagnostics.js";
 import { coerceScalarValue } from "../shared/scalar-coercion.js";
+import { buildMicroprocessorIconFromSymValues, MICROPROCESSOR_ICON_SIZE } from "../shared/microprocessor-icon.js";
 
 export type StormworksXmlParserOptions = NonNullable<ConstructorParameters<typeof XMLParser>[0]>;
 
@@ -187,18 +188,29 @@ function extractMicroprocessorMetadata(root: unknown): IrMicroprocessorMetadata 
     return undefined;
   }
 
+  const symValuesByIndex: (number | undefined)[] = [];
+  let anySymPresent = false;
+
+  for (let symIndex = 0; symIndex < MICROPROCESSOR_ICON_SIZE; symIndex += 1) {
+    const symValue = parseNumberAttribute(microprocessorRecord, `sym${symIndex}`);
+    symValuesByIndex.push(symValue);
+    anySymPresent = anySymPresent || symValue !== undefined;
+  }
+
   const metadata: IrMicroprocessorMetadata = {
     name: getAttribute(microprocessorRecord, "name"),
     description: getAttribute(microprocessorRecord, "description"),
     width: parseNumberAttribute(microprocessorRecord, "width"),
     length: parseNumberAttribute(microprocessorRecord, "length"),
+    icon: buildMicroprocessorIconFromSymValues(symValuesByIndex),
   };
 
   if (
     metadata.name === undefined &&
     metadata.description === undefined &&
     metadata.width === undefined &&
-    metadata.length === undefined
+    metadata.length === undefined &&
+    !anySymPresent
   ) {
     return undefined;
   }

@@ -1,5 +1,6 @@
 // project.json parser that validates the project-surface document used alongside sw-net and sw-mcl.
 import { type IrScalarValue, type IrVector2 } from "../ir.js";
+import { isValidMicroprocessorIconShape } from "../shared/microprocessor-icon.js";
 import {
   expectArrayWith,
   expectFiniteNumberWith,
@@ -53,6 +54,7 @@ export function parseProjectJsonDocument(input: unknown): ProjectJsonDocument {
     description: optionalStringOrNull(root.description, "$.description"),
     width: optionalFiniteNumberOrNull(root.width, "$.width"),
     length: optionalFiniteNumberOrNull(root.length, "$.length"),
+    icon: parseIconOrNull(root.icon, "$.icon"),
     nodes: expectArray(root.nodes, "$.nodes").map((value, index) =>
       parseProjectJsonNode(value, `$.nodes[${index}]`),
     ),
@@ -171,6 +173,19 @@ function optionalStringOrNull(input: unknown, path: string): string | null {
   }
 
   return expectString(input, path);
+}
+
+// Parse the optional 16x16 "#"/"." icon (see shared/microprocessor-icon.ts for the row/bit layout).
+function parseIconOrNull(input: unknown, path: string): string[] | null {
+  if (input === undefined || input === null) {
+    return null;
+  }
+
+  if (!isValidMicroprocessorIconShape(input)) {
+    throw new ProjectJsonParseError("Expected 16 rows of 16 \"#\"/\".\" characters", path);
+  }
+
+  return input;
 }
 
 const expectFiniteNumber = (input: unknown, path: string) =>
