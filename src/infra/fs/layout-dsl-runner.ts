@@ -2,6 +2,11 @@
 // `layout_dsl` tool, so the two front ends stay behaviorally identical.
 import { computeSwNetModuleLayout, type AutoLayoutExistingPositions } from "../../core/layout/auto-layout.js";
 import { type IrVector2 } from "../../core/ir.js";
+import {
+  type StormworksDocumentLoader,
+  type StormworksProjectSource,
+  type StormworksSourceDocument,
+} from "../../core/project-source.js";
 import { compareSwNetIdentifier, formatPortNameKey, formatPortOccurrenceKey } from "../../core/serializers/sw-net-shared.js";
 import { STORMWORKS_SW_MCL_FORMAT_VERSION, type StormworksSwMclDocument } from "../../core/serializers/sw-mcl.js";
 import { type SwMclInstanceDocument, type SwMclPortDocument } from "../../core/serializers/sw-mcl.js";
@@ -214,18 +219,28 @@ function compareInstances(left: SwMclInstanceDocument, right: SwMclInstanceDocum
   return compareSwNetIdentifier(left.id, right.id);
 }
 
-export interface EnsureProjectLayoutResult {
-  // One line per notice worth surfacing to the caller (auto-generated layout, or per-target
+export interface ComputeProjectLayoutOverridesResult {
+  // One line per notice worth surfacing to the caller (auto-computed layout, or per-target
   // failures). Empty when every reachable module's .sw-mcl was already complete.
   messages: string[];
+  // Computed StormworksSwMclDocuments for reachable modules whose on-disk .sw-mcl was missing or
+  // incomplete, keyed by documentId (the module's resolved .sw-net path, matching
+  // StormworksSourceDocument.documentId). Nothing here has been written to disk; callers splice these
+  // into the in-memory project source via applyLayoutOverride/createLayoutOverridingDocumentLoader
+  // before building XML.
+  overridesByDocumentId: Map<string, StormworksSwMclDocument>;
 }
 
-// Fill in any missing/incomplete .sw-mcl layout data via ELK auto-layout before dsl2xml/dsl2xml-tree
-// (CLI) or dsl_to_xml (MCP) consume it, so a missing or partial .sw-mcl degrades to computed
-// positions instead of the exporter's cruder shared-anchor/omitted-<pos> fallback (see
-// src/core/exporters/xml-tree.ts's resolveInstancePosition). Best-effort: .sw-mcl has always been an
-// optional input (CLAUDE.md), so failures here are reported as messages but never thrown — the
-// caller's normal load/export flow still runs afterward and will surface any real, blocking problem.
+// Compute (but never write) ELK auto-layout for any module reachable from the project whose .sw-mcl
+// is missing or incomplete, so dsl2xml/dsl2xml-tree (CLI) and dsl_to_xml (MCP) can feed computed
+// positions into the exporter purely in memory instead of falling through to the exporter's cruder
+// shared-anchor/omitted-<pos> degradation (see src/core/exporters/xml-tree.ts's
+// resolveInstancePosition) -- without mutating the user's project directory as a side effect of what
+// is otherwise a read-only conversion. Persisting a computed layout to disk still requires an
+// explicit `layout-dsl`/`layout_dsl` call; this function is deliberately side-effect-free. Best-effort:
+// .sw-mcl has always been an optional input (CLAUDE.md), so failures here are reported as messages but
+// never thrown — the caller's normal load/export flow still runs afterward and will surface any real,
+// blocking problem.
 //
 // Covers every module reachable from the project, not just project.json's declared submodules:
 // resolveLayoutTargets({ allSubmodules: true }) alone would (a) return nothing at all for the
@@ -235,8 +250,9 @@ export interface EnsureProjectLayoutResult {
 // the old degraded fallback. So this seeds from the entry module plus every declared submodule, then
 // recursively follows each module's own imports the same way resolveSubmoduleFootprints does for
 // footprint sizing.
-export async function ensureProjectLayoutIsComplete(projectJsonPath: string): Promise<EnsureProjectLayoutResult> {
+export async function computeProjectLayoutOverrides(projectJsonPath: string): Promise<ComputeProjectLayoutOverridesResult> {
   const messages: string[] = [];
+  const overridesByDocumentId = new Map<string, StormworksSwMclDocument>();
   let seedTargets: LayoutTarget[];
 
   try {
@@ -249,7 +265,7 @@ export async function ensureProjectLayoutIsComplete(projectJsonPath: string): Pr
     messages.push(
       `Could not resolve layout targets for auto-layout: ${error instanceof Error ? error.message : String(error)}`,
     );
-    return { messages };
+    return { messages, overridesByDocumentId };
   }
 
   const targets = await collectReachableLayoutTargets(seedTargets);
@@ -263,7 +279,7 @@ export async function ensureProjectLayoutIsComplete(projectJsonPath: string): Pr
         continue;
       }
 
-      const result = await runLayoutDslForTarget(target, { force: false, dryRun: false });
+      const result = await runLayoutDslForTarget(target, { force: false, dryRun: true });
 
       if (!result.ok) {
         messages.push(`Auto-layout skipped for ${target.swNetPath}: ${result.errorMessage}`);
@@ -274,9 +290,13 @@ export async function ensureProjectLayoutIsComplete(projectJsonPath: string): Pr
         messages.push(`${target.swNetPath}: ${warning}`);
       }
 
+      if (result.document) {
+        overridesByDocumentId.set(target.documentId, result.document);
+      }
+
       if (result.summary && result.summary.added > 0) {
         messages.push(
-          `Auto-generated missing layout for ${target.swMclPath}: ${result.summary.added} position(s) filled in.`,
+          `Computed missing layout for ${target.documentId} in memory (not written to disk): ${result.summary.added} position(s) filled in.`,
         );
       }
     } catch (error) {
@@ -286,7 +306,55 @@ export async function ensureProjectLayoutIsComplete(projectJsonPath: string): Pr
     }
   }
 
-  return { messages };
+  return { messages, overridesByDocumentId };
+}
+
+// Splice a computed layout override (see computeProjectLayoutOverrides) into one already-loaded
+// source document, without touching whatever's on disk. Returns `document` unchanged when no override
+// applies to it.
+export function applyLayoutOverride(
+  document: StormworksSourceDocument,
+  overridesByDocumentId: Map<string, StormworksSwMclDocument>,
+): StormworksSourceDocument {
+  const override = overridesByDocumentId.get(document.documentId);
+
+  if (!override) {
+    return document;
+  }
+
+  return {
+    ...document,
+    swMcl: override,
+    // A module with no .sw-mcl file on disk at all ("generated") must be re-tagged so
+    // buildSwMclByDocumentPath (project-source.ts) treats the computed layout as real data instead of
+    // filtering it out as "no layout data"; a module whose .sw-mcl file existed but was merely
+    // incomplete keeps its "file" origin since real (if partial) data was already on disk.
+    swMclOrigin: document.swMclOrigin === "generated" ? "computed" : document.swMclOrigin,
+  };
+}
+
+// Wrap a StormworksDocumentLoader so every imported document it resolves also gets any computed
+// layout override applied, the same way applyLayoutOverride does for the entry document.
+export function createLayoutOverridingDocumentLoader(
+  baseLoader: StormworksDocumentLoader["loadImportedDocument"],
+  overridesByDocumentId: Map<string, StormworksSwMclDocument>,
+): StormworksDocumentLoader["loadImportedDocument"] {
+  return async (args) => {
+    const document = await baseLoader(args);
+    return document ? applyLayoutOverride(document, overridesByDocumentId) : document;
+  };
+}
+
+// Splice a computed layout override into a loaded project source's entry document. Callers still need
+// createLayoutOverridingDocumentLoader alongside this to cover documents pulled in via `use ... from`.
+export function applyProjectSourceLayoutOverrides(
+  projectSource: StormworksProjectSource,
+  overridesByDocumentId: Map<string, StormworksSwMclDocument>,
+): StormworksProjectSource {
+  return {
+    ...projectSource,
+    entryDocument: applyLayoutOverride(projectSource.entryDocument, overridesByDocumentId),
+  };
 }
 
 // De-duplicate layout targets by (file, module) so a document reachable through more than one seed
@@ -311,7 +379,7 @@ function dedupeLayoutTargets(targets: LayoutTarget[]): LayoutTarget[] {
 
 // Breadth-first walk of every module reachable from `seedTargets` via cross-file `use ... from`
 // imports, mirroring resolveSubmoduleFootprintsForModule's traversal. Unreadable/malformed documents
-// are left for the per-target loop in ensureProjectLayoutIsComplete to report; this walk just stops
+// are left for the per-target loop in computeProjectLayoutOverrides to report; this walk just stops
 // following that particular branch rather than failing the whole pass.
 async function collectReachableLayoutTargets(seedTargets: LayoutTarget[]): Promise<LayoutTarget[]> {
   const visited = new Set<string>();

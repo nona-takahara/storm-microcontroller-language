@@ -4,12 +4,14 @@ import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import {
+  applyProjectSourceLayoutOverrides,
   buildGateSpec,
   buildSpecOverview,
   buildStormworksXmlFromProjectSource,
   buildStormworksXmlTreeFromProjectSource,
+  computeProjectLayoutOverrides,
   createFileSystemProjectSourceDocumentLoader,
-  ensureProjectLayoutIsComplete,
+  createLayoutOverridingDocumentLoader,
   formatGateSpecListText,
   formatGateSpecText,
   formatSpecOverviewText,
@@ -25,6 +27,7 @@ import {
   runLayoutDslForTarget,
   serializeSourceDocumentTexts,
   type LayoutTarget,
+  type StormworksSwMclDocument,
   createErrorDiagnostic,
   formatDiagnostic,
   hasErrorDiagnostics,
@@ -144,7 +147,7 @@ async function runDsl2XmlCommand(args: string[]): Promise<number> {
     return 1;
   }
 
-  await ensureLayoutIsComplete(parsedArgs.projectJsonPath);
+  const overridesByDocumentId = await computeLayoutOverrides(parsedArgs.projectJsonPath);
 
   const loadResult = await loadProjectSourceFromProjectJsonFile(parsedArgs.projectJsonPath);
   const loadHasErrors = printDiagnostics(loadResult.diagnostics);
@@ -153,10 +156,14 @@ async function runDsl2XmlCommand(args: string[]): Promise<number> {
     return 1;
   }
 
+  const projectSource = applyProjectSourceLayoutOverrides(loadResult.value, overridesByDocumentId);
   const definitions = await loadBundledNodeDefinitions();
-  const buildResult = await buildStormworksXmlFromProjectSource(loadResult.value, {
+  const buildResult = await buildStormworksXmlFromProjectSource(projectSource, {
     definitions,
-    loadImportedDocument: createFileSystemProjectSourceDocumentLoader(),
+    loadImportedDocument: createLayoutOverridingDocumentLoader(
+      createFileSystemProjectSourceDocumentLoader(),
+      overridesByDocumentId,
+    ),
   });
   const buildHasErrors = printDiagnostics(buildResult.diagnostics);
 
@@ -183,7 +190,7 @@ async function runDsl2XmlTreeCommand(args: string[]): Promise<number> {
     return 1;
   }
 
-  await ensureLayoutIsComplete(parsedArgs.projectJsonPath);
+  const overridesByDocumentId = await computeLayoutOverrides(parsedArgs.projectJsonPath);
 
   const loadResult = await loadProjectSourceFromProjectJsonFile(parsedArgs.projectJsonPath);
   const loadHasErrors = printDiagnostics(loadResult.diagnostics);
@@ -192,10 +199,14 @@ async function runDsl2XmlTreeCommand(args: string[]): Promise<number> {
     return 1;
   }
 
+  const projectSource = applyProjectSourceLayoutOverrides(loadResult.value, overridesByDocumentId);
   const definitions = await loadBundledNodeDefinitions();
-  const buildResult = await buildStormworksXmlTreeFromProjectSource(loadResult.value, {
+  const buildResult = await buildStormworksXmlTreeFromProjectSource(projectSource, {
     definitions,
-    loadImportedDocument: createFileSystemProjectSourceDocumentLoader(),
+    loadImportedDocument: createLayoutOverridingDocumentLoader(
+      createFileSystemProjectSourceDocumentLoader(),
+      overridesByDocumentId,
+    ),
   });
   const buildHasErrors = printDiagnostics(buildResult.diagnostics);
 
@@ -207,14 +218,18 @@ async function runDsl2XmlTreeCommand(args: string[]): Promise<number> {
   return loadHasErrors || buildHasErrors ? 1 : 0;
 }
 
-// Run the shared implicit-auto-layout pass (see layout-dsl-runner.ts) and print any of its notices
-// as CLI warnings before dsl2xml/dsl2xml-tree read the (now hopefully complete) .sw-mcl file set.
-async function ensureLayoutIsComplete(projectJsonPath: string): Promise<void> {
-  const { messages } = await ensureProjectLayoutIsComplete(projectJsonPath);
+// Run the shared implicit-auto-layout pass (see layout-dsl-runner.ts) purely in memory, print any of
+// its notices as CLI warnings, and hand back the computed overrides for dsl2xml/dsl2xml-tree to splice
+// into the loaded project source before building XML. Nothing is written to disk here — that still
+// requires an explicit `layout-dsl` call.
+async function computeLayoutOverrides(projectJsonPath: string): Promise<Map<string, StormworksSwMclDocument>> {
+  const { messages, overridesByDocumentId } = await computeProjectLayoutOverrides(projectJsonPath);
 
   for (const message of messages) {
     console.error(`[auto-layout] ${message}`);
   }
+
+  return overridesByDocumentId;
 }
 
 // Resolve imports and report the reachable sw-net document/module graph.
