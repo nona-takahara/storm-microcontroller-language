@@ -26,9 +26,22 @@
     "AUDIO_SWITCHBOX": {
       "displayName": "Audio Switchbox",
       "category": "composite",
-      "status": "todo",
-      "relatedIssues": [],
-      "notes": []
+      "status": "done",
+      "relatedIssues": [
+        4
+      ],
+      "notes": [
+        {
+          "category": "truth-table",
+          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
+          "confidence": "unconfirmed"
+        },
+        {
+          "category": "edge-case",
+          "text": "An unconnected `switch` input is treated as a constant `false`.",
+          "confidence": "inferred"
+        }
+      ]
     },
     "BLINKER": {
       "displayName": "Blinker",
@@ -51,9 +64,9 @@
       "notes": [
         {
           "category": "other",
-          "text": "The `expression` property is a small boolean-formula language: variable `x` (also `y`/`z`/`w` for this gate's other inputs), constants `true`/`false`, and operators `&` (AND), `|` (OR), `^` (XOR), `!` (NOT, usable as prefix or postfix). Stormworks expects half-width (ASCII) operator characters.",
-          "confidence": "verified",
-          "source": "Reproduced from the Stormworks community wiki (Japanese); formatting normalized."
+          "text": "The `expression` property is a small boolean-formula language: variable `x` (also `y`/`z`/`w` for this gate's other inputs), constants `true`/`false`, and operators `&` (AND), `|` (OR), `^` (XOR), `!` (NOT, usable as prefix or postfix).",
+          "confidence": "inferred",
+          "source": "Reproduced from the Stormworks community wiki (Japanese)."
         }
       ]
     },
@@ -167,12 +180,12 @@
       "notes": [
         {
           "category": "truth-table",
-          "text": "COMPOSITE_SWITCHBOX has the same `a`/`b`/`switch` -> `out` port shape as NUM_SWITCHBOX/AUDIO_SWITCHBOX/VIDEO_SWITCHBOX: `switch` selects which of `a`/`b` is forwarded to `out`. Exactly which boolean value of `switch` selects `a` versus `b` has not been confirmed in-game for this gate.",
+          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
           "confidence": "unconfirmed"
         },
         {
           "category": "edge-case",
-          "text": "An unconnected `switch` input is treated as a constant `false`, by analogy with NUM_SWITCHBOX's confirmed behavior. Not independently re-verified for this gate.",
+          "text": "An unconnected `switch` input is treated as a constant `false`.",
           "confidence": "inferred"
         }
       ]
@@ -197,9 +210,9 @@
       "relatedIssues": [],
       "notes": [
         {
-          "category": "round-trip-loss",
-          "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged.",
-          "confidence": "unconfirmed"
+          "category": "edge-case",
+          "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged, matching COMPOSITE_WRITE_NUMBER's confirmed behavior.",
+          "confidence": "inferred"
         }
       ]
     },
@@ -210,7 +223,7 @@
       "relatedIssues": [],
       "notes": [
         {
-          "category": "round-trip-loss",
+          "category": "edge-case",
           "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged.",
           "confidence": "verified"
         }
@@ -238,12 +251,12 @@
       "notes": [
         {
           "category": "other",
-          "text": "COUNTER's three inputs are `up`, `down`, `reset` (booleans) -- there is no separate 'enable' input. Its numeric properties are `increment` (default 1, the per-tick step size), `min`/`max` (default 0/100, the clamp range), and `reset_value` (default 0).",
+          "text": "COUNTER's three inputs are `up`, `down`, `reset` (booleans) -- there is no separate 'enable' input. Its properties are `increment` (default 1), `min`/`max` (default 0/100), and `reset_value` (default 0).",
           "confidence": "verified"
         },
         {
           "category": "edge-case",
-          "text": "`out` increases by `increment` on every tick `up` is true, and decreases by `increment` on every tick `down` is true, clamped to [`min`, `max`]. What happens on a tick where `up` and `down` are both true has not been confirmed.",
+          "text": "`out` changes by `increment` on every tick that `up` or `down` is held true -- continuously, not just on a rising edge -- clamped to [`min`, `max`].",
           "confidence": "inferred"
         }
       ]
@@ -269,12 +282,12 @@
       "notes": [
         {
           "category": "edge-case",
-          "text": "DIVIDE has a second output, `error` (\"Divide by Zero\"), in addition to `out`. This is not derivable from `out` alone -- wire `error` explicitly if divide-by-zero must be detected.",
+          "text": "DIVIDE has a second output, `error` (\"Divide by Zero\") (boolean), in addition to `out` (number). Wire `error` explicitly if divide-by-zero must be detected -- `out`'s numeric value alone cannot signal that it happened.",
           "confidence": "verified"
         },
         {
           "category": "edge-case",
-          "text": "When `b` is 0, `out` reads 0 (rather than an error value or NaN).",
+          "text": "When `b` is 0, `out` reads 0.",
           "confidence": "unconfirmed"
         }
       ]
@@ -310,7 +323,7 @@
           "category": "other",
           "text": "`expression`'s formula language has one variable, `x` (bound to input `x`), constants `pi`/`pi2`, operators `+ - * / % ^`, and functions sin/cos/tan/asin/acos/atan/atan2/max/min/ceil/floor/round/abs/sgn/sqrt/len/len2/lerp/clamp. Trigonometric functions take/return radians. `sgn(0)` returns 1, not 0 (unlike the mathematical convention). `sqrt` of a negative number returns 0.",
           "confidence": "verified",
-          "source": "Reproduced from the Stormworks community wiki (Japanese); formatting normalized."
+          "source": "Reproduced from the Stormworks community wiki (Japanese)."
         }
       ]
     },
@@ -365,7 +378,7 @@
         },
         {
           "category": "priority",
-          "text": "This is a clocked JK flip-flop: when `j` and `k` are both true, `q` toggles each tick, matching the textbook JK-FF truth table.",
+          "text": "When `j` and `k` are both true, `q` toggles every tick, matching the textbook JK-FF truth table. JK_FF has no separate clock input -- each tick's evaluation plays that role.",
           "confidence": "verified"
         }
       ]
@@ -471,7 +484,7 @@
         },
         {
           "category": "truth-table",
-          "text": "`switch` selects which of `a`/`b` is forwarded to `out`. Exactly which boolean value of `switch` selects `a` versus `b` has not been confirmed in-game.",
+          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded.",
           "confidence": "unconfirmed"
         }
       ]
@@ -720,7 +733,12 @@
       "notes": [
         {
           "category": "other",
-          "text": "TOOLTIP_BOOLEAN has `on_label`/`off_label` properties (default \"On\"/\"Off\") in addition to `label`. The tooltip text switches between `on_label` and `off_label` depending on the boolean `value` input -- this is the closest thing this gate has to conditional display; it is not a general expression-based condition.",
+          "text": "TOOLTIP_BOOLEAN has `on_label`/`off_label` properties (default \"On\"/\"Off\") in addition to `label`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "The tooltip text switches between `on_label` and `off_label` depending on the boolean `value` input -- this is the closest thing this gate has to conditional display; it is not a general expression-based condition.",
           "confidence": "inferred"
         }
       ]
@@ -733,7 +751,12 @@
       "notes": [
         {
           "category": "other",
-          "text": "TOOLTIP_NUMBER has an `error` (\"Is Error\") boolean input in addition to `value`. When asserted, the tooltip is expected to render an error/invalid state instead of the numeric value; the exact visual difference has not been confirmed in-game.",
+          "text": "TOOLTIP_NUMBER has an `error` (\"Is Error\") boolean input in addition to `value`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "other",
+          "text": "When `error` is true, the tooltip renders an error/invalid state instead of the numeric value.",
           "confidence": "unconfirmed"
         }
       ]
@@ -762,12 +785,12 @@
       "notes": [
         {
           "category": "truth-table",
-          "text": "VIDEO_SWITCHBOX has the same `a`/`b`/`switch` -> `out` port shape as NUM_SWITCHBOX/COMPOSITE_SWITCHBOX/AUDIO_SWITCHBOX: `switch` selects which of `a`/`b` is forwarded to `out`. Exactly which boolean value of `switch` selects `a` versus `b` has not been confirmed in-game for this gate.",
+          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
           "confidence": "unconfirmed"
         },
         {
           "category": "edge-case",
-          "text": "An unconnected `switch` input is treated as a constant `false`, by analogy with NUM_SWITCHBOX's confirmed behavior. Not independently re-verified for this gate.",
+          "text": "An unconnected `switch` input is treated as a constant `false`.",
           "confidence": "inferred"
         }
       ]

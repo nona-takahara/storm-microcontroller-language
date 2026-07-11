@@ -27,7 +27,7 @@
           "confidence": "verified"
         },
         {
-          "text": "Audio components are likely also re-evaluated every rendered frame, by analogy with Video.",
+          "text": "Audio components are also re-evaluated every rendered frame, matching Video.",
           "confidence": "unconfirmed"
         }
       ]
@@ -75,7 +75,7 @@
       "relatedIssues": [],
       "notes": [
         {
-          "text": "storm-mcl's auto-layouter only supports up to a 6x6 pin grid, so 36 pins is the effective ceiling per group. Composite and (On/Off + Number combined) are each their own group, so each group has its own 36-pin ceiling.",
+          "text": "Stormworks' own in-game pin-layout panel for the microcontroller (not storm-mcl) only offers a 6x6 grid of slots, so 36 pins is the effective ceiling per signal-type group. `Composite` pins are one group with its own 36-pin ceiling; On/Off (boolean) and Number pins together share a second, separate 36-pin ceiling.",
           "confidence": "verified"
         }
       ]
