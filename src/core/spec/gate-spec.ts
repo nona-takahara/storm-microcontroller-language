@@ -176,8 +176,18 @@ function buildUsageExample(
   const inputAssignments = [...staticInputAssignments, ...dynamicInputAssignments].join(", ");
   const outputAssignments = outputs.map((port) => `${port.key}=${toNetPlaceholder(port.key)}`).join(", ");
   const inputSegment = inputAssignments.length > 0 ? `${inputAssignments} ` : "";
+  const wiringSuffix = `: ${inputSegment}-> ${outputAssignments}`;
 
-  return `inst ${id} ${toInstanceNamePlaceholder(id)}${propertiesSuffix} : ${inputSegment}-> ${outputAssignments}`;
+  const primaryExample = `inst ${id} ${toInstanceNamePlaceholder(id)}${propertiesSuffix} ${wiringSuffix}`;
+
+  // script_ref is .sw-net-only syntax sugar for `script` (see LUA's behavior notes) and never
+  // appears in definitions.json's properties, so it can't surface via the generic loop above.
+  if (id === "LUA") {
+    const scriptRefExample = `inst ${id} ${toInstanceNamePlaceholder(id)} (script_ref="scripts/foo.lua") ${wiringSuffix}`;
+    return [primaryExample, scriptRefExample].join("\n");
+  }
+
+  return primaryExample;
 }
 
 function formatExamplePropertyValue(property: GateSpecProperty): string {
@@ -237,7 +247,10 @@ export function formatGateSpecText(spec: GateSpec): string {
 
   lines.push("");
   lines.push("Minimal .sw-net usage example:");
-  lines.push(`  ${spec.usageExample}`);
+
+  for (const exampleLine of spec.usageExample.split("\n")) {
+    lines.push(`  ${exampleLine}`);
+  }
 
   lines.push("");
   lines.push("Known behavior notes:");
