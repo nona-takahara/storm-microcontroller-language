@@ -11,7 +11,7 @@ import {
   type SwMclPortDocument,
 } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
-import { registerFirstProducer } from "../shared/producer-index.js";
+import { indexNetProducers } from "../shared/producer-index.js";
 
 export interface AutoLayoutExistingPositions {
   ports: Map<string, IrVector2>;
@@ -267,21 +267,14 @@ function resolveInstanceTypeName(statement: SwNetStatement): string {
 
 // Index which instance produces each internal net name, mirroring the XML exporter's first-producer-wins rule.
 function buildNetProducerIndex(statements: SwNetStatement[], warnings: string[]): Map<string, NetProducer> {
-  const producers = new Map<string, NetProducer>();
-
-  for (const statement of statements) {
-    for (const output of statement.outputs) {
-      if (output.value.kind !== "identifier") {
-        continue;
-      }
-
-      registerFirstProducer(producers, output.value.value, { instanceId: statement.instanceId }, (netName) => {
-        warnings.push(`Multiple instance outputs drive net ${netName}; using the first producer for layout.`);
-      });
-    }
-  }
-
-  return producers;
+  return indexNetProducers(
+    statements,
+    (statement) => statement,
+    (statement) => ({ instanceId: statement.instanceId }),
+    (netName) => {
+      warnings.push(`Multiple instance outputs drive net ${netName}; using the first producer for layout.`);
+    },
+  );
 }
 
 // Group port slots by semantic name for occurrence-insensitive string-binding lookups (matches the XML exporter's approximation).

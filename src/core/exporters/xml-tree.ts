@@ -20,9 +20,14 @@ import { addVector } from "../serializers/submodule-layout.js";
 import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule, type SwNetResolvedModuleKey } from "../resolvers/sw-net.js";
-import { buildModulePortNameSets, type ModulePortNameSets } from "../shared/module-port-directions.js";
+import {
+  buildModulePortNameSets,
+  resolveStringPortDirection,
+  type ModulePortNameSets,
+} from "../shared/module-port-directions.js";
 import { microprocessorIconToSymValues } from "../shared/microprocessor-icon.js";
-import { registerFirstProducer } from "../shared/producer-index.js";
+import { indexNetProducers } from "../shared/producer-index.js";
+import { resolveModuleInstancePositions } from "../shared/module-net-graph.js";
 
 export type StormworksXmlTreeScalar = string | number | boolean | null;
 export type StormworksXmlTreeValue = StormworksXmlTreeScalar | StormworksXmlTreeElement | StormworksXmlTreeValue[];
@@ -102,6 +107,9 @@ interface FlattenedInstance {
 interface FlattenLayoutContext {
   instancePositionById: Map<string, IrVector2>;
   fallbackPosition: IrVector2 | undefined;
+  // instanceIds declared in this module but absent from its sw-mcl's instances (see
+  // resolveModuleInstancePositions); always empty when the fallback anchor is in play.
+  mismatchedInstanceIds: string[];
 }
 
 interface NetProducer {
@@ -153,6 +161,7 @@ export function buildStormworksXmlTree(
   const swMclModule = entrySwMcl ? resolveSwMclModule(entrySwMcl, entryModule.key.moduleId) : null;
   const entryAnchorFallback = submoduleCanvasOrigin ?? { x: 0, y: 0 };
   const entryLayout = buildFlattenLayoutContext(
+    entryModule.module,
     swMclModule,
     submoduleCanvasOrigin,
     swMclModule ? undefined : entryAnchorFallback,
@@ -560,19 +569,23 @@ function assertUniqueStatementInstanceIds(module: SwNetModule, moduleKey: SwNetR
 // used when that module's sw-mcl could not be resolved (e.g. a same-document helper module that isn't
 // the file's paired layout module -- see known limitation tracked in issue #7).
 function buildFlattenLayoutContext(
+  swNetModule: SwNetModule | null,
   swMclModule: StormworksSwMclDocument | null,
   positionAnchor: IrVector2 | null,
   fallbackPosition: IrVector2 | undefined,
 ): FlattenLayoutContext {
-  if (!swMclModule) {
-    return { instancePositionById: new Map(), fallbackPosition };
+  if (!swNetModule || !swMclModule) {
+    return { instancePositionById: new Map(), fallbackPosition, mismatchedInstanceIds: [] };
   }
+
+  const resolved = resolveModuleInstancePositions(swNetModule, swMclModule);
 
   return {
     instancePositionById: new Map(
-      swMclModule.instances.map((instance) => [instance.id, addVector(instance.position, positionAnchor)] as const),
+      [...resolved.positionByInstanceId].map(([instanceId, position]) => [instanceId, addVector(position, positionAnchor)] as const),
     ),
     fallbackPosition: undefined,
+    mismatchedInstanceIds: resolved.mismatchedInstanceIds,
   };
 }
 
@@ -665,32 +678,6 @@ function resolveFlattenExpr(
   }
 
   return expr;
-}
-
-// Decide which of the module's own declared ports a quoted string reference means, or undefined if
-// the reference doesn't resolve to any usable port declaration. A reference that matches a port
-// declared in the local usage direction is unambiguous and always wins, even if the same name is
-// also declared in the other direction — this is what makes an ambiguous same-named in/out pair
-// resolve predictably instead of silently picking whichever declaration happened to be registered
-// last. A *read* (direction "in") may also resolve against the module's own output port: this is the
-// intended way to reuse a value the module already exposes as one of its outputs, not a workaround —
-// an output can have any number of readers, inside the module or out. A *write* (direction "out")
-// may only ever target a declared output port: an input port's one and only producer is the caller,
-// so nothing inside the module is allowed to also drive it.
-function resolveStringPortDirection(
-  portName: string,
-  usageDirection: "in" | "out",
-  modulePorts: ModulePortNameSets,
-): "in" | "out" | undefined {
-  if (modulePorts[usageDirection].has(portName)) {
-    return usageDirection;
-  }
-
-  if (usageDirection === "in" && modulePorts.out.has(portName)) {
-    return "out";
-  }
-
-  return undefined;
 }
 
 // Resolve a whole inst/use pin-assignment list through resolveFlattenExpr, dropping assignments that
@@ -848,7 +835,9 @@ function flattenModule(
       );
     }
 
+    const targetSwNetModule = moduleByKey.get(formatModuleKey(useEdge.target))?.module ?? null;
     const childLayout = buildFlattenLayoutContext(
+      targetSwNetModule,
       targetSwMclModule,
       useAnchor ?? null,
       targetSwMclModule ? undefined : useAnchor,
@@ -873,29 +862,14 @@ function buildNetProducerIndex(
   logicInstances: LogicInstanceContext[],
   warnings: Diagnostic[],
 ): Map<string, NetProducer> {
-  const producers = new Map<string, NetProducer>();
-
-  for (const instance of logicInstances) {
-    for (const output of instance.statement.outputs) {
-      if (output.value.kind !== "identifier") {
-        continue;
-      }
-
-      registerFirstProducer(
-        producers,
-        output.value.value,
-        {
-          instance,
-          outputKey: output.key,
-        },
-        (netName) => {
-          pushExportWarning(warnings, `Multiple instance outputs drive net ${netName}; using the first producer.`);
-        },
-      );
-    }
-  }
-
-  return producers;
+  return indexNetProducers(
+    logicInstances,
+    (instance) => instance.statement,
+    (instance, outputKey) => ({ instance, outputKey }),
+    (netName) => {
+      pushExportWarning(warnings, `Multiple instance outputs drive net ${netName}; using the first producer.`);
+    },
+  );
 }
 
 // Index which logic producer feeds each exported module output port.
