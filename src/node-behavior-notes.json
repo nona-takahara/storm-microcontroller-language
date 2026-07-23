@@ -373,11 +373,26 @@
       "displayName": "Lua Script",
       "category": "script",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [52],
       "notes": [
         {
           "category": "edge-case",
           "text": "The `script` property is limited to ASCII characters and at most 8192 characters.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "`script_ref` is not a definitions.json property of this gate -- `script` is the only real property, and it is the only one that ever reaches the exported XML. `script_ref=\"relative/path.lua\"` is .sw-net-only syntax sugar: at load time storm-mcl reads the file at that path (resolved relative to the containing .sw-net document's own directory, never the project root or current working directory) and treats its contents as the `script` value.",
+          "confidence": "verified"
+        },
+        {
+          "category": "priority",
+          "text": "If both `script` and `script_ref` are written on the same `inst` statement, there is no dedicated \"ref wins\" or \"inline wins\" rule. storm-mcl applies each attribute in the exact order it appears in the .sw-net source, and each one unconditionally overwrites the exported `script` value -- so whichever of the two is written LATER in the statement determines the final result.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "If the attribute that wins by source order is a `script_ref` whose file cannot be resolved: check-dsl/typecheck-dsl emits a `SCRIPT_REF_MISSING` warning (not an error). Separately, at dsl2xml/export time, if the reference still cannot be resolved, storm-mcl emits its own export-time warning and writes an EMPTY string for `script` (`script=\"\"`) -- it does not fail the export.",
           "confidence": "verified"
         }
       ]

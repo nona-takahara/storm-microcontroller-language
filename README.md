@@ -36,7 +36,7 @@ The output directory contains the following files.
 | File | Contents |
 |---|---|
 | `main.sw-net` | Node definitions and wiring graph |
-| `main.sw-mcl` | Lua logic-node script references and layout data |
+| `main.sw-mcl` | Layout data (instance/port positions) |
 | `scripts/*.lua` | Lua script bodies |
 | `project.json` | Metadata and node coordinates |
 
@@ -175,7 +175,7 @@ end
 
 ### `.sw-mcl`
 
-`.sw-mcl` references script files for `LUA` nodes and stores layout data. It is usually generated automatically.
+`.sw-mcl` stores layout data (instance/port positions) only. `LUA` nodes' script bodies live in `.sw-net`'s `script_ref` attribute, which resolves to a `scripts/*.lua` sidecar file -- `.sw-mcl` never references scripts. It is usually generated automatically.
 
 ### `project.json`
 
