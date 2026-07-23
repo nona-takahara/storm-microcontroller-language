@@ -12,6 +12,7 @@ import {
 } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { indexNetProducers } from "../shared/producer-index.js";
+import { resolveStatementTypeName } from "../shared/module-net-graph.js";
 
 export interface AutoLayoutExistingPositions {
   ports: Map<string, IrVector2>;
@@ -156,7 +157,7 @@ export async function computeSwNetModuleLayout(
 
     return {
       id: statement.instanceId,
-      type: resolveInstanceTypeName(statement),
+      type: resolveStatementTypeName(statement),
       position: existing ?? anchored,
     };
   });
@@ -254,16 +255,6 @@ export function computeModuleFootprint(
   return { width: maxX - minX, height: maxY - minY, originX: minX, originY: minY };
 }
 
-// Resolve the sw-mcl-facing type label for one instance/use statement.
-function resolveInstanceTypeName(statement: SwNetStatement): string {
-  if (statement.kind === "inst") {
-    return statement.typeId;
-  }
-
-  return statement.moduleRef.kind === "local"
-    ? statement.moduleRef.moduleId
-    : `${statement.moduleRef.alias}.${statement.moduleRef.moduleId}`;
-}
 
 // Index which instance produces each internal net name, mirroring the XML exporter's first-producer-wins rule.
 function buildNetProducerIndex(statements: SwNetStatement[], warnings: string[]): Map<string, NetProducer> {
