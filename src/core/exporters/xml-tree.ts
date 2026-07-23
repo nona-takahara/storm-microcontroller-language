@@ -605,7 +605,25 @@ function resolveInstancePosition(
   const position = layout.instancePositionById.get(instanceId);
 
   if (!position) {
-    pushExportWarning(warnings, `sw-mcl is missing an instance layout entry for ${namespacedInstanceId}.`);
+    if (layout.mismatchedInstanceIds.includes(instanceId)) {
+      // A stale/renamed .sw-mcl (its own instance ids no longer match this module's sw-net
+      // instanceIds) gets a distinct, machine-readable code from the generic EXPORT_WARNING used
+      // elsewhere in this file, so tooling can tell "renamed instance" apart from any other
+      // export-time warning (see also src/core/module-net-view.ts's INSTANCE_LAYOUT_ID_MISMATCH,
+      // which is the more reliably reachable consumer of this code -- see CLAUDE.md/PR notes on why
+      // dsl2xml/dsl_to_xml rarely surface this one in practice).
+      warnings.push(
+        createWarningDiagnostic(
+          "INSTANCE_LAYOUT_ID_MISMATCH",
+          `sw-mcl has no instance layout entry matching sw-net instanceId for ${namespacedInstanceId}.`,
+          "exporter",
+          undefined,
+          namespacedInstanceId,
+        ),
+      );
+    } else {
+      pushExportWarning(warnings, `sw-mcl is missing an instance layout entry for ${namespacedInstanceId}.`);
+    }
   }
 
   return position;
