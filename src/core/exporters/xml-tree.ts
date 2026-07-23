@@ -52,7 +52,8 @@ export interface BuildStormworksXmlTreeInput {
   project: ProjectJsonDocument;
   swNet: SwNetResolutionResult;
   // Keyed by sw-net document path so `use` statements can pull layout from a module living in another document.
-  swMclByDocumentPath: Map<string, StormworksSwMclDocument>;
+  // A null (or missing) entry means that document has no real layout data.
+  swMclByDocumentPath: Map<string, StormworksSwMclDocument | null>;
 }
 
 export interface BuildStormworksXmlTreeResult {
@@ -600,7 +601,7 @@ function resolveInstancePosition(
 // Look up a module's own paired sw-mcl without throwing (unlike resolveSwMclModule, which is reserved
 // for the entry module where a mismatch is a hard configuration error).
 function tryResolveModuleSwMcl(
-  swMclByDocumentPath: Map<string, StormworksSwMclDocument>,
+  swMclByDocumentPath: Map<string, StormworksSwMclDocument | null>,
   moduleKey: SwNetResolvedModuleKey,
 ): StormworksSwMclDocument | null {
   const candidate = swMclByDocumentPath.get(moduleKey.documentPath);
@@ -741,7 +742,7 @@ function flattenModule(
   layout: FlattenLayoutContext,
   isEntryModule: boolean,
   moduleByKey: Map<string, SwNetResolvedModule>,
-  swMclByDocumentPath: Map<string, StormworksSwMclDocument>,
+  swMclByDocumentPath: Map<string, StormworksSwMclDocument | null>,
   out: FlattenedInstance[],
   warnings: Diagnostic[],
 ): void {
