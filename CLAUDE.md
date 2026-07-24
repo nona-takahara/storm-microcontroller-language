@@ -19,6 +19,7 @@ pnpm cli xml2dsl <input.xml> --out-dir <output-dir>   # Stormworks XML → proje
 pnpm cli dsl2xml <project.json> --out <output.xml>    # project.json + sw-net + sw-mcl → XML
 pnpm cli check-dsl <project.json>
 pnpm cli typecheck-dsl <project.json>
+pnpm cli compare-dsl <a> <b> [--module-a <id>] [--module-b <id>] [--json]
 pnpm cli layout-dsl <project.json> [--module <id>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]
 pnpm cli spec [<definitionId>] [--list] [--json]   # gate/tool behavior reference, see below
 ```
@@ -30,7 +31,9 @@ pnpm mcp          # run the stdio MCP server directly via tsx
 storm-mcl-mcp    # installed/built package binary
 ```
 
-The MCP server exposes `xml_to_dsl`, `dsl_to_xml`, `check_dsl`, `typecheck_dsl`, and `spec`. The `spec` tool intentionally mirrors `storm-mcl spec` because its overview, gate list, and per-gate behavior notes are optimized for AI-agent reference workflows. Keep MCP-facing descriptions and result text in English for global client compatibility.
+The MCP server exposes `xml_to_dsl`, `dsl_to_xml`, `check_dsl`, `typecheck_dsl`, `compare_dsl`, `layout_dsl`, and `spec`. The `spec` tool intentionally mirrors `storm-mcl spec` because its overview, gate list, and per-gate behavior notes are optimized for AI-agent reference workflows. Keep MCP-facing descriptions and result text in English for global client compatibility.
+
+`compare-dsl`/`compare_dsl` uses port-key-strict matching. As an intentional v1 limitation, re-serializing a commutative gate with its inputs swapped (for example AND, OR, or ADD) is reported as different even though the circuit is semantically equivalent.
 
 ## Architecture
 
@@ -81,8 +84,9 @@ Once delegation is authorized for the session, invoke Codex as:
 codex exec -s workspace-write -C "$(pwd)" "<task instructions>"
 ```
 
-- `-s workspace-write` allows file edits but disables network access by default. Tasks that need registry access (e.g. `pnpm add`) may require `-s danger-full-access` — call that out explicitly before using it rather than escalating silently.
+- `-s workspace-write` allows file edits but disables network access by default. Tasks that need registry access (e.g. `pnpm add`, `pnpm install`) should instead add `-c sandbox_workspace_write.network_access=true`, which grants network access while keeping every other `workspace-write` restriction (filesystem scope, etc.) in place. Prefer this over escalating to `-s danger-full-access` (which drops sandboxing entirely) — only reach for that if something *other* than network access is the actual blocker. Call out either escalation explicitly rather than doing it silently. (Without this, Codex has been observed improvising unsafe workarounds instead of asking — e.g. splicing dependency files from an unrelated sibling repo to fake a missing install. `AGENTS.md`'s handoff protocol is meant to prevent that; granting network access up front avoids needing it for this specific case.)
 - `-C` pins the working root to this repository.
+- If invoking Codex from within a git worktree (not this repo's primary checkout): `git commit` inside Codex's sandbox reliably fails there (`.git/worktrees/<name>/index.lock`: read-only filesystem), even when the main repo's `.git` directory is added via `--add-dir` — that has not fixed it in this environment (Windows drives mounted into WSL). Don't spend time working around this; expect Codex to hand off validated-but-uncommitted work per `AGENTS.md`, and commit it yourself after reviewing each session's diff.
 
 Codex's own conventions live in `AGENTS.md`. Review every Codex diff against it before accepting, checking in particular:
 - `pnpm check` passes

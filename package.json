@@ -27,6 +27,7 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "cli": "node --import tsx ./src/cli/main.ts",
     "mcp": "node --import tsx ./src/mcp/server.ts",
+    "test": "vitest run --config vitest.config.ts",
     "prepack": "npm run build"
   },
   "keywords": [
@@ -45,6 +46,7 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^4.1.10"
   }
 }

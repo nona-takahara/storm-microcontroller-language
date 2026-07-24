@@ -12,6 +12,8 @@ import {
   computeProjectLayoutOverrides,
   createFileSystemProjectSourceDocumentLoader,
   createLayoutOverridingDocumentLoader,
+  formatNetworkComparison,
+  formatProjectComparison,
   formatGateSpecListText,
   formatGateSpecText,
   formatSpecOverviewText,
@@ -24,6 +26,7 @@ import {
   readUtf8TextFile,
   resolveLayoutTargets,
   resolveProjectSource,
+  runCompareDsl,
   runLayoutDslForTarget,
   serializeSourceDocumentTexts,
   type LayoutTarget,
@@ -56,6 +59,8 @@ export async function main(argv: string[]): Promise<number> {
       return runTypecheckDslCommand(rest);
     case "layout-dsl":
       return runLayoutDslCommand(rest);
+    case "compare-dsl":
+      return runCompareDslCommand(rest);
     case "spec":
       return runSpecCommand(rest);
     default:
@@ -294,6 +299,43 @@ async function runTypecheckDslCommand(args: string[]): Promise<number> {
   return loadHasErrors || validationHasErrors || !validationResult.isValid ? 1 : 0;
 }
 
+// Compare two project.json or bare .sw-net targets for structural equivalence.
+async function runCompareDslCommand(args: string[]): Promise<number> {
+  const parsedArgs = parseCompareDslArgs(args);
+
+  if (!parsedArgs) {
+    printUsage();
+    return 1;
+  }
+
+  const result = await runCompareDsl(
+    { path: parsedArgs.pathA, moduleId: parsedArgs.moduleA },
+    { path: parsedArgs.pathB, moduleId: parsedArgs.moduleB },
+  );
+  const loadHasErrors = printDiagnostics(result.loadDiagnostics);
+  const comparisonHasErrors = printDiagnostics(result.diagnostics);
+
+  if (!result.comparison) {
+    return 1;
+  }
+
+  if (parsedArgs.json) {
+    console.log(JSON.stringify(result.comparison, null, 2));
+  } else {
+    console.log(
+      result.kind === "network"
+        ? formatNetworkComparison(result.comparison)
+        : formatProjectComparison(result.comparison),
+    );
+  }
+
+  return loadHasErrors ||
+    comparisonHasErrors ||
+    result.comparison.verdict !== "equivalent"
+    ? 1
+    : 0;
+}
+
 // Look up gate/tool behavior spec: no args prints the tool+system overview, --list enumerates
 // every definition id, and a bare id prints that gate's full port/property/behavior-notes spec.
 async function runSpecCommand(args: string[]): Promise<number> {
@@ -409,6 +451,68 @@ interface LayoutDslArgs {
   force: boolean;
   dryRun: boolean;
   gridSize?: number;
+}
+
+interface CompareDslArgs {
+  pathA: string;
+  pathB: string;
+  moduleA?: string;
+  moduleB?: string;
+  json: boolean;
+}
+
+// Parse compare-dsl paths and optional paired module selectors.
+function parseCompareDslArgs(args: string[]): CompareDslArgs | undefined {
+  const paths: string[] = [];
+  let moduleA: string | undefined;
+  let moduleB: string | undefined;
+  let json = false;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (!arg) {
+      return undefined;
+    }
+
+    if (arg === "--module-a" || arg === "--module-b") {
+      const next = args[index + 1];
+      const alreadySet = arg === "--module-a" ? moduleA !== undefined : moduleB !== undefined;
+
+      if (!next || alreadySet) {
+        return undefined;
+      }
+
+      if (arg === "--module-a") {
+        moduleA = next;
+      } else {
+        moduleB = next;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--json") {
+      if (json) {
+        return undefined;
+      }
+      json = true;
+      continue;
+    }
+
+    if (paths.length < 2) {
+      paths.push(arg);
+      continue;
+    }
+
+    return undefined;
+  }
+
+  if (paths.length !== 2 || (moduleA === undefined) !== (moduleB === undefined)) {
+    return undefined;
+  }
+
+  return { pathA: paths[0]!, pathB: paths[1]!, moduleA, moduleB, json };
 }
 
 // Parse layout-dsl-specific command-line arguments.
@@ -677,6 +781,7 @@ function printUsage(): void {
   console.log("  storm-mcl dsl2xml-tree <project.json>");
   console.log("  storm-mcl check-dsl <project.json>");
   console.log("  storm-mcl typecheck-dsl <project.json>");
+  console.log("  storm-mcl compare-dsl <a> <b> [--module-a <id>] [--module-b <id>] [--json]");
   console.log(
     "  storm-mcl layout-dsl <project.json> [--module <id>] [--document <path>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]",
   );

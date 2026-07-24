@@ -1,0 +1,7 @@
+module main
+  port in "left" : number
+  port in "right" : number
+  port out "result" : number
+  inst ADD add : a="left", b="right" -> out=sum
+  inst ABS absolute : value=sum -> out="result"
+end

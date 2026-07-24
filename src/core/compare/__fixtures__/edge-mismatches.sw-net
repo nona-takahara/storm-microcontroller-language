@@ -1,0 +1,45 @@
+module asymmetric_a
+  port in "left" : number
+  port in "right" : number
+  port out "result" : number
+  inst SUBTRACT subtract : a="left", b="right" -> out="result"
+end
+
+module asymmetric_b
+  port in "left" : number
+  port in "right" : number
+  port out "result" : number
+  inst SUBTRACT subtract : a="right", b="left" -> out="result"
+end
+
+module output_port_a
+  port in "left" : number
+  port in "right" : number
+  port out "result" : number
+  inst SUBTRACT subtract : a="left", b="right" -> out="result"
+end
+
+module output_port_b
+  port in "left" : number
+  port in "right" : number
+  port out "result" : number
+  inst SUBTRACT subtract : a="left", b="right" -> alternate="result"
+end
+
+module fanout_a
+  port in "value" : number
+  port out "first" : number
+  port out "second" : number
+  inst ABS source : value="value" -> out=shared
+  inst ABS sink_one : value=shared -> out="first"
+  inst ABS sink_two : value=shared -> out="second"
+end
+
+module fanout_b
+  port in "value" : number
+  port out "first" : number
+  port out "second" : number
+  inst ABS source : value="value" -> out=shared
+  inst ABS sink_one : value=shared -> out="first"
+  inst ABS sink_two : value="value" -> out="second"
+end

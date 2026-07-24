@@ -1,0 +1,20 @@
+module number_port
+  port in "value" : number
+  port out "result" : number
+  inst ABS gate : value="value" -> out="result"
+end
+
+module boolean_port
+  port in "value" : boolean
+  port out "result" : number
+  inst ABS gate : value="value" -> out="result"
+end
+
+module one_abs
+  inst ABS gate : ->
+end
+
+module two_abs
+  inst ABS gate_one : ->
+  inst ABS gate_two : ->
+end
