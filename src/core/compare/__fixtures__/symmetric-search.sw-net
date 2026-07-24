@@ -1,0 +1,29 @@
+module symmetric_a
+  inst ABS isolated_one : ->
+  inst ABS isolated_two : ->
+  inst ABS isolated_three : ->
+end
+
+module symmetric_b
+  inst ABS renamed_three : ->
+  inst ABS renamed_one : ->
+  inst ABS renamed_two : ->
+end
+
+module cutoff_a
+  inst ABS a1 : ->
+  inst ABS a2 : ->
+  inst ABS a3 : ->
+  inst ABS a4 : ->
+  inst ABS a5 : ->
+  inst ABS a6 : ->
+end
+
+module cutoff_b
+  inst ABS b1 : ->
+  inst ABS b2 : ->
+  inst ABS b3 : ->
+  inst ABS b4 : ->
+  inst ABS b5 : ->
+  inst ABS b6 : ->
+end

@@ -1,0 +1,7 @@
+module main
+  port out "result" : number
+  port in "right" : number
+  port in "left" : number
+  inst ABS renamed_abs : value=renamed_sum -> out="result"
+  inst ADD renamed_add : b="right", a="left" -> out=renamed_sum
+end

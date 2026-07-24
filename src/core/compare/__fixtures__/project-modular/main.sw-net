@@ -1,0 +1,14 @@
+module renamed_helper
+  port in "x" : number
+  port in "y" : number
+  port out "sum" : number
+  inst ADD internal_add : a="x", b="y" -> out="sum"
+end
+
+module main
+  port in "left" : number
+  port in "right" : number
+  port out "result" : number
+  use renamed_helper nested : x="left", y="right" -> sum=nested_sum
+  inst ABS renamed_absolute : value=nested_sum -> out="result"
+end
