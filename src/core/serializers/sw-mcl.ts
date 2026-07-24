@@ -1,5 +1,6 @@
 // sw-mcl serializer that writes one module-local layout document paired 1:1 with a sw-net document.
 import { type IrNode, type IrProgram, type IrSubmodule, type IrVector2 } from "../ir.js";
+import { resolvePinNames, resolvePortNodeName } from "../shared/pin-naming.js";
 import {
   compareSwNetIdentifier,
   getSwNetInstanceName,
@@ -46,12 +47,15 @@ export function buildStormworksSwMclDocument(
   const nodeById = new Map(program.nodes.map((node) => [node.id, node] as const));
   const submodule = selectSwMclSubmodule(program, options.moduleId);
   const moduleId = submodule?.name ?? options.moduleId ?? "main";
+  // project.json's node ids double as module port names (see shared/pin-naming.ts); sw-mcl's own
+  // port names must match exactly, or its occurrence-keyed positions won't line up with sw-net.
+  const pinNameByProjectNodeId = resolvePinNames(program.nodes.filter((node) => node.layer === "project"));
 
   return {
     formatVersion: STORMWORKS_SW_MCL_FORMAT_VERSION,
     sourceName: program.metadata.sourceName,
     moduleId,
-    ports: submodule ? buildSwMclPorts(submodule, nodeById) : [],
+    ports: submodule ? buildSwMclPorts(submodule, nodeById, pinNameByProjectNodeId) : [],
     instances: submodule ? buildSwMclInstances(submodule, nodeById) : buildFallbackSwMclInstances(program),
     warnings: program.metadata.warnings.map((warning) => warning.message),
   };
@@ -69,6 +73,7 @@ export function serializeStormworksSwMcl(
 function buildSwMclPorts(
   submodule: IrSubmodule,
   nodeById: Map<string, IrNode>,
+  pinNameByProjectNodeId: Map<string, string>,
 ): SwMclPortDocument[] {
   const occurrenceByKey = new Map<string, number>();
   const ports: SwMclPortDocument[] = [];
@@ -81,7 +86,7 @@ function buildSwMclPorts(
     }
 
     const direction = String(node.properties.direction ?? "output") === "input" ? "in" : "out";
-    const name = String(node.properties.name ?? node.properties.label ?? node.id);
+    const name = resolvePortNodeName(node, pinNameByProjectNodeId);
     const occurrenceKey = `${direction}:${name}`;
     const occurrence = (occurrenceByKey.get(occurrenceKey) ?? 0) + 1;
     occurrenceByKey.set(occurrenceKey, occurrence);

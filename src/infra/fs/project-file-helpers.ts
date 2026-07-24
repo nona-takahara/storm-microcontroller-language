@@ -1,25 +1,9 @@
 import { type ProjectJsonDocument, type ProjectJsonSubmoduleDocument } from "../../core/serializers/project-json.js";
 
 // Keep entry-module selection consistent for both project loading and layout generation.
-export function selectEntrySubmodule(
-  project: ProjectJsonDocument,
-  preferredModuleId?: string,
-): ProjectJsonSubmoduleDocument | undefined {
-  if (preferredModuleId) {
-    const preferred =
-      project.submodules.find((submodule) => submodule.id === preferredModuleId) ??
-      project.submodules.find((submodule) => submodule.name === preferredModuleId);
-
-    if (preferred) {
-      return preferred;
-    }
-  }
-
-  return (
-    project.submodules.find((submodule) => submodule.id === "main") ??
-    project.submodules.find((submodule) => submodule.name === "main") ??
-    (project.submodules.length === 1 ? project.submodules[0] : undefined)
-  );
+// project.json declares at most one submodule, so this just surfaces it, if any.
+export function selectEntrySubmodule(project: ProjectJsonDocument): ProjectJsonSubmoduleDocument | undefined {
+  return project.submodule ?? undefined;
 }
 
 // Node exposes file-system failures as objects with code; avoid instanceof checks across runtimes.

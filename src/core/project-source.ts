@@ -1199,14 +1199,10 @@ function applyEntryDocumentPath(
 ): ProjectJsonDocument {
   return {
     ...project,
-    submodules: project.submodules.map((submodule) =>
-      submodule.id === moduleId || submodule.name === moduleId
-        ? {
-            ...submodule,
-            relativePath: entryDocumentId,
-          }
-        : submodule,
-    ),
+    submodule:
+      project.submodule && project.submodule.name === moduleId
+        ? { ...project.submodule, relativePath: entryDocumentId }
+        : project.submodule,
   };
 }
 
