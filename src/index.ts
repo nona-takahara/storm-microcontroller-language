@@ -20,3 +20,4 @@ export * from "./core/serializers/sw-net-shared.js";
 export * from "./core/serializers/sw-net.js";
 export * from "./core/exporters/xml.js";
 export * from "./core/exporters/xml-tree.js";
+export * from "./core/module-net-view.js";

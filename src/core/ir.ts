@@ -3,7 +3,11 @@ import { type Diagnostic } from "./diagnostics.js";
 export type IrScalarValue = boolean | number | string | null;
 
 export type IrSignalKind = "number" | "boolean" | "composite" | "video" | "audio" | "execute" | "unknown";
-export type IrNodeLayer = "project" | "submodule" | "logic";
+// "use" is an unflattened sw-net `use` statement instance -- an opaque reference to a submodule,
+// distinct from "submodule" (a module boundary port pin; see importers/xml.ts's
+// synthesizeSubmodulePorts). Only produced by the single-module view in module-net-view.ts, which
+// deliberately does not flatten into `use` targets.
+export type IrNodeLayer = "project" | "submodule" | "logic" | "use";
 
 export interface IrVector2 {
   x: number;

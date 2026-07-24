@@ -57,15 +57,17 @@ import { serializeStormworksSwNet } from "./serializers/sw-net.js";
 export interface StormworksSourceDocument {
   documentId: string;
   swNet: SwNetDocument;
-  swMcl: StormworksSwMclDocument;
+  // null means no .sw-mcl file existed on disk (or none was supplied) — "no layout data", handled
+  // uniformly by treating it the same as a missing swMclByDocumentPath map entry (see
+  // buildSwMclByDocumentPath and xml-tree.ts's tryResolveModuleSwMcl below).
+  swMcl: StormworksSwMclDocument | null;
   scripts: Record<string, string>;
-  // "generated" means no .sw-mcl file existed on disk and swMcl is a placeholder stub (treated as "no
-  // layout data" by buildSwMclByDocumentPath below); "computed" means an implicit auto-layout pass
-  // filled the module in memory for this export only (see computeProjectLayoutOverrides in
-  // layout-dsl-runner.ts) and should be treated as real layout data even though nothing was written
-  // back to disk; undefined/"file" means swMcl reflects real (possibly hand-authored) layout data read
-  // from disk. Only file loaders and applyLayoutOverride set this.
-  swMclOrigin?: "file" | "generated" | "computed";
+  // "computed" means an implicit auto-layout pass filled the module in memory for this export only
+  // (see computeProjectLayoutOverrides in layout-dsl-runner.ts) and should be treated as real layout
+  // data even though nothing was written back to disk; undefined/"file" means swMcl reflects real
+  // (possibly hand-authored) layout data read from disk, or there is no swMcl at all (swMcl === null).
+  // Only file loaders and applyLayoutOverride set this.
+  swMclOrigin?: "file" | "computed";
 }
 
 export interface StormworksProjectSource {
@@ -86,14 +88,17 @@ export interface StormworksDocumentLoader {
 export interface StormworksSourceDocumentTextInput {
   documentId: string;
   swNetText: string;
-  swMclText: string;
+  // Omitted/undefined means no .sw-mcl file exists — produces swMcl: null rather than parsing a stub.
+  swMclText?: string;
   scripts?: Record<string, string>;
 }
 
 export interface StormworksSourceDocumentTexts {
   documentId: string;
   swNetText: string;
-  swMclText: string;
+  // null means the source document's swMcl is null (no real layout data) — callers should skip
+  // writing a .sw-mcl file in that case rather than serializing a placeholder.
+  swMclText: string | null;
   scripts: Record<string, string>;
 }
 
@@ -143,7 +148,7 @@ export function parseSourceDocumentTexts(
       swNet: parseSwNetDocument(input.swNetText, {
         sourceName: input.documentId,
       }),
-      swMcl: parseStormworksSwMclText(input.swMclText),
+      swMcl: input.swMclText === undefined ? null : parseStormworksSwMclText(input.swMclText),
     }),
     "library",
     "DOCUMENT_PARSE_FAILED",
@@ -172,7 +177,7 @@ export function serializeSourceDocumentTexts(
   return {
     documentId: sourceDocument.documentId,
     swNetText: serializeSwNetDocument(sourceDocument.swNet),
-    swMclText: JSON.stringify(sourceDocument.swMcl, null, 2),
+    swMclText: sourceDocument.swMcl ? JSON.stringify(sourceDocument.swMcl, null, 2) : null,
     scripts: { ...sourceDocument.scripts },
   };
 }
@@ -208,6 +213,21 @@ export function importStormworksXmlToProjectSource(
     diagnostics.push(...parsedSourceDocument.diagnostics);
 
     if (!parsedSourceDocument.value) {
+      return { diagnostics };
+    }
+
+    // swMclText is always supplied above, so this is always non-null; guarded rather than asserted
+    // so a future change to this construction fails loudly instead of crashing on `.moduleId`.
+    if (!parsedSourceDocument.value.swMcl) {
+      diagnostics.push(
+        createErrorDiagnostic(
+          "XML_IMPORT_TO_PROJECT_SOURCE_FAILED",
+          "Internal error: synthesized sw-mcl document was unexpectedly null.",
+          "xml",
+          options.sourceName,
+        ),
+      );
+
       return { diagnostics };
     }
 
@@ -425,7 +445,7 @@ async function collectProjectSourceDiagnostics(
   }
 
   if (
-    projectSource.entryDocument.swMclOrigin !== "generated" &&
+    projectSource.entryDocument.swMcl !== null &&
     projectSource.entryDocument.swMcl.moduleId !== projectSource.entryModuleId
   ) {
     diagnostics.push(
@@ -590,13 +610,13 @@ function validateSourceDocument(
   diagnostics: Diagnostic[],
   projectSource: StormworksProjectSource,
 ): void {
-  const hasLayoutModule = sourceDocument.swNet.modules.some(
-    (module) => module.id === sourceDocument.swMcl.moduleId,
-  );
-
   // A missing .sw-mcl file is not an error: export falls back to a degraded shared-anchor layout.
   // Only a real, hand-authored .sw-mcl that names a module that doesn't exist is a genuine bug.
-  if (!hasLayoutModule && sourceDocument.swMclOrigin !== "generated") {
+  const hasLayoutModule =
+    sourceDocument.swMcl === null ||
+    sourceDocument.swNet.modules.some((module) => module.id === sourceDocument.swMcl?.moduleId);
+
+  if (!hasLayoutModule && sourceDocument.swMcl) {
     diagnostics.push(
       createErrorDiagnostic(
         "SW_MCL_MODULE_MISSING",
@@ -1197,14 +1217,11 @@ function compareSourceDocuments(left: StormworksSourceDocument, right: Stormwork
 
 // Give the XML tree exporter access to every resolved document's own sw-mcl, keyed by document path,
 // so `use` statements that pull in a module from another document can resolve its layout too.
-// Documents whose sw-mcl was auto-generated (no real file on disk, and no in-memory auto-layout
-// override applied either) are omitted so the exporter treats them as "no layout data" and falls back
-// to its existing degraded shared-anchor placement. "computed" documents (an override was applied) are
-// kept, same as "file", since they carry real (if not persisted) layout data.
-function buildSwMclByDocumentPath(documents: StormworksSourceDocument[]): Map<string, StormworksSwMclDocument> {
-  return new Map(
-    documents
-      .filter((document) => document.swMclOrigin !== "generated")
-      .map((document) => [document.documentId, document.swMcl] as const),
-  );
+// Documents with no real .sw-mcl data (swMcl === null: no file on disk, and no in-memory auto-layout
+// override applied either) map to a null value here rather than being omitted — xml-tree.ts's
+// tryResolveModuleSwMcl treats a null map value the same as a missing key, so this filtering is
+// actually optional today; it's kept mainly so callers reading this map directly see an honest
+// "no data" signal instead of having to know that convention themselves.
+function buildSwMclByDocumentPath(documents: StormworksSourceDocument[]): Map<string, StormworksSwMclDocument | null> {
+  return new Map(documents.map((document) => [document.documentId, document.swMcl] as const));
 }
