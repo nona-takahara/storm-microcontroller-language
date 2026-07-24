@@ -54,7 +54,9 @@ export async function resolveLayoutTargets(
   }
 
   if (options.allSubmodules) {
-    return project.submodules.map((submodule) => buildTargetFromSubmodule(directoryPath, submodule, options.module));
+    // project.json declares at most one submodule, so "all submodules" and the default entry
+    // resolution below converge on the same single target.
+    return project.submodule ? [buildTargetFromSubmodule(directoryPath, project.submodule, options.module)] : [];
   }
 
   const entrySubmodule = selectEntrySubmodule(project);
@@ -264,6 +266,6 @@ function buildTargetFromSubmodule(
     documentId: swNetPath,
     swNetPath,
     swMclPath: replaceSwNetExtension(swNetPath, ".sw-mcl"),
-    moduleId: moduleId ?? submodule.id,
+    moduleId: moduleId ?? submodule.name,
   };
 }

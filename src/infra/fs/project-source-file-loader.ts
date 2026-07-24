@@ -93,7 +93,7 @@ export async function loadProjectSourceFromProjectJsonFile(
       value: {
         project,
         entryDocument,
-        entryModuleId: entrySubmodule?.id ?? entryDocument.swMcl.moduleId,
+        entryModuleId: entrySubmodule?.name ?? entryDocument.swMcl.moduleId,
         sourceName: project.sourceName ?? filePaths.projectJsonPath,
         warnings: project.warnings.map((warning) =>
           createWarningDiagnostic("PROJECT_JSON_WARNING", warning, "project", filePaths.projectJsonPath),
@@ -163,9 +163,7 @@ export async function writeProjectSourceToDirectory(
 ): Promise<void> {
   const resolvedOutputDirectory = resolve(outputDirectory);
   const serializedEntry = serializeSourceDocumentTexts(projectSource.entryDocument);
-  const entrySubmodule =
-    selectEntrySubmodule(projectSource.project, projectSource.entryModuleId) ??
-    selectEntrySubmodule(projectSource.project);
+  const entrySubmodule = selectEntrySubmodule(projectSource.project);
   const entryRelativePath = entrySubmodule?.relativePath ?? DEFAULT_ENTRY_SW_NET_FILE_NAME;
   const entrySwNetPath = join(resolvedOutputDirectory, ...entryRelativePath.split("/"));
   const entrySwMclPath = replaceSwNetExtension(entrySwNetPath, ".sw-mcl");
