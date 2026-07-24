@@ -25,3 +25,5 @@ export * from "./core/compare/types.js";
 export * from "./core/compare/comparable-node.js";
 export * from "./core/compare/module-graph-comparator.js";
 export * from "./core/compare/format.js";
+export * from "./core/compare/project-flattener.js";
+export * from "./core/compare/project-comparator.js";
