@@ -70,6 +70,41 @@ describe("compareSwNetModules exact matching", () => {
     expect(result.value?.verdict).toBe("different");
     expect(result.value?.reason).toContain("Exhaustive search");
   });
+
+  it("reports a present literal input versus an absent input as verdict-breaking", () => {
+    const modules = fixtureModules("properties.sw-net");
+    const result = compareSwNetModules(modules.get("literal")!, modules.get("absent")!);
+
+    expect(result.value?.verdict).toBe("different");
+    expect(result.value?.unmatchedInA).toEqual([]);
+    expect(result.value?.unmatchedInB).toEqual([]);
+    expect(result.value?.differences).toEqual([
+      expect.objectContaining({
+        kind: "property-value-mismatch",
+        source: "literalInput",
+        key: "a",
+        valueA: 1,
+      }),
+    ]);
+    expect(result.value?.differences[0]).not.toHaveProperty("valueB");
+  });
+
+  it("reports differing attributes on topologically matched nodes as verdict-breaking", () => {
+    const modules = fixtureModules("properties.sw-net");
+    const result = compareSwNetModules(modules.get("attribute_a")!, modules.get("attribute_b")!);
+
+    expect(result.value?.verdict).toBe("different");
+    expect(result.value?.matchedPairs).toHaveLength(3);
+    expect(result.value?.differences).toEqual([
+      expect.objectContaining({
+        kind: "property-value-mismatch",
+        source: "attribute",
+        key: "min",
+        valueA: 0,
+        valueB: -1,
+      }),
+    ]);
+  });
 });
 
 function singleModule(name: string): SwNetModule {

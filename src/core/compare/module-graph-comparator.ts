@@ -95,7 +95,7 @@ export function compareComparableModuleGraphs(
       options.maxSearchSteps ?? DEFAULT_MAX_SEARCH_STEPS,
     );
     if (search.kind === "found") {
-      return resultFromPairs("equivalent", search.pairs, a, b, diagnostics);
+      return resultFromCompleteCorrespondence(search.pairs, a, b, diagnostics);
     }
 
     return resultFromPairs(
@@ -123,7 +123,7 @@ export function compareComparableModuleGraphs(
     );
   }
 
-  return resultFromPairs("equivalent", pairs, a, b, diagnostics);
+  return resultFromCompleteCorrespondence(pairs, a, b, diagnostics);
 }
 
 type SearchResult =
@@ -329,6 +329,60 @@ function compareLinks(
 
 function linkKey(link: IrLink): string {
   return JSON.stringify([link.from.nodeId, link.from.portKey, link.to.nodeId, link.to.portKey]);
+}
+
+function resultFromCompleteCorrespondence(
+  pairs: MatchedNodePair[],
+  a: ComparableModuleGraph,
+  b: ComparableModuleGraph,
+  diagnostics: NetworkComparisonResult["diagnostics"],
+): NetworkComparisonResult {
+  const propertyDifferences = compareProperties(pairs);
+  return resultFromPairs(
+    propertyDifferences.length > 0 ? "different" : "equivalent",
+    pairs,
+    a,
+    b,
+    diagnostics,
+    propertyDifferences.length > 0
+      ? `${propertyDifferences.length} matched-node property value mismatch(es) found.`
+      : undefined,
+    propertyDifferences,
+  );
+}
+
+function compareProperties(pairs: MatchedNodePair[]): NetworkDifference[] {
+  return pairs.flatMap((pair) => [
+    ...comparePropertySource(pair, "attribute", pair.a.attributes, pair.b.attributes),
+    ...comparePropertySource(pair, "literalInput", pair.a.literalInputs, pair.b.literalInputs),
+  ]);
+}
+
+function comparePropertySource(
+  pair: MatchedNodePair,
+  source: "attribute" | "literalInput",
+  valuesA: Record<string, import("../ir.js").IrScalarValue>,
+  valuesB: Record<string, import("../ir.js").IrScalarValue>,
+): NetworkDifference[] {
+  return [...new Set([...Object.keys(valuesA), ...Object.keys(valuesB)])]
+    .sort()
+    .flatMap((key): NetworkDifference[] => {
+      const hasA = Object.hasOwn(valuesA, key);
+      const hasB = Object.hasOwn(valuesB, key);
+      if (hasA === hasB && valuesA[key] === valuesB[key]) {
+        return [];
+      }
+
+      return [{
+        kind: "property-value-mismatch",
+        nodeA: pair.a,
+        nodeB: pair.b,
+        source,
+        key,
+        ...(hasA ? { valueA: valuesA[key] } : {}),
+        ...(hasB ? { valueB: valuesB[key] } : {}),
+      }];
+    });
 }
 
 function resultFromPairs(
