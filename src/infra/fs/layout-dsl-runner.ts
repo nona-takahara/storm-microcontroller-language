@@ -325,11 +325,11 @@ export function applyLayoutOverride(
   return {
     ...document,
     swMcl: override,
-    // A module with no .sw-mcl file on disk at all ("generated") must be re-tagged so
-    // buildSwMclByDocumentPath (project-source.ts) treats the computed layout as real data instead of
-    // filtering it out as "no layout data"; a module whose .sw-mcl file existed but was merely
-    // incomplete keeps its "file" origin since real (if partial) data was already on disk.
-    swMclOrigin: document.swMclOrigin === "generated" ? "computed" : document.swMclOrigin,
+    // A module with no .sw-mcl file on disk at all (swMcl === null) must be re-tagged "computed" so
+    // downstream readers treat the computed layout as real data instead of "no layout data"; a module
+    // whose .sw-mcl file existed but was merely incomplete keeps its "file" origin since real (if
+    // partial) data was already on disk.
+    swMclOrigin: document.swMcl === null ? "computed" : document.swMclOrigin,
   };
 }
 
@@ -352,19 +352,21 @@ export function applyProjectSourceLayoutOverrides(
   overridesByDocumentId: Map<string, StormworksSwMclDocument>,
 ): StormworksProjectSource {
   // When no .sw-mcl file exists on disk and project.json doesn't declare an explicit entry submodule,
-  // loadProjectSourceFromProjectJsonFile can only guess entryModuleId from the generated stub (the
-  // entry .sw-net file's basename), which is wrong whenever the file's sole/entry module has a
-  // different real id. The old write-then-reload flow picked up the correct id automatically because
-  // it re-read the freshly written .sw-mcl; now that nothing is written, adopt the override's real
-  // moduleId ourselves so collectProjectSourceDiagnostics's entry-module/layout-moduleId check doesn't
-  // fire spuriously against the stub's guess.
-  const wasGenerated = projectSource.entryDocument.swMclOrigin === "generated";
+  // loadProjectSourceFromProjectJsonFile can only guess entryModuleId from the entry .sw-net file's
+  // basename, which is wrong whenever the file's sole/entry module has a different real id. The old
+  // write-then-reload flow picked up the correct id automatically because it re-read the freshly
+  // written .sw-mcl; now that nothing is written, adopt the override's real moduleId ourselves so
+  // collectProjectSourceDiagnostics's entry-module/layout-moduleId check doesn't fire spuriously
+  // against the guessed id.
+  const wasGenerated = projectSource.entryDocument.swMcl === null;
   const entryDocument = applyLayoutOverride(projectSource.entryDocument, overridesByDocumentId);
 
   return {
     ...projectSource,
     entryDocument,
-    entryModuleId: wasGenerated ? entryDocument.swMcl.moduleId : projectSource.entryModuleId,
+    entryModuleId: wasGenerated
+      ? (entryDocument.swMcl?.moduleId ?? projectSource.entryModuleId)
+      : projectSource.entryModuleId,
   };
 }
 
