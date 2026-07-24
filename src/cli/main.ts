@@ -793,8 +793,7 @@ function resolveEntryDocumentRelativePath(
   projectSource: StormworksProjectSource,
 ): string {
   const entrySubmodule =
-    projectSource?.project.submodules.find((submodule) => submodule.id === projectSource.entryModuleId) ??
-    projectSource?.project.submodules.find((submodule) => submodule.name === projectSource.entryModuleId);
+    projectSource.project.submodule?.name === projectSource.entryModuleId ? projectSource.project.submodule : undefined;
 
   return entrySubmodule?.relativePath ?? "main.sw-net";
 }

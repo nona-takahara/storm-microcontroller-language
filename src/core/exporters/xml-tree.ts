@@ -15,7 +15,7 @@ import {
 import { createWarningDiagnostic, type Diagnostic } from "../diagnostics.js";
 import { type IrSignalKind, type IrScalarValue, type IrVector2 } from "../ir.js";
 import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement, type SwNetModule } from "../parsers/sw-net.js";
-import { type ProjectJsonDocument, type ProjectJsonLinkDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
+import { type ProjectJsonDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
 import { addVector } from "../serializers/submodule-layout.js";
 import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
@@ -187,10 +187,8 @@ export function buildStormworksXmlTree(
   const logicInstances = buildLogicInstanceContexts(flattenedInstances, options.definitions, allocator);
   const projectNodes = buildProjectNodeContexts(input.project, options.definitions, allocator);
   const projectPortBindings = bindProjectNodesToModulePorts(
-    input.project.links,
     projectNodes,
     buildModulePortSlots(entryModule.module, swMclModule, submoduleCanvasOrigin, warnings),
-    entryModule.key.moduleId,
     warnings,
   );
 
@@ -287,17 +285,15 @@ function resolveSubmoduleCanvasOrigin(
   moduleId: string,
   warnings: Diagnostic[],
 ): IrVector2 | null {
-  // sw-mcl stores module-local positions; project.json provides the placement anchor for XML export.
-  const matchingSubmodule =
-    project.submodules.find((submodule) => submodule.id === moduleId) ??
-    project.submodules.find((submodule) => submodule.name === moduleId);
-
-  if (!matchingSubmodule) {
+  // sw-mcl stores module-local positions; project.json's submodule entry is just a presence check
+  // here since its canvas position is always the origin (auto-generated submodules start at {0,0}
+  // and let sw-mcl own the inner layout).
+  if (project.submodule?.name !== moduleId) {
     pushExportWarning(warnings, `project.json does not define a submodule entry for ${moduleId}; treating sw-mcl positions as absolute.`);
     return null;
   }
 
-  return matchingSubmodule.position;
+  return { x: 0, y: 0 };
 }
 
 // Allocate XML ids deterministically while avoiding collisions between regenerated nodes.
@@ -399,22 +395,19 @@ function buildModulePortSlots(
   });
 }
 
-// Bind project-surface nodes to concrete module-port occurrences using project.json links.
+// Bind project-surface nodes to module-port occurrences by matching each project.json node's own id
+// against the .sw-net port declared with the same name (see shared/pin-naming.ts, which is what
+// guarantees the two always agree) -- project.json no longer carries a separate links array.
 function bindProjectNodesToModulePorts(
-  links: ProjectJsonLinkDocument[],
   projectNodes: ProjectNodeContext[],
   portSlots: ModulePortSlot[],
-  entryModuleId: string,
   warnings: Diagnostic[],
 ): ProjectPortBindingContext {
-  const projectNodeById = new Map(projectNodes.map((node) => [node.document.id, node] as const));
   const portSlotsByName = new Map<string, ModulePortSlot[]>();
-  const pendingProjectNodesByPort = new Map<string, ProjectNodeContext[]>();
   const portSlotsByProjectNodeId = new Map<string, ModulePortSlot>();
   const projectNodeByPortKey = new Map<string, ProjectNodeContext>();
 
   for (const portSlot of portSlots) {
-    // Group slots by semantic name first, then bind concrete occurrences in project-link order.
     const key = formatPortNameKey(portSlot.direction, portSlot.name);
     const list = portSlotsByName.get(key);
 
@@ -426,98 +419,43 @@ function bindProjectNodesToModulePorts(
     portSlotsByName.set(key, [portSlot]);
   }
 
-  for (const link of links) {
-    const binding = resolveProjectPortLink(link, projectNodeById, entryModuleId);
+  for (const projectNode of projectNodes) {
+    const direction = projectNode.direction === "input" ? "in" : "out";
+    const key = formatPortNameKey(direction, projectNode.document.id);
+    const slots = portSlotsByName.get(key);
 
-    if (!binding) {
+    if (!slots || slots.length === 0) {
+      // No sw-net port shares this project node's id; under the id-equality contract that means
+      // this pin is simply not connected to the entry module.
       continue;
     }
 
-    const key = formatPortNameKey(binding.direction, binding.portName);
-    const list = pendingProjectNodesByPort.get(key);
+    if (slots.length > 1) {
+      pushExportWarning(
+        warnings,
+        `sw-net declares ${slots.length} ${key} ports sharing the same name; project.json node ${projectNode.document.id} is ambiguous, using the first.`,
+      );
+    }
 
-    if (list) {
-      list.push(binding.projectNode);
+    const slot = slots[0];
+
+    if (!slot) {
       continue;
     }
 
-    pendingProjectNodesByPort.set(key, [binding.projectNode]);
-  }
+    portSlotsByProjectNodeId.set(projectNode.document.id, slot);
 
-  for (const [key, boundProjectNodes] of pendingProjectNodesByPort) {
-    const slots = portSlotsByName.get(key) ?? [];
-
-    // project.json and sw-net must agree on how many concrete ports exist for a given semantic name.
-    if (slots.length !== boundProjectNodes.length) {
-      pushExportWarning(warnings, `Project links reference ${boundProjectNodes.length} ${key} port(s), but sw-net defines ${slots.length}.`);
+    if (projectNodeByPortKey.has(key)) {
+      pushExportWarning(warnings, `Multiple project nodes map to ${key}; later matches may be ambiguous.`);
     }
 
-    const count = Math.min(slots.length, boundProjectNodes.length);
-
-    for (let index = 0; index < count; index += 1) {
-      const slot = slots[index];
-      const projectNode = boundProjectNodes[index];
-
-      if (!slot || !projectNode) {
-        continue;
-      }
-
-      portSlotsByProjectNodeId.set(projectNode.document.id, slot);
-
-      if (projectNodeByPortKey.has(formatPortNameKey(slot.direction, slot.name))) {
-        pushExportWarning(
-          warnings,
-          `Multiple project nodes map to ${formatPortNameKey(slot.direction, slot.name)}; later matches may be ambiguous.`,
-        );
-      }
-
-      projectNodeByPortKey.set(formatPortNameKey(slot.direction, slot.name), projectNode);
-    }
+    projectNodeByPortKey.set(key, projectNode);
   }
 
   return {
     portSlotsByProjectNodeId,
     projectNodeByPortKey,
   };
-}
-
-// Resolve one project.json link into a project-node-to-module-port binding candidate.
-function resolveProjectPortLink(
-  link: ProjectJsonLinkDocument,
-  projectNodeById: Map<string, ProjectNodeContext>,
-  entryModuleId: string,
-): { projectNode: ProjectNodeContext; direction: "in" | "out"; portName: string } | undefined {
-  if (link.from.kind === "node" && link.to.kind === "submodule_port" && link.to.submodule === entryModuleId) {
-    const projectNode = link.from.id ? projectNodeById.get(link.from.id) : undefined;
-    const portName = link.to.port;
-
-    if (!projectNode || !portName) {
-      return undefined;
-    }
-
-    return {
-      projectNode,
-      direction: "in",
-      portName,
-    };
-  }
-
-  if (link.from.kind === "submodule_port" && link.from.submodule === entryModuleId && link.to.kind === "node") {
-    const projectNode = link.to.id ? projectNodeById.get(link.to.id) : undefined;
-    const portName = link.from.port;
-
-    if (!projectNode || !portName) {
-      return undefined;
-    }
-
-    return {
-      projectNode,
-      direction: "out",
-      portName,
-    };
-  }
-
-  return undefined;
 }
 
 // Allocate XML ids and resolve component definitions for the already-flattened instance list.

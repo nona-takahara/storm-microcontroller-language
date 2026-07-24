@@ -71,3 +71,25 @@ Gate coverage as of the current definitions: all known boolean logic, arithmetic
 - `src/index.ts` — browser-safe, pure logic only (no Node.js I/O)
 - `src/node.ts` — re-exports `index.ts` + `src/infra/fs/` helpers (file I/O, path resolution)
 - `src/cli/main.ts` — CLI entry, imports only from `node.ts`
+
+## Delegating to Codex (`codex exec`)
+
+Delegation to Codex is **off by default** in this repository. Claude implements code directly, as it always has. Claude may proactively suggest delegating a suitable task to Codex at any point, but must not actually invoke `codex exec` unless the user has explicitly authorized/declared Codex delegation for the current session — there's no fixed trigger phrase; an explicit go-ahead from the user in that session is what matters.
+
+This repo is WSL/`pnpm`-canonical (see `AGENTS.md`), so there's no host-switching wrapper script to route through, unlike repos in this workspace that split a Windows-only toolchain from WSL.
+
+Once delegation is authorized for the session, invoke Codex as:
+
+```bash
+codex exec -s workspace-write -C "$(pwd)" "<task instructions>"
+```
+
+- `-s workspace-write` allows file edits but disables network access by default. Tasks that need registry access (e.g. `pnpm add`) may require `-s danger-full-access` — call that out explicitly before using it rather than escalating silently.
+- `-C` pins the working root to this repository.
+
+Codex's own conventions live in `AGENTS.md`. Review every Codex diff against it before accepting, checking in particular:
+- `pnpm check` passes
+- the IR/pipeline layering (Importer → IR → Serializers/Parsers → Exporters) wasn't bypassed
+- `src/definitions.json`'s schema version wasn't touched without cause
+- behavior-notes conventions (English text, `confidence` field) were respected
+- scope wasn't expanded beyond what was asked

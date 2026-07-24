@@ -2,6 +2,7 @@
 import { type NodeDefinitionRegistry } from "../definitions/loader.js";
 import { type ComponentDefinition } from "../definitions/schema.js";
 import { type IrLink, type IrNode, type IrProgram, type IrScalarValue, type IrSubmodule } from "../ir.js";
+import { resolvePinNames, resolvePortNodeName } from "../shared/pin-naming.js";
 import { coerceScalarValue } from "../shared/scalar-coercion.js";
 import {
   compareSwNetIdentifier,
@@ -81,6 +82,9 @@ export function renderStormworksSwNet(
     (options.definitions?.components ?? []).map((definition) => [definition.id, definition] as const),
   );
   const submodules = [...program.submodules].sort(compareById);
+  // project.json's node ids double as module port names (see shared/pin-naming.ts), so port
+  // declarations and every DSL reference to them must use this exact same map.
+  const pinNameByProjectNodeId = resolvePinNames(program.nodes.filter((node) => node.layer === "project"));
 
   // Old or partial IRs may not expose submodules yet, so fall back to a synthetic main module.
   if (submodules.length === 0) {
@@ -94,11 +98,12 @@ export function renderStormworksSwNet(
       program,
       nodeById,
       componentById,
+      pinNameByProjectNodeId,
     );
   }
 
   return submodules
-    .map((submodule) => renderModule(submodule, program, nodeById, componentById))
+    .map((submodule) => renderModule(submodule, program, nodeById, componentById, pinNameByProjectNodeId))
     .join("\n\n");
 }
 
@@ -108,6 +113,7 @@ function renderModule(
   program: IrProgram,
   nodeById: Map<string, IrNode>,
   componentById: Map<string, ComponentDefinition>,
+  pinNameByProjectNodeId: Map<string, string>,
 ): string {
   const lines: string[] = [];
   const submoduleNodeIds = new Set([...submodule.portNodeIds, ...submodule.logicNodeIds]);
@@ -128,7 +134,7 @@ function renderModule(
   lines.push(`module ${formatBareIdentifier(submodule.name)}`);
 
   for (const portNode of portNodes) {
-    lines.push(`  ${renderModulePort(portNode)}`);
+    lines.push(`  ${renderModulePort(portNode, pinNameByProjectNodeId)}`);
   }
 
   if (portNodes.length > 0 && logicNodes.length > 0) {
@@ -137,7 +143,7 @@ function renderModule(
 
   for (const logicNode of logicNodes) {
     lines.push(
-      `  ${renderInstance(logicNode, linksByTargetNodeId, linksBySourceNodeId, nodeById, componentById)}`,
+      `  ${renderInstance(logicNode, linksByTargetNodeId, linksBySourceNodeId, nodeById, componentById, pinNameByProjectNodeId)}`,
     );
   }
 
@@ -147,10 +153,10 @@ function renderModule(
 }
 
 // Render a project-facing boundary node as a sw-net port declaration.
-function renderModulePort(node: IrNode): string {
+function renderModulePort(node: IrNode, pinNameByProjectNodeId: Map<string, string>): string {
   const direction = String(node.properties.direction ?? "unknown") === "input" ? "in" : "out";
   const signal = String(node.properties.signal ?? "unknown");
-  const name = formatQuotedReference(String(node.properties.name ?? node.properties.label ?? node.id));
+  const name = formatQuotedReference(resolvePortNodeName(node, pinNameByProjectNodeId));
 
   return `port ${direction} ${name} : ${signal}`;
 }
@@ -162,6 +168,7 @@ function renderInstance(
   linksBySourceNodeId: Map<string, IrLink[]>,
   nodeById: Map<string, IrNode>,
   componentById: Map<string, ComponentDefinition>,
+  pinNameByProjectNodeId: Map<string, string>,
 ): string {
   // Links are folded into the inst line so the DSL stays SPICE-like and easy to eyeball.
   const definition = componentById.get(node.definitionId);
@@ -171,12 +178,14 @@ function renderInstance(
   const inputAssignments = collectInputAssignments(
     linksByTargetNodeId.get(node.id) ?? [],
     nodeById,
+    pinNameByProjectNodeId,
   );
   const outputAssignments = collectOutputAssignments(
     instanceName,
     definition,
     linksBySourceNodeId.get(node.id) ?? [],
     nodeById,
+    pinNameByProjectNodeId,
   );
   const attributesText =
     attributeAssignments.length > 0 ? ` (${attributeAssignments.join(", ")})` : "";
@@ -261,10 +270,11 @@ function collectAttributeAssignments(
 function collectInputAssignments(
   incomingLinks: IrLink[],
   nodeById: Map<string, IrNode>,
+  pinNameByProjectNodeId: Map<string, string>,
 ): string[] {
   return [...incomingLinks]
     .sort(compareInputLinks)
-    .map((link) => `${link.to.portKey}=${resolveIncomingReference(link, nodeById)}`);
+    .map((link) => `${link.to.portKey}=${resolveIncomingReference(link, nodeById, pinNameByProjectNodeId)}`);
 }
 
 // Render outgoing links as right-hand-side pin assignments, inferring named outputs when possible.
@@ -273,6 +283,7 @@ function collectOutputAssignments(
   definition: ComponentDefinition | undefined,
   outgoingLinks: IrLink[],
   nodeById: Map<string, IrNode>,
+  pinNameByProjectNodeId: Map<string, string>,
 ): string[] {
   const assignments: string[] = [];
   const outgoingLinksByPort = groupLinksBy(outgoingLinks, (link) => link.from.portKey);
@@ -293,7 +304,7 @@ function collectOutputAssignments(
       }
 
       if (targetNode?.layer === "submodule") {
-        modulePortReferences.add(formatQuotedReference(String(targetNode.properties.name ?? targetNode.id)));
+        modulePortReferences.add(formatQuotedReference(resolvePortNodeName(targetNode, pinNameByProjectNodeId)));
       }
     }
 
@@ -349,7 +360,11 @@ function resolveOutputPortKeys(
 }
 
 // Convert an incoming link source into either a quoted module-port reference or an internal net name.
-function resolveIncomingReference(link: IrLink, nodeById: Map<string, IrNode>): string {
+function resolveIncomingReference(
+  link: IrLink,
+  nodeById: Map<string, IrNode>,
+  pinNameByProjectNodeId: Map<string, string>,
+): string {
   const sourceNode = nodeById.get(link.from.nodeId);
 
   if (!sourceNode) {
@@ -357,7 +372,7 @@ function resolveIncomingReference(link: IrLink, nodeById: Map<string, IrNode>): 
   }
 
   if (sourceNode.layer === "submodule") {
-    return formatQuotedReference(String(sourceNode.properties.name ?? sourceNode.id));
+    return formatQuotedReference(resolvePortNodeName(sourceNode, pinNameByProjectNodeId));
   }
 
   return createInternalNetName(getSwNetInstanceName(sourceNode), link.from.portKey);
