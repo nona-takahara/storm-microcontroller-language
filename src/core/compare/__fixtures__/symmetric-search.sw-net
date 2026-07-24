@@ -27,3 +27,17 @@ module cutoff_b
   inst ABS b5 : ->
   inst ABS b6 : ->
 end
+
+module search_mismatch_a
+  inst ABS a1 : -> out=left
+  inst ABS a2 : value=left ->
+  inst ABS a3 : -> out=right
+  inst ABS a4 : value=right ->
+end
+
+module search_mismatch_b
+  inst ABS b1 : -> out=first
+  inst ABS b2 : value=first -> out=second
+  inst ABS b3 : value=second ->
+  inst ABS b4 : ->
+end

@@ -39,12 +39,36 @@ describe("compareSwNetModules exact matching", () => {
     expect(result.value?.reason).toContain("multiset differs");
   });
 
-  it("does not guess among symmetric candidates before bounded search is available", () => {
+  it("finds a correspondence among symmetric candidates", () => {
     const modules = fixtureModules("symmetric-search.sw-net");
     const result = compareSwNetModules(modules.get("symmetric_a")!, modules.get("symmetric_b")!);
 
+    expect(result.value?.verdict).toBe("equivalent");
+    expect(result.value?.matchedPairs).toHaveLength(3);
+    expect(result.value?.differences).toEqual([]);
+  });
+
+  it("reports indeterminate only when the search budget truncates ambiguity", () => {
+    const modules = fixtureModules("symmetric-search.sw-net");
+    const result = compareSwNetModules(
+      modules.get("cutoff_a")!,
+      modules.get("cutoff_b")!,
+      { maxSearchSteps: 1 },
+    );
+
     expect(result.value?.verdict).toBe("indeterminate");
-    expect(result.value?.reason).toContain("bounded search");
+    expect(result.value?.reason).toContain("Search budget exhausted");
+  });
+
+  it("reports different when ambiguous search is exhausted without a match", () => {
+    const modules = fixtureModules("symmetric-search.sw-net");
+    const result = compareSwNetModules(
+      modules.get("search_mismatch_a")!,
+      modules.get("search_mismatch_b")!,
+    );
+
+    expect(result.value?.verdict).toBe("different");
+    expect(result.value?.reason).toContain("Exhaustive search");
   });
 });
 

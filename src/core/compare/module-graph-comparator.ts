@@ -15,16 +15,15 @@ export interface NetworkComparisonOptions {
   maxSearchSteps?: number;
 }
 
+export const DEFAULT_MAX_SEARCH_STEPS = 10_000;
+
 /**
  * Compare two modules without treating instance ids, statement order, or layout as identity.
- *
- * The initial implementation intentionally stops at unresolved symmetric type classes. Bounded
- * search for those classes is layered on separately; this function never guesses a correspondence.
  */
 export function compareSwNetModules(
   a: SwNetModule,
   b: SwNetModule,
-  _options: NetworkComparisonOptions = {},
+  options: NetworkComparisonOptions = {},
 ): StormworksLibraryResult<NetworkComparisonResult> {
   const normalizedA = normalizeComparableModule(a);
   const normalizedB = normalizeComparableModule(b);
@@ -35,7 +34,7 @@ export function compareSwNetModules(
   }
 
   return {
-    value: compareComparableModuleGraphs(normalizedA.value, normalizedB.value, diagnostics),
+    value: compareComparableModuleGraphs(normalizedA.value, normalizedB.value, diagnostics, options),
     diagnostics,
   };
 }
@@ -44,6 +43,7 @@ export function compareComparableModuleGraphs(
   a: ComparableModuleGraph,
   b: ComparableModuleGraph,
   diagnostics: Diagnostic[] = [],
+  options: NetworkComparisonOptions = {},
 ): NetworkComparisonResult {
   const countMismatches = compareNodeKindCounts(a, b);
 
@@ -77,15 +77,36 @@ export function compareComparableModuleGraphs(
   const hasForcedMismatch = propagateForcedPairs(a, b, pairs);
 
   if (pairs.length < a.nodes.length) {
+    if (hasForcedMismatch) {
+      return resultFromPairs(
+        "different",
+        pairs,
+        a,
+        b,
+        diagnostics,
+        "A forced node has no candidate with matching incident endpoint/port wiring.",
+      );
+    }
+
+    const search = searchCorrespondence(
+      a,
+      b,
+      pairs,
+      options.maxSearchSteps ?? DEFAULT_MAX_SEARCH_STEPS,
+    );
+    if (search.kind === "found") {
+      return resultFromPairs("equivalent", search.pairs, a, b, diagnostics);
+    }
+
     return resultFromPairs(
-      hasForcedMismatch ? "different" : "indeterminate",
+      search.kind === "truncated" ? "indeterminate" : "different",
       pairs,
       a,
       b,
       diagnostics,
-      hasForcedMismatch
-        ? "A forced node has no candidate with matching incident endpoint/port wiring."
-        : "Structurally ambiguous node classes require bounded search.",
+      search.kind === "truncated"
+        ? `Search budget exhausted after ${search.steps} candidate assignments.`
+        : `Exhaustive search found no endpoint/port-preserving correspondence after ${search.steps} candidate assignments.`,
     );
   }
 
@@ -103,6 +124,83 @@ export function compareComparableModuleGraphs(
   }
 
   return resultFromPairs("equivalent", pairs, a, b, diagnostics);
+}
+
+type SearchResult =
+  | { kind: "found"; pairs: MatchedNodePair[]; steps: number }
+  | { kind: "exhausted" | "truncated"; steps: number };
+
+function searchCorrespondence(
+  a: ComparableModuleGraph,
+  b: ComparableModuleGraph,
+  forcedPairs: MatchedNodePair[],
+  maxSearchSteps: number,
+): SearchResult {
+  const pairs = [...forcedPairs];
+  const matchedA = new Set(pairs.map((pair) => pair.a.node.id));
+  const matchedB = new Set(pairs.map((pair) => pair.b.node.id));
+  let steps = 0;
+  let truncated = false;
+
+  const visit = (): MatchedNodePair[] | undefined => {
+    if (pairs.length === a.nodes.length) {
+      return compareLinks(a, b, pairs).length === 0 ? [...pairs] : undefined;
+    }
+
+    const bIdByAId = new Map(pairs.map((pair) => [pair.a.node.id, pair.b.node.id] as const));
+    const next = a.nodes
+      .filter((node) => !matchedA.has(node.node.id))
+      .map((nodeA) => ({
+        nodeA,
+        choices: b.nodes.filter(
+          (nodeB) =>
+            !matchedB.has(nodeB.node.id) &&
+            comparableNodeKind(nodeA) === comparableNodeKind(nodeB) &&
+            mappedIncidentKeys(a.links, nodeA.node.id, bIdByAId).join("\n") ===
+              incidentKeys(b.links, nodeB.node.id, matchedB).join("\n"),
+        ),
+      }))
+      .sort(
+        (left, right) =>
+          left.choices.length - right.choices.length ||
+          comparableNodeKind(left.nodeA).localeCompare(comparableNodeKind(right.nodeA)) ||
+          left.nodeA.node.id.localeCompare(right.nodeA.node.id),
+      )[0];
+
+    if (!next || next.choices.length === 0) {
+      return undefined;
+    }
+
+    for (const nodeB of next.choices.sort((left, right) => left.node.id.localeCompare(right.node.id))) {
+      if (steps >= Math.max(0, maxSearchSteps)) {
+        truncated = true;
+        return undefined;
+      }
+      steps += 1;
+      pairs.push({ a: next.nodeA, b: nodeB });
+      matchedA.add(next.nodeA.node.id);
+      matchedB.add(nodeB.node.id);
+
+      const found = visit();
+      if (found) {
+        return found;
+      }
+
+      pairs.pop();
+      matchedA.delete(next.nodeA.node.id);
+      matchedB.delete(nodeB.node.id);
+      if (truncated) {
+        return undefined;
+      }
+    }
+
+    return undefined;
+  };
+
+  const found = visit();
+  return found
+    ? { kind: "found", pairs: found, steps }
+    : { kind: truncated ? "truncated" : "exhausted", steps };
 }
 
 function propagateForcedPairs(a: ComparableModuleGraph, b: ComparableModuleGraph, pairs: MatchedNodePair[]): boolean {
