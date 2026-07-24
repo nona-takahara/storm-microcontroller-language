@@ -19,6 +19,7 @@ pnpm cli xml2dsl <input.xml> --out-dir <output-dir>   # Stormworks XML → proje
 pnpm cli dsl2xml <project.json> --out <output.xml>    # project.json + sw-net + sw-mcl → XML
 pnpm cli check-dsl <project.json>
 pnpm cli typecheck-dsl <project.json>
+pnpm cli compare-dsl <a> <b> [--module-a <id>] [--module-b <id>] [--json]
 pnpm cli layout-dsl <project.json> [--module <id>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]
 pnpm cli spec [<definitionId>] [--list] [--json]   # gate/tool behavior reference, see below
 ```
@@ -30,7 +31,9 @@ pnpm mcp          # run the stdio MCP server directly via tsx
 storm-mcl-mcp    # installed/built package binary
 ```
 
-The MCP server exposes `xml_to_dsl`, `dsl_to_xml`, `check_dsl`, `typecheck_dsl`, and `spec`. The `spec` tool intentionally mirrors `storm-mcl spec` because its overview, gate list, and per-gate behavior notes are optimized for AI-agent reference workflows. Keep MCP-facing descriptions and result text in English for global client compatibility.
+The MCP server exposes `xml_to_dsl`, `dsl_to_xml`, `check_dsl`, `typecheck_dsl`, `compare_dsl`, `layout_dsl`, and `spec`. The `spec` tool intentionally mirrors `storm-mcl spec` because its overview, gate list, and per-gate behavior notes are optimized for AI-agent reference workflows. Keep MCP-facing descriptions and result text in English for global client compatibility.
+
+`compare-dsl`/`compare_dsl` uses port-key-strict matching. As an intentional v1 limitation, re-serializing a commutative gate with its inputs swapped (for example AND, OR, or ADD) is reported as different even though the circuit is semantically equivalent.
 
 ## Architecture
 

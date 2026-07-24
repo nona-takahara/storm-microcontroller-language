@@ -87,10 +87,13 @@ Available MCP tools mirror the core CLI workflows.
 | `dsl_to_xml` | Convert a DSL project back into Stormworks XML, optionally writing it to a path. |
 | `check_dsl` | Validate DSL syntax and import resolution. |
 | `typecheck_dsl` | Validate signal types and report port mismatches. |
+| `compare_dsl` | Compare two `project.json` or `.sw-net` inputs for structural equivalence; supports paired `module_id_a`/`module_id_b` selectors and JSON output. |
 | `spec` | Read the same gate/tool behavior reference as `storm-mcl spec`; use `list=true`, `gate_id`, and/or `json=true`. |
 | `layout_dsl` | Compute (and by default write) `.sw-mcl` auto-layout, same as `storm-mcl layout-dsl`; supports `module_id`/`document_path`, `all_submodules`, `force`, `dry_run`, and `grid_size`. |
 
 All MCP tool descriptions and responses are written in English so global MCP clients can display them consistently.
+
+`compare-dsl`/`compare_dsl` uses port-key-strict matching. As an intentional v1 limitation, re-serializing a commutative gate with its inputs swapped (for example AND, OR, or ADD) is reported as different even though the circuit is semantically equivalent.
 
 ## DSL format
 

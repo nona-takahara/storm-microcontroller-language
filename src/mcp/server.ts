@@ -13,6 +13,8 @@ import {
   computeProjectLayoutOverrides,
   createFileSystemProjectSourceDocumentLoader,
   createLayoutOverridingDocumentLoader,
+  formatNetworkComparison,
+  formatProjectComparison,
   formatGateSpecListText,
   formatGateSpecText,
   formatSpecOverviewText,
@@ -25,6 +27,7 @@ import {
   readUtf8TextFile,
   resolveLayoutTargets,
   resolveProjectSource,
+  runCompareDsl,
   runLayoutDslForTarget,
   validateProjectSource,
   writeProjectSourceToDirectory,
@@ -176,6 +179,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ["project_json_path"],
       },
     },
+    {
+      name: "compare_dsl",
+      description:
+        "Compare two project.json or .sw-net inputs for structural equivalence, ignoring instance names, declaration order, and layout. Provide both module IDs to compare one module pair; omit both for fully flattened project comparison.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path_a: {
+            type: "string",
+            description: "Absolute path to the first project.json or .sw-net input",
+          },
+          path_b: {
+            type: "string",
+            description: "Absolute path to the second project.json or .sw-net input",
+          },
+          module_id_a: {
+            type: "string",
+            description: "Optional module ID in the first input; must be paired with module_id_b",
+          },
+          module_id_b: {
+            type: "string",
+            description: "Optional module ID in the second input; must be paired with module_id_a",
+          },
+          json: {
+            type: "boolean",
+            description: "When true, return the structured comparison result as JSON",
+          },
+        },
+        required: ["path_a", "path_b"],
+      },
+    },
   ],
 }));
 
@@ -204,6 +238,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             force?: boolean;
             dry_run?: boolean;
             grid_size?: number;
+          },
+        );
+      case "compare_dsl":
+        return await handleCompareDsl(
+          args as {
+            path_a: string;
+            path_b: string;
+            module_id_a?: string;
+            module_id_b?: string;
+            json?: boolean;
           },
         );
       default:
@@ -413,6 +457,45 @@ async function handleLayoutDsl(args: {
 
   const text = sections.join("\n\n");
   return hasErrors ? errorResult(text) : textResult(text);
+}
+
+async function handleCompareDsl(args: {
+  path_a: string;
+  path_b: string;
+  module_id_a?: string;
+  module_id_b?: string;
+  json?: boolean;
+}) {
+  if ((args.module_id_a === undefined) !== (args.module_id_b === undefined)) {
+    return errorResult("Provide both module_id_a and module_id_b, or omit both.");
+  }
+
+  const result = await runCompareDsl(
+    { path: args.path_a, moduleId: args.module_id_a },
+    { path: args.path_b, moduleId: args.module_id_b },
+  );
+  const diagnostics = [...result.loadDiagnostics, ...result.diagnostics];
+
+  if (!result.comparison) {
+    const diagnosticText = formatDiagnostics(diagnostics);
+    return errorResult(diagnosticText || "Comparison failed.");
+  }
+
+  const comparisonText = args.json
+    ? JSON.stringify(result.comparison, null, 2)
+    : result.kind === "network"
+      ? formatNetworkComparison(result.comparison)
+      : formatProjectComparison(result.comparison);
+  const diagnosticText = formatDiagnostics(diagnostics);
+  const text =
+    diagnosticText && !args.json
+      ? `${comparisonText}\n\nDiagnostics:\n${diagnosticText}`
+      : comparisonText;
+  const hasErrors = diagnostics.some((diagnostic) => diagnostic.severity === "error");
+
+  return hasErrors || result.comparison.verdict !== "equivalent"
+    ? errorResult(text)
+    : textResult(text);
 }
 
 async function handleTypecheckDsl(args: { project_json_path: string }) {
