@@ -18,6 +18,7 @@ export interface ComparablePortIdentity {
 export interface ComparableNode {
   node: IrNode;
   port?: ComparablePortIdentity;
+  provenance?: ProvenancePath;
   attributes: Record<string, IrScalarValue>;
   literalInputs: Record<string, IrScalarValue>;
 }
