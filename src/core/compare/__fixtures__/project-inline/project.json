@@ -1,4 +1,21 @@
 {
+  "formatVersion": "stormworks-project-json-v10",
   "name": "inline",
-  "entry": "./main.sw-net"
+  "entry": "./main.sw-net",
+  "description": null,
+  "width": null,
+  "length": null,
+  "icon": null,
+  "nodes": [],
+  "constants": [],
+  "submodules": [
+    {
+      "id": "main",
+      "name": "main",
+      "relativePath": "main.sw-net",
+      "position": null
+    }
+  ],
+  "links": [],
+  "warnings": []
 }
