@@ -24,6 +24,7 @@ export interface FlattenSwNetProjectOptions {
 export interface FlattenedSwNetProject {
   module: SwNetModule;
   provenanceByInstanceId: Record<string, ProvenancePath>;
+  documentPathByInstanceId: Record<string, string>;
 }
 
 /**
@@ -45,6 +46,7 @@ export function flattenSwNetProject(
   );
   const statements: SwNetStatement[] = [];
   const provenanceByInstanceId: Record<string, ProvenancePath> = {};
+  const documentPathByInstanceId: Record<string, string> = {};
   const rootBindings = new Map(
     entry.module.ports.map((port) => [portBindingKey(port), stringExpression(port.name)] as const),
   );
@@ -56,6 +58,7 @@ export function flattenSwNetProject(
     moduleByKey,
     statements,
     provenanceByInstanceId,
+    documentPathByInstanceId,
   );
 
   return {
@@ -66,6 +69,7 @@ export function flattenSwNetProject(
         statements,
       },
       provenanceByInstanceId,
+      documentPathByInstanceId,
     },
     diagnostics,
   };
@@ -78,6 +82,7 @@ function flattenModule(
   moduleByKey: Map<string, SwNetResolvedModule>,
   statements: SwNetStatement[],
   provenanceByInstanceId: Record<string, ProvenancePath>,
+  documentPathByInstanceId: Record<string, string>,
 ): void {
   const useByInstanceId = new Map(
     resolved.uses.map((use) => [use.statement.instanceId, use] as const),
@@ -97,6 +102,7 @@ function flattenModule(
         moduleId: resolved.module.id,
         instanceIds: [...instancePath, statement.instanceId],
       };
+      documentPathByInstanceId[flattenedId] = resolved.key.documentPath;
       continue;
     }
 
@@ -125,6 +131,7 @@ function flattenModule(
       moduleByKey,
       statements,
       provenanceByInstanceId,
+      documentPathByInstanceId,
     );
   }
 }
