@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseSwNetDocument } from "../parsers/sw-net.js";
+import { createTranslator } from "../i18n/index.js";
 import { formatNetworkComparison, formatProjectComparison } from "./format.js";
 import { compareSwNetModules } from "./module-graph-comparator.js";
 import { type ProjectComparisonResult } from "./types.js";
@@ -43,6 +44,16 @@ describe("comparison formatting", () => {
     expect(formatted).toContain("Module comparisons (1):");
     expect(formatted).toContain("a:main ↔ b:main: equivalent");
     expect(formatted).toContain("Unmatched modules in A: a:unused");
+  });
+
+  it("localizes human-facing comparison text without changing the result", () => {
+    const module = parseSwNetDocument("module main\nend").modules[0]!;
+    const result = compareSwNetModules(module, module).value!;
+
+    const formatted = formatNetworkComparison(result, createTranslator("ja"));
+    expect(formatted).toContain("ネットワーク比較: 同等");
+    expect(formatted).toContain("一致したノード: 0");
+    expect(result.verdict).toBe("equivalent");
   });
 
   it("renders module-grouped project differences", () => {

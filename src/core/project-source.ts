@@ -225,6 +225,11 @@ export function importStormworksXmlToProjectSource(
           "Internal error: synthesized sw-mcl document was unexpectedly null.",
           "xml",
           options.sourceName,
+          undefined,
+          {
+            messageId: "diagnostic.internalError",
+            messageArgs: { detail: "synthesized sw-mcl document was unexpectedly null." },
+          },
         ),
       );
 
@@ -242,12 +247,15 @@ export function importStormworksXmlToProjectSource(
       diagnostics,
     };
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     diagnostics.push(
       createErrorDiagnostic(
         "XML_IMPORT_TO_PROJECT_SOURCE_FAILED",
-        error instanceof Error ? error.message : String(error),
+        detail,
         "xml",
         options.sourceName,
+        undefined,
+        { messageId: "diagnostic.operationFailed", messageArgs: { detail } },
       ),
     );
 
@@ -365,12 +373,15 @@ export async function buildStormworksXmlTreeFromProjectSource(
       diagnostics,
     };
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     diagnostics.push(
       createErrorDiagnostic(
         "XML_TREE_BUILD_FAILED",
-        error instanceof Error ? error.message : String(error),
+        detail,
         "xml",
         projectSource.entryDocument.documentId,
+        undefined,
+        { messageId: "diagnostic.operationFailed", messageArgs: { detail } },
       ),
     );
 
@@ -415,12 +426,15 @@ export async function buildStormworksXmlFromProjectSource(
       diagnostics,
     };
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     diagnostics.push(
       createErrorDiagnostic(
         "XML_BUILD_FAILED",
-        error instanceof Error ? error.message : String(error),
+        detail,
         "xml",
         projectSource.entryDocument.documentId,
+        undefined,
+        { messageId: "diagnostic.operationFailed", messageArgs: { detail } },
       ),
     );
 
@@ -454,6 +468,14 @@ async function collectProjectSourceDiagnostics(
         `entryDocument.swMcl.moduleId is ${projectSource.entryDocument.swMcl.moduleId}, expected ${projectSource.entryModuleId}.`,
         "sw-mcl",
         projectSource.entryDocument.documentId,
+        undefined,
+        {
+          messageId: "project.entryLayoutMismatch",
+          messageArgs: {
+            actual: projectSource.entryDocument.swMcl.moduleId,
+            expected: projectSource.entryModuleId,
+          },
+        },
       ),
     );
   }
@@ -529,6 +551,10 @@ async function preloadProjectSourceDocuments(
             "library",
             currentDocument.documentId,
             imported.path,
+            {
+              messageId: "project.importLoaderRequired",
+              messageArgs: { documentId: currentDocument.documentId, path: imported.path },
+            },
           ),
         );
         continue;
@@ -548,6 +574,10 @@ async function preloadProjectSourceDocuments(
               "library",
               currentDocument.documentId,
               imported.path,
+              {
+                messageId: "project.importNotFound",
+                messageArgs: { path: imported.path, documentId: currentDocument.documentId },
+              },
             ),
           );
           continue;
@@ -560,13 +590,15 @@ async function preloadProjectSourceDocuments(
           pendingDocumentIds.push(loadedDocument.documentId);
         }
       } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
         diagnostics.push(
           createErrorDiagnostic(
             "IMPORTED_DOCUMENT_LOAD_FAILED",
-            error instanceof Error ? error.message : String(error),
+            detail,
             "library",
             currentDocument.documentId,
             imported.path,
+            { messageId: "diagnostic.operationFailed", messageArgs: { detail } },
           ),
         );
       }
@@ -597,6 +629,7 @@ function validateProjectDocument(
           "project",
           undefined,
           node.id,
+          { messageId: "project.nodeDefinitionMissing", messageArgs: { type: node.type } },
         ),
       );
     }
@@ -621,8 +654,13 @@ function validateSourceDocument(
       createErrorDiagnostic(
         "SW_MCL_MODULE_MISSING",
         `sw-mcl moduleId ${sourceDocument.swMcl.moduleId} does not exist in ${sourceDocument.documentId}.`,
-        "sw-mcl",
-        sourceDocument.documentId,
+      "sw-mcl",
+      sourceDocument.documentId,
+      undefined,
+      {
+        messageId: "project.swMclModuleMissing",
+        messageArgs: { moduleId: sourceDocument.swMcl.moduleId, documentId: sourceDocument.documentId },
+      },
       ),
     );
   }
@@ -635,8 +673,13 @@ function validateSourceDocument(
       createErrorDiagnostic(
         "ENTRY_MODULE_NOT_FOUND",
         `Entry module ${projectSource.entryModuleId} does not exist in ${sourceDocument.documentId}.`,
-        "sw-net",
-        sourceDocument.documentId,
+      "sw-net",
+      sourceDocument.documentId,
+      undefined,
+      {
+        messageId: "project.entryModuleNotFound",
+        messageArgs: { moduleId: projectSource.entryModuleId, documentId: sourceDocument.documentId },
+      },
       ),
     );
   }
@@ -668,6 +711,7 @@ function validateInstStatement(
         "sw-net",
         sourceDocument.documentId,
         statement.instanceId,
+        { messageId: "project.componentDefinitionMissing", messageArgs: { typeId: statement.typeId } },
       ),
     );
   }
@@ -685,6 +729,10 @@ function validateInstStatement(
         "script",
         sourceDocument.documentId,
         statement.instanceId,
+        {
+          messageId: "project.scriptMissing",
+          messageArgs: { scriptRef, documentId: sourceDocument.documentId },
+        },
       ),
     );
   }
@@ -708,6 +756,10 @@ function validateUseStatements(swNet: SwNetResolutionResult, diagnostics: Diagno
             "sw-net",
             callerModule.key.documentPath,
             statement.instanceId,
+            {
+              messageId: "project.duplicateUseInstance",
+              messageArgs: { instanceId: statement.instanceId, moduleId: callerModule.key.moduleId },
+            },
           ),
         );
       }
@@ -759,6 +811,14 @@ function validateUseStatement(
           "sw-net",
           use.caller.documentPath,
           use.statement.instanceId,
+          {
+            messageId: "project.unboundUseInput",
+            messageArgs: {
+              portName: JSON.stringify(inputPort.name),
+              moduleId: use.target.moduleId,
+              instanceId: use.statement.instanceId,
+            },
+          },
         ),
       );
     }
@@ -796,6 +856,10 @@ function validateUsePortAssignments(
           "sw-net",
           use.caller.documentPath,
           use.statement.instanceId,
+          {
+            messageId: "project.portAssignedMultiple",
+            messageArgs: { portName: JSON.stringify(assignment.key), instanceId: use.statement.instanceId },
+          },
         ),
       );
     }
@@ -812,6 +876,14 @@ function validateUsePortAssignments(
           "sw-net",
           use.caller.documentPath,
           use.statement.instanceId,
+          {
+            messageId: "project.modulePortMissing",
+            messageArgs: {
+              moduleId: use.target.moduleId,
+              portName: JSON.stringify(assignment.key),
+              instanceId: use.statement.instanceId,
+            },
+          },
         ),
       );
     }
@@ -938,6 +1010,14 @@ function netKeyForAssignment(
           "sw-net",
           resolvedModule.key.documentPath,
           resolvedModule.key.moduleId,
+          {
+            messageId: "project.moduleInputDrivenInternally",
+            messageArgs: {
+              context: contextLabel,
+              portName: JSON.stringify(portName),
+              moduleId: resolvedModule.key.moduleId,
+            },
+          },
         ),
       );
       return undefined;
@@ -1118,6 +1198,14 @@ function reportNetSignalMismatch(
       "sw-net",
       resolvedModule.key.documentPath,
       resolvedModule.key.moduleId,
+      {
+        messageId: "project.netSignalMismatch",
+        messageArgs: {
+          netKey: JSON.stringify(describeNetKey(netKey)),
+          moduleId: resolvedModule.key.moduleId,
+          edges: edgeDescriptions,
+        },
+      },
     ),
   );
 }

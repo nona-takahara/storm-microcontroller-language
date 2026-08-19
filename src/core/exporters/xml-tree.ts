@@ -13,6 +13,7 @@ import {
   type ProjectNodeDefinition,
 } from "../definitions/schema.js";
 import { createWarningDiagnostic, type Diagnostic } from "../diagnostics.js";
+import { type LocalizedMessage } from "../i18n/index.js";
 import { type IrSignalKind, type IrScalarValue, type IrVector2 } from "../ir.js";
 import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement, type SwNetModule } from "../parsers/sw-net.js";
 import { type ProjectJsonDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
@@ -131,8 +132,13 @@ const DEFAULT_GROUP_DATA_TYPE = "-1104064832";
 
 // Export warnings are emitted as structured diagnostics at their source so callers do not need
 // adapter code that can drift between CLI, MCP, and library entry points.
-function pushExportWarning(warnings: Diagnostic[], message: string, path?: string): void {
-  warnings.push(createWarningDiagnostic("EXPORT_WARNING", message, "exporter", undefined, path));
+function pushExportWarning(
+  warnings: Diagnostic[],
+  message: string,
+  path?: string,
+  localized?: LocalizedMessage,
+): void {
+  warnings.push(createWarningDiagnostic("EXPORT_WARNING", message, "exporter", undefined, path, localized));
 }
 
 
@@ -155,6 +161,8 @@ export function buildStormworksXmlTree(
     pushExportWarning(
       warnings,
       `sw-mcl for entry module ${entryModule.key.moduleId} was not found; instances will share the module canvas anchor position.`,
+      undefined,
+      { messageId: "export.entryLayoutMissing", messageArgs: { moduleId: entryModule.key.moduleId } },
     );
   }
 
@@ -289,7 +297,12 @@ function resolveSubmoduleCanvasOrigin(
   // here since its canvas position is always the origin (auto-generated submodules start at {0,0}
   // and let sw-mcl own the inner layout).
   if (project.submodule?.name !== moduleId) {
-    pushExportWarning(warnings, `project.json does not define a submodule entry for ${moduleId}; treating sw-mcl positions as absolute.`);
+    pushExportWarning(
+      warnings,
+      `project.json does not define a submodule entry for ${moduleId}; treating sw-mcl positions as absolute.`,
+      undefined,
+      { messageId: "export.submoduleEntryMissing", messageArgs: { moduleId } },
+    );
     return null;
   }
 
@@ -381,7 +394,12 @@ function buildModulePortSlots(
     const position = positionByKey.get(key);
 
     if (!position) {
-      pushExportWarning(warnings, `sw-mcl is missing a port layout entry for ${key}.`);
+      pushExportWarning(
+        warnings,
+        `sw-mcl is missing a port layout entry for ${key}.`,
+        undefined,
+        { messageId: "export.portLayoutMissing", messageArgs: { portKey: key } },
+      );
     }
 
     return {
@@ -434,6 +452,11 @@ function bindProjectNodesToModulePorts(
       pushExportWarning(
         warnings,
         `sw-net declares ${slots.length} ${key} ports sharing the same name; project.json node ${projectNode.document.id} is ambiguous, using the first.`,
+        undefined,
+        {
+          messageId: "export.ambiguousNamedPorts",
+          messageArgs: { count: slots.length, portKey: key, nodeId: projectNode.document.id },
+        },
       );
     }
 
@@ -446,7 +469,12 @@ function bindProjectNodesToModulePorts(
     portSlotsByProjectNodeId.set(projectNode.document.id, slot);
 
     if (projectNodeByPortKey.has(key)) {
-      pushExportWarning(warnings, `Multiple project nodes map to ${key}; later matches may be ambiguous.`);
+      pushExportWarning(
+        warnings,
+        `Multiple project nodes map to ${key}; later matches may be ambiguous.`,
+        undefined,
+        { messageId: "export.ambiguousProjectNodes", messageArgs: { portKey: key } },
+      );
     }
 
     projectNodeByPortKey.set(key, projectNode);
@@ -557,10 +585,16 @@ function resolveInstancePosition(
           "exporter",
           undefined,
           namespacedInstanceId,
+          { messageId: "export.instanceLayoutMissing", messageArgs: { instanceId: namespacedInstanceId } },
         ),
       );
     } else {
-      pushExportWarning(warnings, `sw-mcl is missing an instance layout entry for ${namespacedInstanceId}.`);
+      pushExportWarning(
+        warnings,
+        `sw-mcl is missing an instance layout entry for ${namespacedInstanceId}.`,
+        undefined,
+        { messageId: "export.instanceLayoutMissing", messageArgs: { instanceId: namespacedInstanceId } },
+      );
     }
   }
 
@@ -619,14 +653,30 @@ function resolveFlattenExpr(
         direction === "out" && modulePorts.in.has(expr.value)
           ? `${contextLabel} tries to drive its own input port "${expr.value}"; an input port has exactly one producer (the caller's binding), so a module cannot also drive it internally.`
           : `${contextLabel} references undeclared module port "${expr.value}".`;
-      pushExportWarning(warnings, message);
+      pushExportWarning(
+        warnings,
+        message,
+        undefined,
+        {
+          messageId: "export.undeclaredModulePort",
+          messageArgs: { context: contextLabel, portName: JSON.stringify(expr.value) },
+        },
+      );
       return undefined;
     }
 
     const resolved = portBindings.get(formatPortBindingKey(portDirection, expr.value));
 
     if (!resolved) {
-      pushExportWarning(warnings, `${contextLabel} references undeclared module port "${expr.value}".`);
+      pushExportWarning(
+        warnings,
+        `${contextLabel} references undeclared module port "${expr.value}".`,
+        undefined,
+        {
+          messageId: "export.undeclaredModulePort",
+          messageArgs: { context: contextLabel, portName: JSON.stringify(expr.value) },
+        },
+      );
       return undefined;
     }
 
@@ -788,6 +838,14 @@ function flattenModule(
       pushExportWarning(
         warnings,
         `sw-mcl for module ${formatModuleKey(useEdge.target)} was not found; instances embedded via "${namespacedInstanceId}" will share its anchor position.`,
+        undefined,
+        {
+          messageId: "export.moduleLayoutMissing",
+          messageArgs: {
+            moduleKey: formatModuleKey(useEdge.target),
+            instanceId: JSON.stringify(namespacedInstanceId),
+          },
+        },
       );
     }
 
@@ -823,7 +881,12 @@ function buildNetProducerIndex(
     (instance) => instance.statement,
     (instance, outputKey) => ({ instance, outputKey }),
     (netName) => {
-      pushExportWarning(warnings, `Multiple instance outputs drive net ${netName}; using the first producer.`);
+      pushExportWarning(
+        warnings,
+        `Multiple instance outputs drive net ${netName}; using the first producer.`,
+        undefined,
+        { messageId: "export.duplicateNetProducer", messageArgs: { netName } },
+      );
     },
   );
 }
@@ -974,7 +1037,15 @@ function applyInstanceAttributes(
     const scalarValue = expressionToScalarValue(attribute.value);
 
     if (scalarValue === undefined) {
-      pushExportWarning(warnings, `Attribute ${attribute.key} on ${instance.statement.instanceId} is not a scalar and was skipped.`);
+      pushExportWarning(
+        warnings,
+        `Attribute ${attribute.key} on ${instance.statement.instanceId} is not a scalar and was skipped.`,
+        undefined,
+        {
+          messageId: "export.attributeNonScalar",
+          messageArgs: { attributeKey: attribute.key, instanceId: instance.statement.instanceId },
+        },
+      );
       continue;
     }
 
@@ -1108,7 +1179,12 @@ function applyScriptReferenceAttribute(
   const scriptRef = typeof scalarValue === "string" ? scalarValue : undefined;
 
   if (!scriptRef) {
-    pushExportWarning(warnings, `script_ref on ${instance.statement.instanceId} is not a string and was skipped.`);
+    pushExportWarning(
+      warnings,
+      `script_ref on ${instance.statement.instanceId} is not a string and was skipped.`,
+      undefined,
+      { messageId: "export.scriptRefInvalid", messageArgs: { instanceId: instance.statement.instanceId } },
+    );
     return;
   }
 
@@ -1120,7 +1196,12 @@ function applyScriptReferenceAttribute(
   });
 
   if (scriptText === undefined) {
-    pushExportWarning(warnings, `No script text resolver value was provided for ${scriptRef}; exporting an empty Lua script.`);
+    pushExportWarning(
+      warnings,
+      `No script text resolver value was provided for ${scriptRef}; exporting an empty Lua script.`,
+      undefined,
+      { messageId: "export.scriptTextMissing", messageArgs: { scriptRef } },
+    );
   }
 
   asTreeElement(componentElement.object)["@_script"] = scriptText ?? "";
@@ -1139,7 +1220,15 @@ function resolveXmlInputElement(
     const producer = netProducerByName.get(input.value.value);
 
     if (!producer) {
-      pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} references unknown net ${input.value.value}.`);
+      pushExportWarning(
+        warnings,
+        `Input ${input.key} on ${instance.statement.instanceId} references unknown net ${input.value.value}.`,
+        undefined,
+        {
+          messageId: "export.unknownNet",
+          messageArgs: { inputKey: input.key, instanceId: instance.statement.instanceId, netName: input.value.value },
+        },
+      );
       return undefined;
     }
 
@@ -1172,7 +1261,15 @@ function resolveXmlInputElement(
     const producer = producers[0];
 
     if (!producer) {
-      pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} references unknown module input port ${input.value.value}.`);
+      pushExportWarning(
+        warnings,
+        `Input ${input.key} on ${instance.statement.instanceId} references unknown module input port ${input.value.value}.`,
+        undefined,
+        {
+          messageId: "export.unknownInputPort",
+          messageArgs: { inputKey: input.key, instanceId: instance.statement.instanceId, portName: input.value.value },
+        },
+      );
       return undefined;
     }
 
@@ -1188,7 +1285,12 @@ function resolveXmlInputElement(
     return element;
   }
 
-  pushExportWarning(warnings, `Input ${input.key} on ${instance.statement.instanceId} uses a non-net expression and was skipped.`);
+  pushExportWarning(
+    warnings,
+    `Input ${input.key} on ${instance.statement.instanceId} uses a non-net expression and was skipped.`,
+    undefined,
+    { messageId: "export.nonNetInput", messageArgs: { inputKey: input.key, instanceId: instance.statement.instanceId } },
+  );
   return undefined;
 }
 
@@ -1350,7 +1452,12 @@ function buildBridgeObjectElement(
       "@_y": formatXmlNumber(position.y),
     };
   } else {
-    pushExportWarning(warnings, `No bridge position was found for project node ${projectNode.document.id}.`);
+    pushExportWarning(
+      warnings,
+      `No bridge position was found for project node ${projectNode.document.id}.`,
+      undefined,
+      { messageId: "export.bridgePositionMissing", messageArgs: { nodeId: projectNode.document.id } },
+    );
   }
 
   if (projectNode.direction === "output") {
@@ -1358,7 +1465,12 @@ function buildBridgeObjectElement(
 
     // Output bridges point from the project pin back into the logic body through component_id/node_index pairs.
     if (producers.length === 0) {
-      pushExportWarning(warnings, `Project output ${projectNode.document.id} is not driven by any sw-net output assignment.`);
+      pushExportWarning(
+        warnings,
+        `Project output ${projectNode.document.id} is not driven by any sw-net output assignment.`,
+        undefined,
+        { messageId: "export.projectOutputUndriven", messageArgs: { nodeId: projectNode.document.id } },
+      );
     }
 
     producers.forEach((producer, producerIndex) => {
@@ -1529,7 +1641,12 @@ function applyItemListWriteTarget(
   warnings: Diagnostic[],
 ): void {
   if (typeof value !== "string") {
-    pushExportWarning(warnings, `Expected a JSON string for item-list target ${segment}.`);
+    pushExportWarning(
+      warnings,
+      `Expected a JSON string for item-list target ${segment}.`,
+      undefined,
+      { messageId: "export.itemListExpectedString", messageArgs: { segment } },
+    );
     return;
   }
 
@@ -1538,12 +1655,22 @@ function applyItemListWriteTarget(
   try {
     items = JSON.parse(value);
   } catch {
-    pushExportWarning(warnings, `Failed to parse JSON for item-list target ${segment}; left unset.`);
+    pushExportWarning(
+      warnings,
+      `Failed to parse JSON for item-list target ${segment}; left unset.`,
+      undefined,
+      { messageId: "export.itemListInvalidJson", messageArgs: { segment } },
+    );
     return;
   }
 
   if (!Array.isArray(items)) {
-    pushExportWarning(warnings, `Expected a JSON array for item-list target ${segment}; left unset.`);
+    pushExportWarning(
+      warnings,
+      `Expected a JSON array for item-list target ${segment}; left unset.`,
+      undefined,
+      { messageId: "export.itemListExpectedArray", messageArgs: { segment } },
+    );
     return;
   }
 

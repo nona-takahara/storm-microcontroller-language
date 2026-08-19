@@ -43,6 +43,7 @@ export function resolveSwNetModuleGraph(
         "module-net-view",
         undefined,
         instanceId,
+        { messageId: "graph.instanceLayoutMismatch", messageArgs: { instanceId: JSON.stringify(instanceId) } },
       ),
     );
   }
@@ -60,6 +61,9 @@ export function resolveSwNetModuleGraph(
           "DUPLICATE_NET_PRODUCER",
           `Multiple instance outputs drive net ${netName}; using the first producer.`,
           "module-net-view",
+          undefined,
+          undefined,
+          { messageId: "graph.duplicateNetProducer", messageArgs: { netName } },
         ),
       );
     },
@@ -189,6 +193,14 @@ function resolveInputSource(
           "module-net-view",
           undefined,
           statement.instanceId,
+          {
+            messageId: "graph.unresolvedNet",
+            messageArgs: {
+              inputKey: JSON.stringify(assignment.key),
+              instanceId: JSON.stringify(statement.instanceId),
+              netName: JSON.stringify(assignment.value.value),
+            },
+          },
         ),
       );
     }
@@ -207,6 +219,14 @@ function resolveInputSource(
           "module-net-view",
           undefined,
           statement.instanceId,
+          {
+            messageId: "graph.unresolvedInputPort",
+            messageArgs: {
+              inputKey: JSON.stringify(assignment.key),
+              instanceId: JSON.stringify(statement.instanceId),
+              portName: JSON.stringify(assignment.value.value),
+            },
+          },
         ),
       );
 
@@ -246,6 +266,14 @@ function resolveOutputTarget(
         "module-net-view",
         undefined,
         statement.instanceId,
+        {
+          messageId: "graph.unresolvedOutputPort",
+          messageArgs: {
+            outputKey: JSON.stringify(assignment.key),
+            instanceId: JSON.stringify(statement.instanceId),
+            portName: JSON.stringify(assignment.value.value),
+          },
+        },
       ),
     );
 

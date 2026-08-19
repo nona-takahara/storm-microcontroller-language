@@ -72,6 +72,9 @@ export async function runCompareDsl(
             "COMPARE_MODULE_IDS_MUST_BE_PAIRED",
             "Module IDs must be provided for both comparison targets or neither target.",
             "compare",
+            undefined,
+            undefined,
+            { messageId: "compare.diagnostic.moduleIdsPaired" },
           ),
         ],
         diagnostics: [],
@@ -159,6 +162,8 @@ async function loadCompareTarget(path: string): Promise<LoadedCompareTarget> {
         `Expected a project.json or .sw-net path, received ${path}.`,
         "compare",
         path,
+        undefined,
+        { messageId: "compare.diagnostic.unsupportedInput", messageArgs: { path } },
       ),
     ],
   };
@@ -186,6 +191,10 @@ function selectModule(
       message,
       "compare",
       resolution.entryDocumentPath,
+      undefined,
+      matches.length === 0
+        ? { messageId: "compare.diagnostic.moduleNotFound", messageArgs: { moduleId, side } }
+        : { messageId: "compare.diagnostic.moduleAmbiguous", messageArgs: { moduleId, side } },
     ),
   );
   return undefined;

@@ -1,3 +1,11 @@
+import {
+  englishTranslator,
+  type LocalizedMessage,
+  type MessageArguments,
+  type MessageId,
+  type Translator,
+} from "./i18n/index.js";
+
 // Shared diagnostic helpers keep CLI, MCP, and library code on one public shape.
 export type StormworksDiagnosticSeverity = "error" | "warning" | "info";
 export type StormworksDiagnosticSource = string;
@@ -9,6 +17,9 @@ export interface Diagnostic {
   documentId?: string;
   path?: string;
   source: StormworksDiagnosticSource;
+  /** Stable localization metadata. `message` remains the canonical English text. */
+  messageId?: MessageId;
+  messageArgs?: MessageArguments;
 }
 
 export interface StormworksLibraryResult<T> {
@@ -30,6 +41,7 @@ export function createDiagnostic(
   source: StormworksDiagnosticSource,
   documentId?: string,
   path?: string,
+  localized?: LocalizedMessage,
 ): Diagnostic {
   return {
     severity,
@@ -38,6 +50,7 @@ export function createDiagnostic(
     source,
     documentId,
     path,
+    ...localized,
   };
 }
 
@@ -47,8 +60,9 @@ export function createWarningDiagnostic(
   source: StormworksDiagnosticSource,
   documentId?: string,
   path?: string,
+  localized?: LocalizedMessage,
 ): Diagnostic {
-  return createDiagnostic("warning", code, message, source, documentId, path);
+  return createDiagnostic("warning", code, message, source, documentId, path, localized);
 }
 
 export function createInfoDiagnostic(
@@ -57,8 +71,9 @@ export function createInfoDiagnostic(
   source: StormworksDiagnosticSource,
   documentId?: string,
   path?: string,
+  localized?: LocalizedMessage,
 ): Diagnostic {
-  return createDiagnostic("info", code, message, source, documentId, path);
+  return createDiagnostic("info", code, message, source, documentId, path, localized);
 }
 
 export function createErrorDiagnostic(
@@ -67,8 +82,9 @@ export function createErrorDiagnostic(
   source: StormworksDiagnosticSource,
   documentId?: string,
   path?: string,
+  localized?: LocalizedMessage,
 ): Diagnostic {
-  return createDiagnostic("error", code, message, source, documentId, path);
+  return createDiagnostic("error", code, message, source, documentId, path, localized);
 }
 
 // Wrap validator/parser calls that still throw into the library result shape at the boundary.
@@ -83,14 +99,16 @@ export function runToDiagnostics<T>(
   try {
     return { value: fn(), diagnostics: [] };
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     return {
       diagnostics: [
         createErrorDiagnostic(
           code,
-          error instanceof Error ? error.message : String(error),
+          detail,
           source,
           documentId,
           path,
+          { messageId: "diagnostic.operationFailed", messageArgs: { detail } },
         ),
       ],
     };
@@ -107,14 +125,16 @@ export async function runAsyncToDiagnostics<T>(
   try {
     return { value: await fn(), diagnostics: [] };
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     return {
       diagnostics: [
         createErrorDiagnostic(
           code,
-          error instanceof Error ? error.message : String(error),
+          detail,
           source,
           documentId,
           path,
+          { messageId: "diagnostic.operationFailed", messageArgs: { detail } },
         ),
       ],
     };
@@ -122,12 +142,19 @@ export async function runAsyncToDiagnostics<T>(
 }
 
 // Format diagnostics consistently for human-facing CLI/MCP output; include location only when present.
-export function formatDiagnostic(diagnostic: Diagnostic): string {
+export function formatDiagnostic(diagnostic: Diagnostic, translator: Translator = englishTranslator): string {
   const location = [diagnostic.documentId, diagnostic.path].filter((value): value is string => !!value).join(":");
   const suffix = location.length > 0 ? ` (${location})` : "";
-  return `[${diagnostic.severity}] ${diagnostic.code}${suffix}: ${diagnostic.message}`;
+  const severity = translator.format(`diagnostic.severity.${diagnostic.severity}`);
+  const message = diagnostic.messageId
+    ? translator.format(diagnostic.messageId, diagnostic.messageArgs as never)
+    : diagnostic.message;
+  return `[${severity}] ${diagnostic.code}${suffix}: ${message}`;
 }
 
-export function formatDiagnostics(diagnostics: readonly Diagnostic[]): string {
-  return diagnostics.map(formatDiagnostic).join("\n");
+export function formatDiagnostics(
+  diagnostics: readonly Diagnostic[],
+  translator: Translator = englishTranslator,
+): string {
+  return diagnostics.map((diagnostic) => formatDiagnostic(diagnostic, translator)).join("\n");
 }

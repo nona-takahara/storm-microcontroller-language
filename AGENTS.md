@@ -1,76 +1,119 @@
 # AGENTS.md
 
-Conventions for whoever runs as the implementer under `codex exec` in this repository. Role split and the `codex exec` invocation pattern live in `CLAUDE.md` (Claude's side) — this file only covers implementer-facing conventions and isn't duplicated there.
+Guidance for AI agents working directly with the user in this repository. This is the canonical repository instruction file; tool-specific instruction files should import it rather than duplicate it.
 
-## Environment (most important)
+## Working with the user
 
-- This repo's toolchain (Node/pnpm/TypeScript) is **WSL/pnpm-canonical**. There is no Windows-side toolchain to consider and no host-switching wrapper script — run `pnpm build` / `pnpm check` / `pnpm cli` / `pnpm mcp` directly from the WSL shell.
-- Don't start long-running or interactive processes (dev servers, watchers) unless explicitly asked to.
-- Adding a dependency (`pnpm add` or similar) needs npm-registry network access. If the sandbox is `workspace-write` with no network access, stop and report this back to the requester rather than trying to work around it or escalate the sandbox yourself — see "When you hit an external blocker" below for the general version of this rule. (In practice, the calling process may instead grant network access to an already-`workspace-write` sandbox via `-c sandbox_workspace_write.network_access=true`, which is more scoped than escalating to `-s danger-full-access` — but that's the caller's decision to make, not something to request or assume.)
-- If you're working in a git worktree (not the repository's primary checkout), see the git-worktree caveat under "When you hit an external blocker" below — `git commit` can fail there in ways that look like a permissions bug but are actually a known environment limitation.
+- Treat the user as the decision-maker and collaborate with them directly. Do not assume a Claude-to-Codex role split, an external orchestrator, or a `codex exec` handoff workflow.
+- For implementation requests, inspect the relevant code, make reasonable in-scope decisions, implement, validate, and report the result. Ask the user when a missing choice would materially change the outcome or expand the requested scope.
+- For investigation, design, review, or planning requests, keep implementation separate unless the user also asks for changes. Share intermediate findings when they help the user steer an important decision.
+- Preserve unrelated user changes in the working tree. Do not commit, push, open a pull request, or otherwise publish changes unless the user explicitly asks.
 
-## When you hit an external blocker, hand off — don't improvise a workaround
+## Environment
 
-If you hit something outside your control — a tool/permission problem, a sandbox or network
-restriction, an environment inconsistency, a genuine ambiguity in your instructions you can't
-reasonably resolve yourself — do **not** improvise a workaround that:
+- This repository's Node/pnpm/TypeScript toolchain is **WSL/pnpm-canonical**. There is no Windows-side toolchain or host-switching wrapper. Run `pnpm build`, `pnpm check`, `pnpm cli`, and `pnpm mcp` directly from the WSL shell.
+- Do not start long-running or interactive processes such as development servers or watchers unless explicitly asked.
+- Adding a dependency (`pnpm add` or similar) requires npm-registry network access. If the current environment does not permit it, report the blocker instead of borrowing dependencies or generated files from another project, hand-editing `pnpm-lock.yaml`, or weakening the sandbox without the user's approval.
+- In a git worktree, sandbox restrictions can make the main repository's `.git/worktrees/<name>/` metadata read-only. If `git add` or `git commit` fails for that reason, leave the validated changes uncommitted and report the exact files; do not fight the restriction with destructive or out-of-repository workarounds.
 
-- touches any file or directory outside this repository (e.g. borrowing files, lockfiles, or
-  `node_modules` from an unrelated sibling project to work around a missing dependency),
-- hand-edits generated files such as `pnpm-lock.yaml` instead of regenerating them properly,
-- deletes things aggressively to route around a permissions error, or
-- otherwise leaves the repository in a hacky or inconsistent state to make a symptom go away.
+## Commands
 
-Instead: leave the repository in its last clean, working state (or clearly describe exactly what's
-uncommitted and why), write a short **HANDOFF** section at the end of your response explaining
-precisely what you were trying to do, what went wrong, what you already tried, and what you think
-the calling process should do about it — then stop. Someone (human or the orchestrating process)
-will read the handoff, fix the underlying issue or make the judgment call, and resume you with more
-specific instructions.
-
-This rule is about genuine external blockers only. It does **not** apply to implementation
-judgment calls that are explicitly delegated to you (algorithm choice, file layout, internal
-architecture, etc. — see the task's own instructions for what's delegated) — keep deciding those
-yourself and moving forward.
-
-### Known environment caveat: git worktrees under a sandboxed shell
-
-If you're working in a git worktree, its real `.git` metadata lives in the *main* repository's
-`.git/worktrees/<name>/` directory, outside the worktree folder itself. Under a sandboxed shell,
-`git add`/`git commit` can fail with something like:
-
-```
-fatal: Unable to create '.../.git/worktrees/<name>/index.lock': Read-only file system
+```bash
+pnpm build          # tsc compile + copy bundled JSON assets to dist/
+pnpm check          # type-check only (no emit)
+pnpm test           # Vitest suite
+pnpm cli <args>     # run the CLI directly via tsx (no build required)
 ```
 
-even after being granted write access to that path (e.g. via `--add-dir`) — this has been observed
-to not reliably fix it in this environment (Windows drives mounted into WSL). If you hit this, do
-not fight it further: leave your completed, validated changes uncommitted, list the exact files in
-your response, and let the calling process commit them. This is a normal, expected handoff case,
-not a failure on your part.
+### CLI usage
 
-## Validation gate before finishing a task
+```bash
+pnpm cli xml2dsl <input.xml> --out-dir <output-dir>   # Stormworks XML -> project.json + sw-net + sw-mcl
+pnpm cli dsl2xml <project.json> --out <output.xml>    # project.json + sw-net + sw-mcl -> XML
+pnpm cli check-dsl <project.json>
+pnpm cli typecheck-dsl <project.json>
+pnpm cli compare-dsl <a> <b> [--module-a <id>] [--module-b <id>] [--json]
+pnpm cli layout-dsl <project.json> [--module <id>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]
+pnpm cli spec [<definitionId>] [--list] [--json]
+```
 
-- `pnpm check` (`tsc --noEmit`) must pass.
-- Most of this repo has no test suite, and `pnpm cli <subcommand>` against a real or sample project is the primary way to validate behavior there — exercise the relevant subcommand(s) for whatever changed. `src/core/compare/` is an exception: it has a scoped Vitest setup (`pnpm test`), added deliberately because that code's correctness (graph matching, bounded search, flattening) isn't reliably checkable by eyeballing CLI output — if you touch that directory, its tests must pass too.
+## Validation before finishing
 
-## Tech stack
+- `pnpm check` (`tsc --noEmit`) must pass for code changes.
+- Most of the repository has no automated test suite. Exercise the relevant `pnpm cli <subcommand>` against a real or sample project when behavior changes.
+- Vitest covers comparison logic and cross-cutting behavior such as localization. Run `pnpm test` when those areas change.
+- For documentation-only changes, inspect the rendered source/diff and verify internal references and commands; code validation is not required unless the documentation change depends on current runtime behavior.
+- If validation cannot run, state what was not run and why. Do not imply that an unrun check passed.
 
-TypeScript (ESM, Node ≥18), `elkjs` (auto-layout), `fast-xml-parser`, `@modelcontextprotocol/sdk`, `tsx` for direct execution without a build step. `vitest` is a devDependency scoped to `src/core/compare/`.
+## MCP server
+
+```bash
+pnpm mcp          # run the stdio MCP server directly via tsx
+storm-mcl-mcp     # installed/built package binary
+```
+
+The MCP server exposes `xml_to_dsl`, `dsl_to_xml`, `check_dsl`, `typecheck_dsl`, `compare_dsl`, `layout_dsl`, and `spec`. The `spec` tool mirrors `storm-mcl spec`; its overview, gate list, and per-gate behavior notes are designed for AI-agent reference workflows. Keep MCP-facing descriptions and result text in English for global client compatibility.
+
+`compare-dsl`/`compare_dsl` uses port-key-strict matching. As an intentional v1 limitation, a commutative gate whose inputs have been swapped (for example AND, OR, or ADD) is reported as different even though the circuit is semantically equivalent.
 
 ## Architecture
 
-See `CLAUDE.md`'s Architecture section for the IR pipeline, importer/serializer/parser/exporter layers, `src/definitions.json`, and the behavior-notes knowledge base — read it before touching those areas rather than re-deriving the design from the code alone.
+The tool converts Stormworks microcontroller save files (XML) to and from a human-editable DSL format.
 
-## Scope discipline
+### Intermediate Representation
 
-Implement only what was asked. No unrequested refactors, new features, or speculative abstractions. Once the stated completion condition is met, stop — don't keep polishing or expanding scope.
+All formats pass through `IrProgram` in `src/core/ir.ts` (nodes, links, submodules, and metadata). This keeps importers decoupled from serializers and exporters.
 
-## Files not to touch without explicit instruction
+| Layer | Direction | Entry point |
+|---|---|---|
+| Importer | XML -> IR | `src/core/importers/xml.ts` |
+| Serializers | IR -> DSL files | `src/core/serializers/sw-net.ts` (orchestrates the others) |
+| Parsers | DSL files -> IR | `src/core/parsers/sw-net.ts`, `sw-mcl.ts`, `project-json.ts` |
+| Exporters | IR -> XML | `src/core/exporters/xml.ts` |
 
-`CLAUDE.md`, `AGENTS.md`, `README.md`, `README-ja.md`, `GUIDE-ja.md`, and `package.json` dependency/script changes. If you believe one of these needs to change, say so in your handoff/diff message and leave the decision to the requester.
+Do not bypass this pipeline when adding format behavior. Put conversion logic in the layer that owns it.
 
-## Schema/versioned files
+### Project source and DSL formats
 
-- `src/definitions.json` has an enforced `NODE_DEFINITIONS_SCHEMA_VERSION` — don't bump or edit it without a reason tied to the task.
-- `src/node-behavior-notes.json` and `src/stormworks-system-notes.json` notes are written in assertive English (uncertainty is carried by the `confidence` field, not hedged wording) — keep new notes consistent with that convention.
+`StormworksProjectSource` in `src/core/project-source.ts` aggregates all DSL documents for a project directory. `resolveProjectSource` links `.sw-net` imports across files; `src/core/resolvers/sw-net.ts` resolves `use` statements to module definitions.
+
+- `.sw-net` is the graph DSL. It declares modules with typed ports, instantiates nodes with `inst`, wires them using `->`, and composes submodules with `use`.
+- `.sw-mcl` stores module-internal port and instance positions for one `.sw-net` module. It does not need to be hand-authored. `dsl2xml`/`dsl_to_xml` runs the same ELK auto-layout used by `layout-dsl` over every reachable module in fill mode: existing positions remain unchanged and only missing positions are computed. This pass is in memory and tags synthesized data with `swMclOrigin: "computed"`; it never writes `.sw-mcl`. Persisting layout requires an explicit `layout-dsl`/`layout_dsl` call. The exporter's shared-anchor or omitted-`<pos>` degradation is reserved for modules outside layout v1's scope (issue #7) or auto-layout failures.
+- `project.json` stores metadata and project-surface layout for external pins and submodule anchors. Lua scripts referenced by `script_ref` live in separate `.lua` files.
+
+### Node definitions and behavior knowledge
+
+`src/definitions.json` is the source of truth for gate structure: Stormworks XML `type` numbers, DSL `definitionId`s, port signals, and property XML paths. `scripts/copy-definitions.mjs` copies it to `dist/` at build time. Its schema version is enforced by `NODE_DEFINITIONS_SCHEMA_VERSION`; do not edit or bump it without a task-specific reason. `definitions/sample/` is intentionally empty for historical reasons. Unknown XML types pass through as `LOGIC_COMPONENT:<type>` with a warning.
+
+Runtime behavior belongs in `src/node-behavior-notes.json` and `src/stormworks-system-notes.json`, not in `definitions.json`. The former contains per-gate notes keyed by `definitionId`; the latter contains platform-wide facts such as tick rate, execution order, and composite channel layout. Both are parsed under `src/core/behavior-notes/`, loaded through `src/infra/fs/`, and copied to `dist/` as bundled assets.
+
+`src/core/spec/gate-spec.ts` combines definitions, behavior notes, and `src/core/spec/tool-conventions.ts` into the `spec` CLI/MCP output. Notes are written in assertive English. Their `confidence` field (`verified`, `inferred`, or `unconfirmed`) carries uncertainty, so do not hedge the note text. Include only behavior an agent given the DSL but not the game could otherwise misread; empty notes for textbook-obvious gates and project I/O are intentional.
+
+### Public API split
+
+- `src/index.ts` is browser-safe and contains pure logic only; it must not depend on Node.js I/O.
+- `src/node.ts` re-exports `index.ts` plus `src/infra/fs/` helpers.
+- `src/cli/main.ts` is the CLI entry point and imports only from `node.ts`.
+
+## Tech stack
+
+TypeScript (ESM, Node >=18), `elkjs` for auto-layout, `fast-xml-parser`, `intl-messageformat`, `@modelcontextprotocol/sdk`, `tsx` for direct execution, and Vitest.
+
+## Scope and file discipline
+
+- Implement only what the user asked for. Do not add unrelated refactors, speculative abstractions, or cleanup that does not contribute to the requested result.
+- Prefer a coherent completed structure over the smallest textual diff when the task genuinely requires broader changes, but explain the scope and preserve unrelated work.
+- Do not modify `CLAUDE.md`, `AGENTS.md`, `README.md`, `README-ja.md`, `GUIDE-ja.md`, or dependency/script entries in `package.json` unless the user explicitly requests it. If one appears necessary, discuss it with the user instead of changing it incidentally.
+- Do not edit generated files by hand when a repository command is responsible for generating them.
+
+## External blockers
+
+When a permission, network, tool, or environment problem prevents progress, exhaust safe in-repository diagnostics, then stop and explain:
+
+- what outcome you were trying to reach,
+- the exact blocker and relevant error,
+- what you already checked or attempted,
+- the state of any uncommitted changes, and
+- the smallest user action or permission change that would unblock the work.
+
+Do not route around the blocker by touching files outside this repository, borrowing another project's `node_modules` or lockfile, aggressively deleting files, or leaving the repository in an inconsistent state. Genuine implementation decisions remain the agent's responsibility; use this blocker protocol only for constraints that cannot be resolved within the authorized scope.
