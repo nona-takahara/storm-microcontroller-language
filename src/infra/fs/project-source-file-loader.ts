@@ -103,12 +103,15 @@ export async function loadProjectSourceFromProjectJsonFile(
       diagnostics,
     };
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     diagnostics.push(
       createErrorDiagnostic(
         "PROJECT_SOURCE_LOAD_FAILED",
-        error instanceof Error ? error.message : String(error),
+        detail,
         "library",
         filePaths.projectJsonPath,
+        undefined,
+        { messageId: "diagnostic.operationFailed", messageArgs: { detail } },
       ),
     );
 

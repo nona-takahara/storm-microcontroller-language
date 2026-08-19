@@ -2,6 +2,7 @@
 // `layout_dsl` tool, so the two front ends stay behaviorally identical.
 import { computeSwNetModuleLayout, type AutoLayoutExistingPositions } from "../../core/layout/auto-layout.js";
 import { type IrVector2 } from "../../core/ir.js";
+import { type LocalizedMessage } from "../../core/i18n/index.js";
 import {
   type StormworksDocumentLoader,
   type StormworksProjectSource,
@@ -31,7 +32,9 @@ export interface LayoutDslTargetResult {
   target: LayoutTarget;
   ok: boolean;
   errorMessage?: string;
+  errorMessageLocalization?: LocalizedMessage;
   warnings: string[];
+  warningLocalizations?: Array<LocalizedMessage | undefined>;
   document?: StormworksSwMclDocument;
   written: boolean;
   summary?: { kept: number; added: number; overwritten: number };
@@ -51,6 +54,7 @@ export async function runLayoutDslForTarget(
       target,
       ok: false,
       errorMessage: `no target module found; use --module/module_id to select one of: ${availableIds}.`,
+      errorMessageLocalization: { messageId: "layout.noTarget", messageArgs: { availableIds } },
       warnings: [],
       written: false,
     };
@@ -60,9 +64,13 @@ export async function runLayoutDslForTarget(
     (skippedModuleId) =>
       `module ${skippedModuleId} is outside layout-dsl's v1 scope (one module per file) and was left untouched; see issue #7.`,
   );
+  const warningLocalizations: Array<LocalizedMessage | undefined> = selection.skipped.map(
+    (moduleId) => ({ messageId: "layout.outsideScope", messageArgs: { moduleId } }),
+  );
 
   const submoduleFootprintResult = await resolveSubmoduleFootprints(target.swNetPath, swNet, selection.module);
   warnings.push(...submoduleFootprintResult.warnings);
+  warningLocalizations.push(...submoduleFootprintResult.warnings.map(() => undefined));
 
   const mode = options.force ? "force" : "fill";
   const existing = mode === "fill" ? buildExistingPositions(existingSwMcl) : undefined;
@@ -73,6 +81,7 @@ export async function runLayoutDslForTarget(
     submoduleFootprints: submoduleFootprintResult.footprints,
   });
   warnings.push(...result.warnings);
+  warningLocalizations.push(...result.warnings.map(() => undefined));
 
   const document: StormworksSwMclDocument = {
     formatVersion: STORMWORKS_SW_MCL_FORMAT_VERSION,
@@ -89,7 +98,7 @@ export async function runLayoutDslForTarget(
     await writeSwMclDocument(target.swMclPath, document);
   }
 
-  return { target, ok: true, warnings, document, written: !options.dryRun, summary };
+  return { target, ok: true, warnings, warningLocalizations, document, written: !options.dryRun, summary };
 }
 
 // Select the module a sw-net document's layout applies to, mirroring sw-mcl.ts's selectSwMclSubmodule rule.
@@ -223,6 +232,7 @@ export interface ComputeProjectLayoutOverridesResult {
   // One line per notice worth surfacing to the caller (auto-computed layout, or per-target
   // failures). Empty when every reachable module's .sw-mcl was already complete.
   messages: string[];
+  messageLocalizations?: Array<LocalizedMessage | undefined>;
   // Computed StormworksSwMclDocuments for reachable modules whose on-disk .sw-mcl was missing or
   // incomplete, keyed by documentId (the module's resolved .sw-net path, matching
   // StormworksSourceDocument.documentId). Nothing here has been written to disk; callers splice these
@@ -252,6 +262,7 @@ export interface ComputeProjectLayoutOverridesResult {
 // footprint sizing.
 export async function computeProjectLayoutOverrides(projectJsonPath: string): Promise<ComputeProjectLayoutOverridesResult> {
   const messages: string[] = [];
+  const messageLocalizations: Array<LocalizedMessage | undefined> = [];
   const overridesByDocumentId = new Map<string, StormworksSwMclDocument>();
   let seedTargets: LayoutTarget[];
 
@@ -262,10 +273,12 @@ export async function computeProjectLayoutOverrides(projectJsonPath: string): Pr
     ]);
     seedTargets = dedupeLayoutTargets([...entryTarget, ...declaredSubmoduleTargets]);
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     messages.push(
-      `Could not resolve layout targets for auto-layout: ${error instanceof Error ? error.message : String(error)}`,
+      `Could not resolve layout targets for auto-layout: ${detail}`,
     );
-    return { messages, overridesByDocumentId };
+    messageLocalizations.push({ messageId: "layout.autoResolveFailed", messageArgs: { detail } });
+    return { messages, messageLocalizations, overridesByDocumentId };
   }
 
   const targets = await collectReachableLayoutTargets(seedTargets);
@@ -283,11 +296,25 @@ export async function computeProjectLayoutOverrides(projectJsonPath: string): Pr
 
       if (!result.ok) {
         messages.push(`Auto-layout skipped for ${target.swNetPath}: ${result.errorMessage}`);
+        messageLocalizations.push({
+          messageId: "layout.autoSkipped",
+          messageArgs: {
+            path: target.swNetPath,
+            detail: result.errorMessage ?? "",
+          },
+        });
         continue;
       }
 
-      for (const warning of result.warnings) {
+      for (const [index, warning] of result.warnings.entries()) {
         messages.push(`${target.swNetPath}: ${warning}`);
+        const localization = result.warningLocalizations?.[index];
+        messageLocalizations.push(localization
+          ? {
+              messageId: "layout.pathWarning",
+              messageArgs: { path: target.swNetPath, detail: warning },
+            }
+          : undefined);
       }
 
       if (result.document) {
@@ -298,15 +325,21 @@ export async function computeProjectLayoutOverrides(projectJsonPath: string): Pr
         messages.push(
           `Computed missing layout for ${target.documentId} in memory (not written to disk): ${result.summary.added} position(s) filled in.`,
         );
+        messageLocalizations.push({
+          messageId: "layout.autoComputed",
+          messageArgs: { documentId: target.documentId, count: result.summary.added },
+        });
       }
     } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
       messages.push(
-        `Auto-layout failed for ${target.swNetPath}: ${error instanceof Error ? error.message : String(error)}`,
+        `Auto-layout failed for ${target.swNetPath}: ${detail}`,
       );
+      messageLocalizations.push({ messageId: "layout.autoFailed", messageArgs: { path: target.swNetPath, detail } });
     }
   }
 
-  return { messages, overridesByDocumentId };
+  return { messages, messageLocalizations, overridesByDocumentId };
 }
 
 // Splice a computed layout override (see computeProjectLayoutOverrides) into one already-loaded

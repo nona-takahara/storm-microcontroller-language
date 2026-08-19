@@ -32,19 +32,42 @@ import {
   type LayoutTarget,
   type StormworksSwMclDocument,
   createErrorDiagnostic,
+  createTranslator,
+  englishTranslator,
   formatDiagnostic,
   hasErrorDiagnostics,
   type Diagnostic,
+  type Translator,
   type StormworksProjectSource,
   validateProjectSource,
   writeProjectSourceToDirectory,
   writeUtf8TextFile,
 } from "../node.js";
 import { extname } from "node:path";
+import { extractLanguageOption, resolveLanguage } from "./language.js";
+
+let cliTranslator: Translator = englishTranslator;
 
 // Dispatch one CLI invocation to the selected command handler.
 export async function main(argv: string[]): Promise<number> {
-  const [command, ...rest] = argv;
+  const languageResult = extractLanguageOption(argv);
+  if (!languageResult.ok) {
+    if (languageResult.error === "missing") {
+      console.error(englishTranslator.format("cli.missingLanguage"));
+    } else if (languageResult.error === "duplicate") {
+      console.error(englishTranslator.format("cli.duplicateLanguage"));
+    } else {
+      console.error(englishTranslator.format("cli.invalidLanguage", { value: languageResult.value ?? "" }));
+    }
+    return 1;
+  }
+
+  cliTranslator = createTranslator(resolveLanguage(
+    languageResult.language,
+    process.env,
+    Intl.DateTimeFormat().resolvedOptions().locale,
+  ));
+  const [command, ...rest] = languageResult.args;
 
   switch (command) {
     case "xml2dsl":
@@ -102,13 +125,13 @@ async function runXml2DslCommand(args: string[]): Promise<number> {
     await writeProjectSourceToDirectory(result.value, parsedArgs.outputDirectory);
     const entryRelativePath = resolveEntryDocumentRelativePath(result.value);
     const entrySwMclRelativePath = replaceSwNetExtensionForDisplay(entryRelativePath, ".sw-mcl");
-    console.error(`Wrote ${parsedArgs.outputDirectory}/project.json`);
-    console.error(`Wrote ${parsedArgs.outputDirectory}/${entryRelativePath}`);
-    console.error(`Wrote ${parsedArgs.outputDirectory}/${entrySwMclRelativePath}`);
+    console.error(cliTranslator.format("cli.wroteFile", { path: `${parsedArgs.outputDirectory}/project.json` }));
+    console.error(cliTranslator.format("cli.wroteFile", { path: `${parsedArgs.outputDirectory}/${entryRelativePath}` }));
+    console.error(cliTranslator.format("cli.wroteFile", { path: `${parsedArgs.outputDirectory}/${entrySwMclRelativePath}` }));
 
     for (const relativeScriptPath of Object.keys(result.value.entryDocument.scripts).sort()) {
       const scriptOutputPath = joinRelativeDisplayPath(entryRelativePath, relativeScriptPath);
-      console.error(`Wrote ${parsedArgs.outputDirectory}/${scriptOutputPath}`);
+      console.error(cliTranslator.format("cli.wroteFile", { path: `${parsedArgs.outputDirectory}/${scriptOutputPath}` }));
     }
 
     return hasErrors ? 1 : 0;
@@ -178,7 +201,7 @@ async function runDsl2XmlCommand(args: string[]): Promise<number> {
 
   if (parsedArgs.outputPath) {
     await writeUtf8TextFile(parsedArgs.outputPath, buildResult.value.xml);
-    console.error(`Wrote ${parsedArgs.outputPath}`);
+    console.error(cliTranslator.format("cli.wroteFile", { path: parsedArgs.outputPath }));
     return loadHasErrors || buildHasErrors ? 1 : 0;
   }
 
@@ -228,10 +251,13 @@ async function runDsl2XmlTreeCommand(args: string[]): Promise<number> {
 // into the loaded project source before building XML. Nothing is written to disk here — that still
 // requires an explicit `layout-dsl` call.
 async function computeLayoutOverrides(projectJsonPath: string): Promise<Map<string, StormworksSwMclDocument>> {
-  const { messages, overridesByDocumentId } = await computeProjectLayoutOverrides(projectJsonPath);
+  const { messages, messageLocalizations, overridesByDocumentId } = await computeProjectLayoutOverrides(projectJsonPath);
 
-  for (const message of messages) {
-    console.error(`[auto-layout] ${message}`);
+  for (const [index, message] of messages.entries()) {
+    const localization = messageLocalizations?.[index];
+    console.error(`[${cliTranslator.format("cli.autoLayout")}] ${
+      localization ? cliTranslator.format(localization.messageId, localization.messageArgs as never) : message
+    }`);
   }
 
   return overridesByDocumentId;
@@ -262,9 +288,11 @@ async function runCheckDslCommand(args: string[]): Promise<number> {
     return 1;
   }
 
-  console.log(
-    `Resolved ${resolveResult.value.documents.length} document(s), ${resolveResult.value.swNet.modules.length} module(s), and ${resolveResult.value.swNet.uses.length} use statement(s).`,
-  );
+  console.log(cliTranslator.format("cli.resolved", {
+    documents: resolveResult.value.documents.length,
+    modules: resolveResult.value.swNet.modules.length,
+    uses: resolveResult.value.swNet.uses.length,
+  }));
 
   return loadHasErrors || resolveHasErrors ? 1 : 0;
 }
@@ -293,7 +321,7 @@ async function runTypecheckDslCommand(args: string[]): Promise<number> {
   const validationHasErrors = printDiagnostics(validationResult.diagnostics);
 
   if (validationResult.isValid) {
-    console.log("DSL typecheck passed.");
+    console.log(cliTranslator.format("cli.typecheckPassed"));
   }
 
   return loadHasErrors || validationHasErrors || !validationResult.isValid ? 1 : 0;
@@ -324,8 +352,8 @@ async function runCompareDslCommand(args: string[]): Promise<number> {
   } else {
     console.log(
       result.kind === "network"
-        ? formatNetworkComparison(result.comparison)
-        : formatProjectComparison(result.comparison),
+        ? formatNetworkComparison(result.comparison, cliTranslator)
+        : formatProjectComparison(result.comparison, cliTranslator),
     );
   }
 
@@ -402,7 +430,7 @@ async function runLayoutDslCommand(args: string[]): Promise<number> {
       const targetHasErrors = await layoutOneTarget(target, parsedArgs);
       hasErrors = hasErrors || targetHasErrors;
     } catch (error) {
-      console.error(`[error] ${target.swNetPath}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[${cliTranslator.format("layout.error")}] ${target.swNetPath}: ${error instanceof Error ? error.message : String(error)}`);
       hasErrors = true;
     }
   }
@@ -420,17 +448,32 @@ async function layoutOneTarget(target: LayoutTarget, args: LayoutDslArgs): Promi
   });
 
   if (!result.ok) {
-    console.error(`[error] ${target.swNetPath}: ${result.errorMessage}`);
+    console.error(`[${cliTranslator.format("layout.error")}] ${target.swNetPath}: ${
+      result.errorMessageLocalization
+        ? cliTranslator.format(
+            result.errorMessageLocalization.messageId,
+            result.errorMessageLocalization.messageArgs as never,
+          )
+        : result.errorMessage
+    }`);
     return true;
   }
 
-  for (const warning of result.warnings) {
-    console.error(`[warning] ${target.swNetPath}: ${warning}`);
+  for (const [index, warning] of result.warnings.entries()) {
+    const localization = result.warningLocalizations?.[index];
+    console.error(`[${cliTranslator.format("layout.warning")}] ${target.swNetPath}: ${
+      localization ? cliTranslator.format(localization.messageId, localization.messageArgs as never) : warning
+    }`);
   }
 
   if (result.summary) {
     console.error(
-      `${target.swMclPath}: ${result.summary.kept} kept, ${result.summary.added} added, ${result.summary.overwritten} overwritten.`,
+      cliTranslator.format("layout.summary", {
+        path: target.swMclPath,
+        kept: result.summary.kept,
+        added: result.summary.added,
+        overwritten: result.summary.overwritten,
+      }),
     );
   }
 
@@ -439,7 +482,7 @@ async function layoutOneTarget(target: LayoutTarget, args: LayoutDslArgs): Promi
     return false;
   }
 
-  console.error(`Wrote ${target.swMclPath}`);
+  console.error(cliTranslator.format("cli.wroteFile", { path: target.swMclPath }));
   return false;
 }
 
@@ -736,6 +779,13 @@ async function readTextFileToDiagnostics(
           error instanceof Error ? error.message : String(error),
           "cli",
           filePath,
+          undefined,
+          code === "FILE_NOT_FOUND"
+            ? { messageId: "diagnostic.fileNotFound", messageArgs: { path: filePath } }
+            : {
+                messageId: "diagnostic.fileReadFailed",
+                messageArgs: { path: filePath, detail: error instanceof Error ? error.message : String(error) },
+              },
         ),
       ],
     };
@@ -767,7 +817,7 @@ function parseProjectJsonPathArgs(
 // Print diagnostics and return whether any of them were errors.
 function printDiagnostics(diagnostics: Diagnostic[]): boolean {
   for (const diagnostic of diagnostics) {
-    console.error(formatDiagnostic(diagnostic));
+    console.error(formatDiagnostic(diagnostic, cliTranslator));
   }
 
   return hasErrorDiagnostics(diagnostics);
@@ -775,7 +825,7 @@ function printDiagnostics(diagnostics: Diagnostic[]): boolean {
 
 // Print the supported CLI command list.
 function printUsage(): void {
-  console.log("Usage:");
+  console.log(cliTranslator.format("cli.usageHeading"));
   console.log("  storm-mcl xml2dsl <input.xml> [--out-dir output-directory]");
   console.log("  storm-mcl dsl2xml <project.json> [--out output.xml]");
   console.log("  storm-mcl dsl2xml-tree <project.json>");
@@ -786,6 +836,8 @@ function printUsage(): void {
     "  storm-mcl layout-dsl <project.json> [--module <id>] [--document <path>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]",
   );
   console.log("  storm-mcl spec [<definitionId>] [--list] [--json]");
+  console.log("  --lang auto|en|ja");
+  console.log(cliTranslator.format("cli.specEnglishOnly"));
 }
 
 // Resolve the entry sw-net relative path to display from the loaded project source.
@@ -820,8 +872,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
       process.exitCode = exitCode;
     })
     .catch((error) => {
+      const detail = error instanceof Error ? error.message : String(error);
       printDiagnostics([
-        createErrorDiagnostic("INTERNAL_ERROR", error instanceof Error ? error.message : String(error), "cli"),
+        createErrorDiagnostic(
+          "INTERNAL_ERROR",
+          detail,
+          "cli",
+          undefined,
+          undefined,
+          { messageId: "diagnostic.internalError", messageArgs: { detail } },
+        ),
       ]);
       process.exitCode = 1;
     });

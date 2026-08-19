@@ -240,6 +240,8 @@ function selectEntryModule(
         `Entry document does not define module ${entryModuleId}.`,
         "compare",
         resolution.entryDocumentPath,
+        undefined,
+        { messageId: "compare.diagnostic.entryNotFound", messageArgs: { moduleId: entryModuleId } },
       ),
     );
     return undefined;
@@ -259,6 +261,8 @@ function selectEntryModule(
         "Select an entry module explicitly when the entry document does not have a unique module or a module named main.",
         "compare",
         resolution.entryDocumentPath,
+        undefined,
+        { messageId: "compare.diagnostic.entryAmbiguous" },
       ),
     );
     return undefined;

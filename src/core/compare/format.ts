@@ -1,4 +1,5 @@
 import { type IrLink, type IrScalarValue } from "../ir.js";
+import { englishTranslator, type Translator } from "../i18n/index.js";
 import {
   type ComparableNode,
   type NetworkComparisonResult,
@@ -7,87 +8,118 @@ import {
 } from "./types.js";
 
 /** Format a comparison result for human-facing CLI and MCP text output. */
-export function formatNetworkComparison(result: NetworkComparisonResult): string {
+export function formatNetworkComparison(
+  result: NetworkComparisonResult,
+  translator: Translator = englishTranslator,
+): string {
+  const verdict = formatVerdict(result.verdict, translator);
   const lines = [
-    `Network comparison: ${result.verdict}`,
-    `Matched nodes: ${result.matchedPairs.length}`,
+    translator.format("compare.network", { verdict }),
+    translator.format("compare.matchedNodes", { count: result.matchedPairs.length }),
   ];
 
   if (result.reason) {
-    lines.push(`Reason: ${result.reason}`);
+    lines.push(translator.format("compare.reason", { reason: result.reason }));
   }
 
   if (result.differences.length === 0) {
-    lines.push("Differences: none");
+    lines.push(translator.format("compare.noDifferences"));
   } else {
-    lines.push(`Differences (${result.differences.length}):`);
-    lines.push(...result.differences.map((difference) => `- ${formatDifference(difference)}`));
+    lines.push(translator.format("compare.differences", { count: result.differences.length }));
+    lines.push(...result.differences.map((difference) => `- ${formatDifference(difference, translator)}`));
   }
 
   return lines.join("\n");
 }
 
 /** Format a project result, including module-level groupings when available. */
-export function formatProjectComparison(result: ProjectComparisonResult): string {
-  const lines = [formatNetworkComparison(result)];
+export function formatProjectComparison(
+  result: ProjectComparisonResult,
+  translator: Translator = englishTranslator,
+): string {
+  const lines = [formatNetworkComparison(result, translator)];
 
   if (result.moduleResults.length > 0) {
-    lines.push("", `Module comparisons (${result.moduleResults.length}):`);
+    lines.push("", translator.format("compare.moduleComparisons", { count: result.moduleResults.length }));
     for (const entry of result.moduleResults) {
       lines.push(
-        `- ${entry.moduleKeyA} ↔ ${entry.moduleKeyB}: ${entry.result.verdict} ` +
-          `(${entry.result.matchedPairs.length} matched, ${entry.result.differences.length} differences)`,
+        `- ${translator.format("compare.moduleSummary", {
+          moduleA: entry.moduleKeyA,
+          moduleB: entry.moduleKeyB,
+          verdict: formatVerdict(entry.result.verdict, translator),
+          matched: entry.result.matchedPairs.length,
+          differences: entry.result.differences.length,
+        })}`,
       );
       if (entry.result.reason) {
-        lines.push(`  Reason: ${entry.result.reason}`);
+        lines.push(`  ${translator.format("compare.reason", { reason: entry.result.reason })}`);
       }
       lines.push(
         ...entry.result.differences.map(
-          (difference) => `  - ${formatDifference(difference)}`,
+          (difference) => `  - ${formatDifference(difference, translator)}`,
         ),
       );
     }
   }
 
   if (result.unmatchedModulesInA.length > 0) {
-    lines.push("", `Unmatched modules in A: ${result.unmatchedModulesInA.join(", ")}`);
+    lines.push("", translator.format("compare.unmatchedModulesA", { modules: result.unmatchedModulesInA.join(", ") }));
   }
   if (result.unmatchedModulesInB.length > 0) {
-    lines.push("", `Unmatched modules in B: ${result.unmatchedModulesInB.join(", ")}`);
+    lines.push("", translator.format("compare.unmatchedModulesB", { modules: result.unmatchedModulesInB.join(", ") }));
   }
 
   return lines.join("\n");
 }
 
-export function formatDifference(difference: NetworkDifference): string {
+export function formatDifference(
+  difference: NetworkDifference,
+  translator: Translator = englishTranslator,
+): string {
   switch (difference.kind) {
     case "unmatched-node":
-      return `node ${formatNode(difference.node)} exists only in ${difference.side.toUpperCase()}`;
+      return translator.format("compare.difference.unmatchedNode", {
+        node: formatNode(difference.node, translator),
+        side: difference.side.toUpperCase(),
+      });
     case "unmatched-link":
-      return `link ${formatLink(difference.link)} exists only in ${difference.side.toUpperCase()}`;
+      return translator.format("compare.difference.unmatchedLink", {
+        link: formatLink(difference.link),
+        side: difference.side.toUpperCase(),
+      });
     case "input-mismatch":
-      return (
-        `input ${JSON.stringify(difference.portKey)} differs between ` +
-        `${formatNode(difference.nodeA)} and ${formatNode(difference.nodeB)}`
-      );
+      return translator.format("compare.difference.inputMismatch", {
+        portKey: JSON.stringify(difference.portKey),
+        nodeA: formatNode(difference.nodeA, translator),
+        nodeB: formatNode(difference.nodeB, translator),
+      });
     case "property-value-mismatch":
-      return (
-        `${difference.source} ${JSON.stringify(difference.key)} differs between ` +
-        `${formatNode(difference.nodeA)} (${formatValue(difference.valueA)}) and ` +
-        `${formatNode(difference.nodeB)} (${formatValue(difference.valueB)})`
-      );
+      return translator.format("compare.difference.propertyMismatch", {
+        source: difference.source,
+        key: JSON.stringify(difference.key),
+        nodeA: formatNode(difference.nodeA, translator),
+        valueA: formatValue(difference.valueA, translator),
+        nodeB: formatNode(difference.nodeB, translator),
+        valueB: formatValue(difference.valueB, translator),
+      });
   }
 }
 
-function formatNode(node: ComparableNode): string {
+function formatNode(node: ComparableNode, translator: Translator): string {
   if (node.port) {
-    return (
-      `${JSON.stringify(node.node.id)} ` +
-      `(port ${node.port.direction} ${JSON.stringify(node.port.name)}, ${node.port.signal}, occurrence ${node.port.occurrence})`
-    );
+    return translator.format("compare.node.port", {
+      id: JSON.stringify(node.node.id),
+      direction: node.port.direction,
+      name: JSON.stringify(node.port.name),
+      signal: node.port.signal,
+      occurrence: node.port.occurrence,
+    });
   }
 
-  return `${JSON.stringify(node.node.id)} (${node.node.definitionId})`;
+  return translator.format("compare.node.gate", {
+    id: JSON.stringify(node.node.id),
+    definitionId: node.node.definitionId,
+  });
 }
 
 function formatLink(link: IrLink): string {
@@ -97,6 +129,10 @@ function formatLink(link: IrLink): string {
   );
 }
 
-function formatValue(value: IrScalarValue | undefined): string {
-  return value === undefined ? "absent" : JSON.stringify(value);
+function formatValue(value: IrScalarValue | undefined, translator: Translator): string {
+  return value === undefined ? translator.format("compare.value.absent") : JSON.stringify(value);
+}
+
+function formatVerdict(verdict: NetworkComparisonResult["verdict"], translator: Translator): string {
+  return translator.format(`compare.verdict.${verdict}`);
 }

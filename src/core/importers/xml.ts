@@ -130,6 +130,11 @@ export function importStormworksXml(
       `No IR nodes were imported. Loaded ${options.definitions.nodes.length + options.definitions.components.length} definitions but did not match any XML content.`,
       "xml-importer",
       options.sourceName,
+      undefined,
+      {
+        messageId: "import.empty",
+        messageArgs: { definitions: options.definitions.nodes.length + options.definitions.components.length },
+      },
     ));
     program.metadata.warnings = [...warnings];
   }
@@ -175,6 +180,15 @@ function buildIrProgram(
     `Imported ${program.nodes.length} nodes, ${program.links.length} links, and ${program.submodules.length} submodules from XML.`,
     "xml-importer",
     undefined,
+    undefined,
+    {
+      messageId: "import.summary",
+      messageArgs: {
+        nodes: program.nodes.length,
+        links: program.links.length,
+        submodules: program.submodules.length,
+      },
+    },
   ));
 
   return program;
@@ -246,6 +260,7 @@ function collectProjectNodes(
         "xml-importer",
         undefined,
         `microprocessor.nodes.n[${index}]`,
+        { messageId: "import.projectNodeSkipped" },
       ));
       continue;
     }
@@ -287,6 +302,10 @@ function collectProjectNodes(
         "xml-importer",
         undefined,
         `microprocessor.nodes.n[${index}]`,
+        {
+          messageId: "import.projectNodeUnclassified",
+          messageArgs: { typeKey, direction: binding.direction, signal: binding.signal },
+        },
       ));
     }
 
@@ -345,6 +364,7 @@ function collectProjectBridgesFromComponents(
         "xml-importer",
         undefined,
         `microprocessor.group.components_bridge.c[${index}]`,
+        { messageId: "import.projectBridgeSkipped" },
       ));
       continue;
     }
@@ -416,6 +436,7 @@ function collectLogicNodes(
         "xml-importer",
         undefined,
         `microprocessor.group.components.c[${index}]`,
+        { messageId: "import.logicComponentSkipped" },
       ));
       continue;
     }
@@ -454,6 +475,7 @@ function collectLogicNodes(
         "xml-importer",
         undefined,
         `microprocessor.group.components.c[${index}]`,
+        { messageId: "import.logicComponentUnresolved", messageArgs: { componentType } },
       ));
     }
 
@@ -505,6 +527,7 @@ function synthesizeSubmodulePorts(
         "xml-importer",
         undefined,
         projectNode.path,
+        { messageId: "import.projectNodeWithoutBridge", messageArgs: { rawId } },
       ));
     } else if (
       projectNode.definition?.stormworks.bridgeType !== undefined &&
@@ -517,6 +540,14 @@ function synthesizeSubmodulePorts(
         "xml-importer",
         undefined,
         projectBridge.path,
+        {
+          messageId: "import.projectBridgeTypeMismatch",
+          messageArgs: {
+            rawId,
+            expected: projectNode.definition.stormworks.bridgeType,
+            actual: projectBridge.componentType,
+          },
+        },
       ));
     }
 
@@ -545,6 +576,7 @@ function synthesizeSubmodulePorts(
         "xml-importer",
         undefined,
         projectBridge.path,
+        { messageId: "import.bridgeWithoutProjectNode", messageArgs: { rawId } },
       ));
     }
   }
@@ -677,6 +709,7 @@ function importProjectAndBridgeLinks(
         "xml-importer",
         undefined,
         projectNode.path,
+        { messageId: "import.projectOutputWithoutBridge", messageArgs: { rawId } },
       ));
     } else if (outputBindings.length === 0) {
       warnings.push(createWarningDiagnostic(
@@ -685,6 +718,7 @@ function importProjectAndBridgeLinks(
         "xml-importer",
         undefined,
         projectBridge.path,
+        { messageId: "import.bridgeOutputSourceMissing", messageArgs: { rawId } },
       ));
     }
 
@@ -821,6 +855,7 @@ function ensureSubmoduleInputPort(
     "xml-importer",
     undefined,
     describeInputRecord(inputRecord),
+    { messageId: "import.submoduleInputSynthesized", messageArgs: { rawId } },
   ));
 
   program.nodes.push(importedNode);
@@ -1050,6 +1085,10 @@ function extractDefinedProperties(
         "xml-importer",
         undefined,
         path,
+        {
+          messageId: "import.propertyMissing",
+          messageArgs: { propertyKey: propertyDefinition.key, definitionId: definition?.id ?? "unknown" },
+        },
       ));
     }
   }

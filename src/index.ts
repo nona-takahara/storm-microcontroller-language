@@ -1,5 +1,6 @@
 // Browser-safe public entrypoint that re-exports the pure library API without Node-specific file helpers.
 export * from "./core/diagnostics.js";
+export * from "./core/i18n/index.js";
 export * from "./core/ir.js";
 export * from "./core/project-source.js";
 export * from "./core/definitions/bundled.js";
