@@ -33,3 +33,4 @@ export * from "./core/sync/types.js";
 export * from "./core/sync/partial-matcher.js";
 export * from "./core/sync/ir-comparable.js";
 export * from "./core/sync/engine.js";
+export * from "./core/sync/format.js";

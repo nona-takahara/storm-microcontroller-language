@@ -21,5 +21,10 @@ describe("localized CLI shell", () => {
     expect(await main(["check-dsl", "project.json", "--lang", "fr"])).toBe(1);
     expect(error).toHaveBeenCalledWith("Invalid --lang value: fr. Expected auto, en, or ja.");
   });
-});
 
+  it("rejects --dry-run unless xml2dsl synchronization is selected", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    expect(await main(["xml2dsl", "input.xml", "--dry-run", "--lang", "en"])).toBe(1);
+    expect(log).toHaveBeenCalledWith("Usage:");
+  });
+});

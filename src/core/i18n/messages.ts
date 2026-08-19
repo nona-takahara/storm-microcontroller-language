@@ -108,6 +108,34 @@ export const enMessages = {
   "layout.pathWarning": "{path}: {detail}",
   "layout.autoComputed": "Computed missing layout for {documentId} in memory (not written to disk): {count, plural, one {# position} other {# positions}} filled in.",
   "layout.autoFailed": "Auto-layout failed for {path}: {detail}",
+  "sync.changes": "Changes ({count}):",
+  "sync.change": "- {kind}: {node}",
+  "sync.warnings": "Warnings ({count}):",
+  "sync.warning": "- {kind}: {impacts}",
+  "sync.conflicts": "Blocking conflicts ({count}):",
+  "sync.conflict": "- {kind}: {impacts}",
+  "sync.suggestion": "  Suggested edit: {suggestion}",
+  "sync.summary": "Summary: {added} added, {removed} removed, {updated} updated, {rewired} rewired, {conflicts} blocking conflicts.",
+  "sync.result.written": "Synchronization applied. Files were written.",
+  "sync.result.dryRun": "Dry run completed. No files were written.",
+  "sync.result.blocked": "Synchronization was blocked. No files were written.",
+  "sync.kind.added": "added",
+  "sync.kind.removed": "removed",
+  "sync.kind.updated": "updated",
+  "sync.kind.rewired": "rewired",
+  "sync.warning.layout-overwrite": "layout overwrite",
+  "sync.warning.layout-projection": "layout not applied",
+  "sync.conflict.module-boundary": "module boundary",
+  "sync.conflict.shared-module-divergence": "shared module divergence",
+  "sync.conflict.ambiguous-correspondence": "ambiguous correspondence",
+  "sync.conflict.ambiguous-placement": "ambiguous placement",
+  "sync.conflict.layout-projection": "layout projection",
+  "sync.suggestion.add-module-port": "edit module ports",
+  "sync.suggestion.add-pin-assignment": "edit internal pin assignments",
+  "sync.suggestion.add-use-binding": "edit affected use bindings",
+  "sync.suggestion.duplicate-module": "duplicate the module for divergent use sites",
+  "sync.suggestion.update-shared-module": "apply one common change to the shared module",
+  "sync.suggestion.review-candidates": "review the listed modules, instances, and use sites",
 } as const;
 
 export type MessageId = keyof typeof enMessages;
@@ -225,6 +253,34 @@ export interface MessageArgsById {
   "layout.pathWarning": { path: string; detail: string };
   "layout.autoComputed": { documentId: string; count: number };
   "layout.autoFailed": { path: string; detail: string };
+  "sync.changes": { count: number };
+  "sync.change": { kind: string; node: string };
+  "sync.warnings": { count: number };
+  "sync.warning": { kind: string; impacts: string };
+  "sync.conflicts": { count: number };
+  "sync.conflict": { kind: string; impacts: string };
+  "sync.suggestion": { suggestion: string };
+  "sync.summary": { added: number; removed: number; updated: number; rewired: number; conflicts: number };
+  "sync.result.written": NoMessageArguments;
+  "sync.result.dryRun": NoMessageArguments;
+  "sync.result.blocked": NoMessageArguments;
+  "sync.kind.added": NoMessageArguments;
+  "sync.kind.removed": NoMessageArguments;
+  "sync.kind.updated": NoMessageArguments;
+  "sync.kind.rewired": NoMessageArguments;
+  "sync.warning.layout-overwrite": NoMessageArguments;
+  "sync.warning.layout-projection": NoMessageArguments;
+  "sync.conflict.module-boundary": NoMessageArguments;
+  "sync.conflict.shared-module-divergence": NoMessageArguments;
+  "sync.conflict.ambiguous-correspondence": NoMessageArguments;
+  "sync.conflict.ambiguous-placement": NoMessageArguments;
+  "sync.conflict.layout-projection": NoMessageArguments;
+  "sync.suggestion.add-module-port": NoMessageArguments;
+  "sync.suggestion.add-pin-assignment": NoMessageArguments;
+  "sync.suggestion.add-use-binding": NoMessageArguments;
+  "sync.suggestion.duplicate-module": NoMessageArguments;
+  "sync.suggestion.update-shared-module": NoMessageArguments;
+  "sync.suggestion.review-candidates": NoMessageArguments;
 }
 
 export const jaMessages: Record<MessageId, string> = {
@@ -335,6 +391,34 @@ export const jaMessages: Record<MessageId, string> = {
   "layout.pathWarning": "{path}: {detail}",
   "layout.autoComputed": "{documentId} の不足レイアウトをメモリ上で計算しました（ディスクには未書き込み）: {count}個の位置を補完。",
   "layout.autoFailed": "{path} の自動レイアウトに失敗しました: {detail}",
+  "sync.changes": "変更（{count}件）:",
+  "sync.change": "- {kind}: {node}",
+  "sync.warnings": "警告（{count}件）:",
+  "sync.warning": "- {kind}: {impacts}",
+  "sync.conflicts": "ブロッキング競合（{count}件）:",
+  "sync.conflict": "- {kind}: {impacts}",
+  "sync.suggestion": "  編集候補: {suggestion}",
+  "sync.summary": "集計: 追加 {added}、削除 {removed}、更新 {updated}、配線変更 {rewired}、ブロッキング競合 {conflicts}。",
+  "sync.result.written": "同期を適用し、ファイルを書き込みました。",
+  "sync.result.dryRun": "dry-runが完了しました。ファイルは変更していません。",
+  "sync.result.blocked": "同期を中止しました。ファイルは変更していません。",
+  "sync.kind.added": "追加",
+  "sync.kind.removed": "削除",
+  "sync.kind.updated": "更新",
+  "sync.kind.rewired": "配線変更",
+  "sync.warning.layout-overwrite": "レイアウト上書き",
+  "sync.warning.layout-projection": "レイアウト未反映",
+  "sync.conflict.module-boundary": "module境界",
+  "sync.conflict.shared-module-divergence": "共有moduleの利用箇所間差異",
+  "sync.conflict.ambiguous-correspondence": "対応の曖昧性",
+  "sync.conflict.ambiguous-placement": "配置先の曖昧性",
+  "sync.conflict.layout-projection": "レイアウト投影",
+  "sync.suggestion.add-module-port": "moduleポートを編集する",
+  "sync.suggestion.add-pin-assignment": "内部pin assignmentを編集する",
+  "sync.suggestion.add-use-binding": "影響するuse bindingを編集する",
+  "sync.suggestion.duplicate-module": "差異のあるuse向けにmoduleを複製する",
+  "sync.suggestion.update-shared-module": "共有moduleへ共通の変更を適用する",
+  "sync.suggestion.review-candidates": "列挙されたmodule・instance・useを確認する",
 };
 
 export type LocalizedMessage = {
