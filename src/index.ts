@@ -29,3 +29,7 @@ export * from "./core/compare/module-graph-comparator.js";
 export * from "./core/compare/format.js";
 export * from "./core/compare/project-flattener.js";
 export * from "./core/compare/project-comparator.js";
+export * from "./core/sync/types.js";
+export * from "./core/sync/partial-matcher.js";
+export * from "./core/sync/ir-comparable.js";
+export * from "./core/sync/engine.js";
