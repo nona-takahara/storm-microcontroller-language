@@ -57,6 +57,86 @@ describe("buildSynchronizationPlan", () => {
     expect(plan.conflicts.some((conflict) => conflict.kind === "module-boundary")).toBe(true);
     expect(plan.sourceEdits).toEqual([]);
   });
+
+  it("reports and applies a newly added node as an individual change", async () => {
+    const existing = project([
+      "module main\n",
+      "  inst SOURCE source : -> out=wire\n",
+      "  inst SINK sink : in=wire ->\n",
+      "end\n",
+    ].join(""), "old", []);
+    const incoming = project([
+      "module main\n",
+      "  inst SOURCE renamed_source : -> out=a\n",
+      "  inst MIDDLE added : in=a -> out=b\n",
+      "  inst SINK renamed_sink : in=b ->\n",
+      "end\n",
+    ].join(""), "new", []);
+    const resolved = await resolveProjectSource(existing);
+    const plan = buildSynchronizationPlan(resolved.value!, incoming);
+
+    expect(plan.applicable).toBe(true);
+    expect(plan.changes.filter((change) => change.kind === "added")).toEqual([
+      expect.objectContaining({ incoming: expect.objectContaining({ nodeId: "added", definitionId: "MIDDLE" }) }),
+    ]);
+    expect(materializeSynchronizationSources(resolved.value!, plan)["main.sw-net"]).toContain(
+      "inst MIDDLE nadded",
+    );
+  });
+
+  it("reports and applies a removed node as an individual change", async () => {
+    const existing = project([
+      "module main\n",
+      "  inst SOURCE source : -> out=a\n",
+      "  inst MIDDLE middle : in=a -> out=b\n",
+      "  inst SINK sink : in=b ->\n",
+      "end\n",
+    ].join(""), "old", []);
+    const incoming = project([
+      "module main\n",
+      "  inst SOURCE renamed_source : -> out=direct\n",
+      "  inst SINK renamed_sink : in=direct ->\n",
+      "end\n",
+    ].join(""), "new", []);
+    const resolved = await resolveProjectSource(existing);
+    const plan = buildSynchronizationPlan(resolved.value!, incoming);
+
+    expect(plan.applicable).toBe(true);
+    expect(plan.changes.filter((change) => change.kind === "removed")).toEqual([
+      expect.objectContaining({ existing: expect.objectContaining({ instanceId: "middle", definitionId: "MIDDLE" }) }),
+    ]);
+    const materialized = materializeSynchronizationSources(resolved.value!, plan)["main.sw-net"]!;
+    expect(materialized).not.toContain("inst MIDDLE middle");
+    expect(materialized).toContain("inst SINK sink : in=a ->");
+  });
+
+  it("lists every old and new node when the circuits are completely different", async () => {
+    const existing = project([
+      "module main\n",
+      "  inst OLD_A old_a : ->\n",
+      "  inst OLD_B old_b : ->\n",
+      "end\n",
+    ].join(""), "old", []);
+    const incoming = project([
+      "module main\n",
+      "  inst NEW_A new_a : ->\n",
+      "  inst NEW_B new_b : ->\n",
+      "end\n",
+    ].join(""), "new", []);
+    const resolved = await resolveProjectSource(existing);
+    const plan = buildSynchronizationPlan(resolved.value!, incoming);
+
+    expect(plan.changes.filter((change) => change.kind === "removed").map((change) => change.existing?.nodeId)).toEqual([
+      "old_a",
+      "old_b",
+    ]);
+    expect(plan.changes.filter((change) => change.kind === "added").map((change) => change.incoming?.nodeId)).toEqual([
+      "new_a",
+      "new_b",
+    ]);
+    expect(plan.applicable).toBe(false);
+    expect(plan.conflicts.every((conflict) => conflict.kind === "module-boundary")).toBe(true);
+  });
 });
 
 function project(
