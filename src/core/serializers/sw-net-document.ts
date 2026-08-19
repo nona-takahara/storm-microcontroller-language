@@ -63,7 +63,7 @@ function serializeSwNetModule(module: SwNetModule): string[] {
 }
 
 // Serialize either an inst or use statement from the sw-net AST.
-function serializeSwNetStatement(statement: SwNetStatement): string {
+export function serializeSwNetStatement(statement: SwNetStatement): string {
   if (statement.kind === "inst") {
     const attributesText =
       statement.attributes.length > 0 ? ` (${serializeAssignments(statement.attributes)})` : "";

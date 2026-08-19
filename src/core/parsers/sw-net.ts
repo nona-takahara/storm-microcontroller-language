@@ -110,7 +110,7 @@ export class SwNetParseError extends Error {
   }
 }
 
-type TokenKind =
+export type SwNetTokenKind =
   | "identifier"
   | "string"
   | "number"
@@ -125,12 +125,21 @@ type TokenKind =
   | "arrow"
   | "eof";
 
-interface Token {
-  kind: TokenKind;
+export interface SwNetToken {
+  kind: SwNetTokenKind;
   text: string;
   value?: string | number | boolean | null;
   line: number;
   column: number;
+  start: number;
+  end: number;
+}
+
+type TokenKind = SwNetTokenKind;
+type Token = SwNetToken;
+
+export interface SwNetParseObserver {
+  record(value: object, start: number, end: number): void;
 }
 
 /** Parse sw-net source text into the typed AST used by resolvers and higher-level library APIs. */
@@ -138,13 +147,39 @@ export function parseSwNetDocument(text: string, options: SwNetParseOptions = {}
   return new SwNetParser(text, options.sourceName).parseDocument();
 }
 
+/** Tokenize the semantic sw-net tokens with UTF-16 source offsets. Trivia remains in the raw text. */
+export function tokenizeSwNetDocument(text: string, options: SwNetParseOptions = {}): SwNetToken[] {
+  const lexer = new SwNetLexer(text, options.sourceName);
+  const tokens: SwNetToken[] = [];
+
+  while (true) {
+    const token = lexer.next();
+    tokens.push(token);
+
+    if (token.kind === "eof") {
+      return tokens;
+    }
+  }
+}
+
+/** Internal hook used by the lossless source-document facade without changing the AST shape. */
+export function parseSwNetDocumentWithObserver(
+  text: string,
+  observer: SwNetParseObserver,
+  options: SwNetParseOptions = {},
+): SwNetDocument {
+  return new SwNetParser(text, options.sourceName, observer).parseDocument();
+}
+
 /** Recursive-descent parser for the sw-net grammar. */
 class SwNetParser {
   private readonly lexer: SwNetLexer;
+  private lastConsumed?: Token;
 
   constructor(
     text: string,
     private readonly sourceName?: string,
+    private readonly observer?: SwNetParseObserver,
   ) {
     this.lexer = new SwNetLexer(text, sourceName);
   }
@@ -186,19 +221,23 @@ class SwNetParser {
 
   /** Parse one `import alias from "./path.sw-net"` declaration. */
   private parseImport(): SwNetImport {
+    const start = this.peek().start;
     this.expectIdentifier("import");
     const alias = this.expect("identifier").text;
     this.expectIdentifier("from");
     const pathToken = this.expect("string");
 
-    return {
+    const imported: SwNetImport = {
       alias,
       path: expectStringTokenValue(pathToken),
     };
+    this.record(imported, start);
+    return imported;
   }
 
   /** Parse one `module ... end` block. */
   private parseModule(): SwNetModule {
+    const start = this.peek().start;
     this.expectIdentifier("module");
     const id = this.expect("identifier").text;
     const ports: SwNetPort[] = [];
@@ -229,15 +268,18 @@ class SwNetParser {
 
     this.expectIdentifier("end");
 
-    return {
+    const module: SwNetModule = {
       id,
       ports,
       statements,
     };
+    this.record(module, start);
+    return module;
   }
 
   /** Parse one `port in|out ... : signal` declaration. */
   private parsePort(): SwNetPort {
+    const start = this.peek().start;
     this.expectIdentifier("port");
     const directionToken = this.expect("identifier");
     const direction = parseDirection(directionToken, this.sourceName);
@@ -245,11 +287,13 @@ class SwNetParser {
     this.expect("colon");
     const signalToken = this.expect("identifier");
 
-    return {
+    const port: SwNetPort = {
       direction,
       name,
       signal: parseSignalKind(signalToken, this.sourceName),
     };
+    this.record(port, start);
+    return port;
   }
 
   /** Parse either a quoted or bare port name. */
@@ -263,13 +307,14 @@ class SwNetParser {
 
   /** Parse one `inst` statement including optional attributes and pin assignments. */
   private parseInstStatement(): SwNetInstStatement {
+    const start = this.peek().start;
     this.expectIdentifier("inst");
     const typeId = this.expect("identifier").text;
     const instanceId = this.expect("identifier").text;
     const attributes = this.isToken("lparen") ? this.parseAttributeAssignments() : [];
     const { inputs, outputs } = this.parsePinAssignments();
 
-    return {
+    const statement: SwNetInstStatement = {
       kind: "inst",
       typeId,
       instanceId,
@@ -277,22 +322,27 @@ class SwNetParser {
       inputs,
       outputs,
     };
+    this.record(statement, start);
+    return statement;
   }
 
   /** Parse one `use` statement that instantiates another module. */
   private parseUseStatement(): SwNetUseStatement {
+    const start = this.peek().start;
     this.expectIdentifier("use");
     const moduleRef = this.parseModuleRef();
     const instanceId = this.expect("identifier").text;
     const { inputs, outputs } = this.parsePinAssignments();
 
-    return {
+    const statement: SwNetUseStatement = {
       kind: "use",
       moduleRef,
       instanceId,
       inputs,
       outputs,
     };
+    this.record(statement, start);
+    return statement;
   }
 
   /** Parse either a local module reference or an alias-qualified imported module reference. */
@@ -368,13 +418,16 @@ class SwNetParser {
 
   /** Parse one `key=value` assignment. */
   private parseAssignment(): SwNetAssignment {
+    const start = this.peek().start;
     const key = this.expect("identifier").text;
     this.expect("equal");
 
-    return {
+    const assignment: SwNetAssignment = {
       key,
       value: this.parseExpression(),
     };
+    this.record(assignment, start);
+    return assignment;
   }
 
   /** Parse one scalar or identifier expression supported by the current sw-net grammar. */
@@ -452,7 +505,9 @@ class SwNetParser {
       this.raiseError(`Expected ${kind} but found ${this.describeToken(token)}`, token);
     }
 
-    return this.lexer.next();
+    const consumed = this.lexer.next();
+    this.lastConsumed = consumed;
+    return consumed;
   }
 
   /** Consume one identifier token with a required keyword spelling. */
@@ -479,6 +534,10 @@ class SwNetParser {
   /** Raise a source-located parse error using the current document metadata. */
   private raiseError(message: string, token: Token): never {
     throw new SwNetParseError(message, token.line, token.column, this.sourceName);
+  }
+
+  private record(value: object, start: number): void {
+    this.observer?.record(value, start, this.lastConsumed?.end ?? start);
   }
 }
 
@@ -521,38 +580,38 @@ class SwNetLexer {
 
     if (char === ":") {
       this.advance();
-      return { kind: "colon", text: ":", line: startLine, column: startColumn };
+      return this.tokenAt("colon", ":", startLine, startColumn, this.index - 1);
     }
 
     if (char === ",") {
       this.advance();
-      return { kind: "comma", text: ",", line: startLine, column: startColumn };
+      return this.tokenAt("comma", ",", startLine, startColumn, this.index - 1);
     }
 
     if (char === ".") {
       this.advance();
-      return { kind: "dot", text: ".", line: startLine, column: startColumn };
+      return this.tokenAt("dot", ".", startLine, startColumn, this.index - 1);
     }
 
     if (char === "=") {
       this.advance();
-      return { kind: "equal", text: "=", line: startLine, column: startColumn };
+      return this.tokenAt("equal", "=", startLine, startColumn, this.index - 1);
     }
 
     if (char === "(") {
       this.advance();
-      return { kind: "lparen", text: "(", line: startLine, column: startColumn };
+      return this.tokenAt("lparen", "(", startLine, startColumn, this.index - 1);
     }
 
     if (char === ")") {
       this.advance();
-      return { kind: "rparen", text: ")", line: startLine, column: startColumn };
+      return this.tokenAt("rparen", ")", startLine, startColumn, this.index - 1);
     }
 
     if (char === "-" && this.peekChar(1) === ">") {
       this.advance();
       this.advance();
-      return { kind: "arrow", text: "->", line: startLine, column: startColumn };
+      return this.tokenAt("arrow", "->", startLine, startColumn, this.index - 2);
     }
 
     if (char === "\"") {
@@ -564,6 +623,8 @@ class SwNetLexer {
         value,
         line: startLine,
         column: startColumn,
+        start: this.index - text.length,
+        end: this.index,
       };
     }
 
@@ -581,6 +642,8 @@ class SwNetLexer {
         value,
         line: startLine,
         column: startColumn,
+        start: this.index - text.length,
+        end: this.index,
       };
     }
 
@@ -594,6 +657,8 @@ class SwNetLexer {
           value: text === "true",
           line: startLine,
           column: startColumn,
+          start: this.index - text.length,
+          end: this.index,
         };
       }
 
@@ -604,6 +669,8 @@ class SwNetLexer {
           value: null,
           line: startLine,
           column: startColumn,
+          start: this.index - text.length,
+          end: this.index,
         };
       }
 
@@ -612,6 +679,8 @@ class SwNetLexer {
         text,
         line: startLine,
         column: startColumn,
+        start: this.index - text.length,
+        end: this.index,
       };
     }
 
@@ -731,7 +800,13 @@ class SwNetLexer {
       text,
       line: this.line,
       column: this.column,
+      start: this.index,
+      end: this.index,
     };
+  }
+
+  private tokenAt(kind: TokenKind, text: string, line: number, column: number, start: number): Token {
+    return { kind, text, line, column, start, end: this.index };
   }
 
   /** Advance the lexer by one UTF-16 code unit while maintaining line/column counters. */
