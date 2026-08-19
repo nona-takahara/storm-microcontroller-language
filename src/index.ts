@@ -13,6 +13,7 @@ export * from "./core/importers/xml.js";
 export * from "./core/parsers/project-json.js";
 export * from "./core/parsers/sw-mcl.js";
 export * from "./core/parsers/sw-net.js";
+export * from "./core/parsers/sw-net-source.js";
 export * from "./core/resolvers/sw-net.js";
 export * from "./core/serializers/sw-mcl.js";
 export * from "./core/serializers/project-json.js";

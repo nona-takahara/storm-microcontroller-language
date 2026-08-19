@@ -28,13 +28,13 @@ import {
 } from "./diagnostics.js";
 import { type IrProgram, type IrSignalKind } from "./ir.js";
 import {
-  parseSwNetDocument,
   type SwNetAssignment,
   type SwNetDocument,
   type SwNetInstStatement,
   type SwNetPort,
   type SwNetUseStatement,
 } from "./parsers/sw-net.js";
+import { parseSwNetSourceDocument, type SwNetSourceDocument } from "./parsers/sw-net-source.js";
 import { parseStormworksSwMclText } from "./parsers/sw-mcl.js";
 import {
   resolveSwNetDocumentGraph,
@@ -57,6 +57,8 @@ import { serializeStormworksSwNet } from "./serializers/sw-net.js";
 export interface StormworksSourceDocument {
   documentId: string;
   swNet: SwNetDocument;
+  /** Exact sw-net source and syntax spans, when this document was parsed from text. */
+  swNetSource?: SwNetSourceDocument;
   // null means no .sw-mcl file existed on disk (or none was supplied) — "no layout data", handled
   // uniformly by treating it the same as a missing swMclByDocumentPath map entry (see
   // buildSwMclByDocumentPath and xml-tree.ts's tryResolveModuleSwMcl below).
@@ -144,12 +146,16 @@ export function parseSourceDocumentTexts(
   input: StormworksSourceDocumentTextInput,
 ): StormworksLibraryResult<StormworksSourceDocument> {
   const parsed = runToDiagnostics(
-    () => ({
-      swNet: parseSwNetDocument(input.swNetText, {
+    () => {
+      const swNetSource = parseSwNetSourceDocument(input.swNetText, {
         sourceName: input.documentId,
-      }),
-      swMcl: input.swMclText === undefined ? null : parseStormworksSwMclText(input.swMclText),
-    }),
+      });
+      return {
+        swNet: swNetSource.ast,
+        swNetSource,
+        swMcl: input.swMclText === undefined ? null : parseStormworksSwMclText(input.swMclText),
+      };
+    },
     "library",
     "DOCUMENT_PARSE_FAILED",
     input.documentId,
@@ -163,6 +169,7 @@ export function parseSourceDocumentTexts(
     value: {
       documentId: input.documentId,
       swNet: parsed.value.swNet,
+      swNetSource: parsed.value.swNetSource,
       swMcl: parsed.value.swMcl,
       scripts: { ...(input.scripts ?? {}) },
     },
