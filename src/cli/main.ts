@@ -5,6 +5,8 @@ import { pathToFileURL } from "node:url";
 
 import {
   applyProjectSourceLayoutOverrides,
+  applySynchronizationPlanToDisk,
+  buildSynchronizationPlan,
   buildGateSpec,
   buildSpecOverview,
   buildStormworksXmlFromProjectSource,
@@ -17,6 +19,7 @@ import {
   formatGateSpecListText,
   formatGateSpecText,
   formatSpecOverviewText,
+  formatSynchronizationReport,
   importStormworksXmlToProjectSource,
   listGateSpecSummaries,
   loadBundledNodeBehaviorNotes,
@@ -121,6 +124,10 @@ async function runXml2DslCommand(args: string[]): Promise<number> {
     return 1;
   }
 
+  if (parsedArgs.syncWith) {
+    return runXml2DslSynchronization(parsedArgs, result.value, definitions, hasErrors);
+  }
+
   if (parsedArgs.outputDirectory) {
     await writeProjectSourceToDirectory(result.value, parsedArgs.outputDirectory);
     const entryRelativePath = resolveEntryDocumentRelativePath(result.value);
@@ -164,6 +171,40 @@ async function runXml2DslCommand(args: string[]): Promise<number> {
   }
 
   return hasErrors ? 1 : 0;
+}
+
+async function runXml2DslSynchronization(
+  parsedArgs: Xml2DslArgs,
+  incoming: StormworksProjectSource,
+  definitions: Awaited<ReturnType<typeof loadBundledNodeDefinitions>>,
+  importHasErrors: boolean,
+): Promise<number> {
+  const loadResult = await loadProjectSourceFromProjectJsonFile(parsedArgs.syncWith!);
+  const loadHasErrors = printDiagnostics(loadResult.diagnostics);
+  if (!loadResult.value) return 1;
+  const resolveResult = await resolveProjectSource(loadResult.value, {
+    loadImportedDocument: createFileSystemProjectSourceDocumentLoader(),
+  });
+  const resolveHasErrors = printDiagnostics(resolveResult.diagnostics);
+  if (!resolveResult.value) return 1;
+
+  const plan = buildSynchronizationPlan(resolveResult.value, incoming);
+  if (!plan.applicable) {
+    console.log(formatSynchronizationReport(plan, cliTranslator, "blocked"));
+    return 1;
+  }
+  if (parsedArgs.dryRun) {
+    console.log(formatSynchronizationReport(plan, cliTranslator, "dry-run"));
+    return importHasErrors || loadHasErrors || resolveHasErrors ? 1 : 0;
+  }
+
+  await applySynchronizationPlanToDisk(resolveResult.value, plan, {
+    projectJsonPath: parsedArgs.syncWith!,
+    outputDirectory: parsedArgs.outputDirectory,
+    definitions,
+  });
+  console.log(formatSynchronizationReport(plan, cliTranslator, "written"));
+  return importHasErrors || loadHasErrors || resolveHasErrors ? 1 : 0;
 }
 
 // Load the standard DSL file set and rebuild Stormworks XML text.
@@ -689,11 +730,18 @@ function parseSpecArgs(args: string[]): SpecArgs | undefined {
 }
 
 // Parse xml2dsl-specific command-line arguments.
-function parseXml2DslArgs(
-  args: string[],
-): { inputPath: string; outputDirectory?: string } | undefined {
+interface Xml2DslArgs {
+  inputPath: string;
+  outputDirectory?: string;
+  syncWith?: string;
+  dryRun: boolean;
+}
+
+function parseXml2DslArgs(args: string[]): Xml2DslArgs | undefined {
   let inputPath: string | undefined;
   let outputDirectory: string | undefined;
+  let syncWith: string | undefined;
+  let dryRun = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -714,6 +762,20 @@ function parseXml2DslArgs(
       continue;
     }
 
+    if (arg === "--sync-with") {
+      const next = args[index + 1];
+      if (!next || syncWith !== undefined) return undefined;
+      syncWith = next;
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--dry-run") {
+      if (dryRun) return undefined;
+      dryRun = true;
+      continue;
+    }
+
     if (!inputPath) {
       inputPath = arg;
       continue;
@@ -722,7 +784,8 @@ function parseXml2DslArgs(
     return undefined;
   }
 
-  return inputPath ? { inputPath, outputDirectory } : undefined;
+  if (!inputPath || (dryRun && !syncWith)) return undefined;
+  return { inputPath, outputDirectory, syncWith, dryRun };
 }
 
 // Parse dsl2xml-specific command-line arguments.
@@ -827,6 +890,7 @@ function printDiagnostics(diagnostics: Diagnostic[]): boolean {
 function printUsage(): void {
   console.log(cliTranslator.format("cli.usageHeading"));
   console.log("  storm-mcl xml2dsl <input.xml> [--out-dir output-directory]");
+  console.log("  storm-mcl xml2dsl <input.xml> --sync-with <project.json> [--out-dir output-directory] [--dry-run]");
   console.log("  storm-mcl dsl2xml <project.json> [--out output.xml]");
   console.log("  storm-mcl dsl2xml-tree <project.json>");
   console.log("  storm-mcl check-dsl <project.json>");
