@@ -4,6 +4,7 @@ import {
   type ComparableNode,
   type MatchedNodePair,
 } from "../compare/types.js";
+import { type IrScalarValue } from "../ir.js";
 
 export interface PartialCorrespondenceOptions {
   maxSearchSteps?: number;
@@ -24,7 +25,12 @@ const DEFAULT_PARTIAL_SEARCH_STEPS = 20_000;
 
 /**
  * Find only correspondences shared by every optimal partial graph mapping. Object ids and property
- * values deliberately never participate in identity.
+ * values never decide which candidates are *eligible* to correspond (that stays purely structural,
+ * see `hasSameIdentityClass`); once multiple structurally-tied candidates remain, matching `n`
+ * (display-label) and other property values break the tie as described by `compareScore` below.
+ * A correspondence is reported as `certainPairs` only when it is the single best-scoring one shared
+ * by every optimal search branch, so a tie that neither structure nor properties resolve still
+ * surfaces as an ambiguous-correspondence conflict instead of being guessed.
  */
 export function findPartialNodeCorrespondence(
   existing: ComparableModuleGraph,
@@ -44,7 +50,7 @@ export function findPartialNodeCorrespondence(
   const maxSteps = Math.max(0, options.maxSearchSteps ?? DEFAULT_PARTIAL_SEARCH_STEPS);
   const current = [...forced.pairs];
   const optimal: MatchedNodePair[][] = [];
-  let bestScore: [number, number] = [-1, -1];
+  let bestScore: CorrespondenceScore = [-1, -1, -1, -1];
   let steps = 0;
   let truncated = false;
 
@@ -59,7 +65,12 @@ export function findPartialNodeCorrespondence(
     steps += 1;
 
     if (index === ordered.length) {
-      const score: [number, number] = [current.length, countPreservedLinks(existing, incoming, current)];
+      const score: CorrespondenceScore = [
+        current.length,
+        countPreservedLinks(existing, incoming, current),
+        countNameMatches(current),
+        countPropertyMatches(current),
+      ];
       const comparison = compareScore(score, bestScore);
       if (comparison > 0) {
         bestScore = score;
@@ -165,10 +176,53 @@ function propagateCertainPairs(
         changed = true;
         break;
       }
+
+      // A cheap, linear-time counterpart to the structural-only rule above: when this node's `n`
+      // display label picks out exactly one of its remaining structurally-valid candidates, and no
+      // other remaining node sharing that same label could also validly claim that candidate, the
+      // label alone is decisive. Without this, a cluster of same-kind nodes disambiguated only by
+      // distinct labels (issue #71's actual shape) falls entirely to the exponential backtracking
+      // search below and can exhaust its step budget well before a realistic cluster size.
+      const label = nameLabel(nodeA);
+      if (label !== undefined) {
+        const labelChoices = choices.filter((nodeB) => nameLabel(nodeB) === label);
+        // `choices` is already narrowed by adjacency compatibility against pairs forced so far, and
+        // that narrowing is deliberately lenient (a missing edge on either side does not disqualify a
+        // candidate, see `hasCompatibleCertainAdjacency`). So a single label match in `choices` alone
+        // is not proof of uniqueness -- it could just be that adjacency happened to rule the other
+        // same-label incoming node out at this point in the fixed-point loop. Require the label to
+        // also pick out exactly one candidate in nodeA's full (adjacency-unfiltered) candidate list.
+        const unusedLabelCandidates = (candidates.get(nodeA) ?? []).filter(
+          (nodeB) => !incomingIds.has(nodeB.node.id) && nameLabel(nodeB) === label,
+        );
+        const isOnlyLabelClaimant =
+          labelChoices.length === 1 &&
+          unusedLabelCandidates.length === 1 &&
+          existing.nodes.filter(
+            (other) =>
+              !existingIds.has(other.node.id) &&
+              nameLabel(other) === label &&
+              (candidates.get(other) ?? []).some((candidate) => candidate.node.id === labelChoices[0]!.node.id),
+          ).length === 1;
+
+        if (isOnlyLabelClaimant) {
+          pairs.push({ a: nodeA, b: labelChoices[0]! });
+          existingIds.add(nodeA.node.id);
+          incomingIds.add(labelChoices[0]!.node.id);
+          changed = true;
+          break;
+        }
+      }
     }
   }
 
   return { pairs, existingIds };
+}
+
+/** The Stormworks in-game custom display name, when the DSL/XML source set a non-empty one. */
+function nameLabel(node: ComparableNode): string | undefined {
+  const value = node.attributes.n;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function hasCompatibleCertainAdjacency(
@@ -229,8 +283,38 @@ function linkKey(link: ComparableModuleGraph["links"][number]): string {
   return `${link.from.nodeId}:${link.from.portKey}->${link.to.nodeId}:${link.to.portKey}`;
 }
 
-function compareScore(left: [number, number], right: [number, number]): number {
-  return left[0] - right[0] || left[1] - right[1];
+/**
+ * Score tuple compared lexicographically, most significant first:
+ *  1. total matched pairs (more correspondence coverage always wins);
+ *  2. preserved incident links (wiring topology is the strongest disambiguator once counts tie);
+ *  3. matching `n` display-label attributes (a strong but weaker-than-wiring identity signal);
+ *  4. matching non-`n` property values, one point per pair at most (a strong signal too, but a
+ *     mismatch here never subtracts — it is deliberately not a veto, only the absence of a bonus).
+ */
+type CorrespondenceScore = [number, number, number, number];
+
+function compareScore(left: CorrespondenceScore, right: CorrespondenceScore): number {
+  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2] || left[3] - right[3];
+}
+
+/** Count pairs whose `n` (display-label) attribute is present on both sides and equal. */
+function countNameMatches(pairs: MatchedNodePair[]): number {
+  return pairs.filter((pair) => attributesEqual(pair.a.attributes.n, pair.b.attributes.n)).length;
+}
+
+/**
+ * Count pairs whose non-`n` attributes are fully equal, capped at one point per pair so a
+ * property-rich node cannot outweigh several sparser ones in the same search branch.
+ */
+function countPropertyMatches(pairs: MatchedNodePair[]): number {
+  return pairs.filter((pair) => {
+    const keys = new Set([...Object.keys(pair.a.attributes), ...Object.keys(pair.b.attributes)].filter((key) => key !== "n"));
+    return keys.size > 0 && [...keys].every((key) => attributesEqual(pair.a.attributes[key], pair.b.attributes[key]));
+  }).length;
+}
+
+function attributesEqual(left: IrScalarValue | undefined, right: IrScalarValue | undefined): boolean {
+  return left !== undefined && right !== undefined && left === right;
 }
 
 function intersectPairs(correspondences: MatchedNodePair[][]): MatchedNodePair[] {

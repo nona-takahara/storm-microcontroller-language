@@ -137,6 +137,77 @@ describe("buildSynchronizationPlan", () => {
     expect(plan.applicable).toBe(false);
     expect(plan.conflicts.every((conflict) => conflict.kind === "module-boundary")).toBe(true);
   });
+
+  it("keeps each node's own value and label on a no-op round trip through adjacent same-type nodes (issue #71)", async () => {
+    // Regression test for issue #71: syncing XML that was freshly generated from this exact project
+    // (a pure round trip, no external edits) previously swapped the value/n of two of three adjacent
+    // same-definitionId nodes, because the XML importer assigns incoming instance ids independently
+    // of the existing DSL instance names. The n display-label match must resolve the correspondence.
+    const existingText = [
+      "module main\n",
+      '  inst PROPERTY_NUMBER overspeed_threshold (value=32, n="Over Speed Th. [m/s]") : ->\n',
+      '  inst PROPERTY_NUMBER cam_advance_current_limit_base (value=210, n="Power Limit Current [A]") : ->\n',
+      '  inst PROPERTY_NUMBER brake_current_limit_scale (value=290, n="Brake Limit@320kPa [A]") : ->\n',
+      "end\n",
+    ].join("");
+    const existing = project(existingText, "old", [
+      { id: "overspeed_threshold", type: "PROPERTY_NUMBER", position: { x: -9, y: -32 } },
+      { id: "cam_advance_current_limit_base", type: "PROPERTY_NUMBER", position: { x: -7.75, y: -32 } },
+      { id: "brake_current_limit_scale", type: "PROPERTY_NUMBER", position: { x: -6.5, y: -32 } },
+    ]);
+    const resolved = await resolveProjectSource(existing);
+    expect(resolved.value).toBeDefined();
+
+    const incoming = project([
+      "module main\n",
+      '  inst PROPERTY_NUMBER n50 (value=32, n="Over Speed Th. [m/s]") : ->\n',
+      '  inst PROPERTY_NUMBER n51 (value=210, n="Power Limit Current [A]") : ->\n',
+      '  inst PROPERTY_NUMBER n52 (value=290, n="Brake Limit@320kPa [A]") : ->\n',
+      "end\n",
+    ].join(""), "new", [
+      { id: "n50", type: "PROPERTY_NUMBER", position: { x: -9, y: -32 } },
+      { id: "n51", type: "PROPERTY_NUMBER", position: { x: -7.75, y: -32 } },
+      { id: "n52", type: "PROPERTY_NUMBER", position: { x: -6.5, y: -32 } },
+    ]);
+    const plan = buildSynchronizationPlan(resolved.value!, incoming);
+
+    expect(plan.conflicts).toEqual([]);
+    expect(plan.changes).toEqual([]);
+    expect(plan.warnings.some((warning) => warning.kind === "layout-overwrite")).toBe(false);
+    expect(plan.applicable).toBe(true);
+  });
+
+  it("blocks as ambiguous when same-type nodes collide on every signal (issue #71 safety)", async () => {
+    // Companion safety test: two same-type nodes share the same n label and their property values
+    // also don't line up across the two sides, so no signal disambiguates them. The engine must
+    // keep refusing to silently guess a correspondence here, the same way it already does for
+    // fully symmetric nodes with no properties at all.
+    const existing = project([
+      "module main\n",
+      '  inst PROPERTY_NUMBER gain_a (value=1, n="Gain") : ->\n',
+      '  inst PROPERTY_NUMBER gain_b (value=2, n="Gain") : ->\n',
+      "end\n",
+    ].join(""), "old", [
+      { id: "gain_a", type: "PROPERTY_NUMBER", position: { x: 0, y: 0 } },
+      { id: "gain_b", type: "PROPERTY_NUMBER", position: { x: 1, y: 0 } },
+    ]);
+    const resolved = await resolveProjectSource(existing);
+    expect(resolved.value).toBeDefined();
+
+    const incoming = project([
+      "module main\n",
+      '  inst PROPERTY_NUMBER m1 (value=3, n="Gain") : ->\n',
+      '  inst PROPERTY_NUMBER m2 (value=4, n="Gain") : ->\n',
+      "end\n",
+    ].join(""), "new", [
+      { id: "m1", type: "PROPERTY_NUMBER", position: { x: 0, y: 0 } },
+      { id: "m2", type: "PROPERTY_NUMBER", position: { x: 1, y: 0 } },
+    ]);
+    const plan = buildSynchronizationPlan(resolved.value!, incoming);
+
+    expect(plan.applicable).toBe(false);
+    expect(plan.conflicts.some((conflict) => conflict.kind === "ambiguous-correspondence")).toBe(true);
+  });
 });
 
 function project(
