@@ -247,17 +247,12 @@
         },
         {
           "category": "other",
-          "text": "COUNTER's `object` element carries an `m` attribute with value `\"0\"` or `\"1\"` on real, Stormworks-authored saves (confirmed by directly inspecting real vehicle files: e.g. one file has both `m=\"0\"` and `m=\"1\"` on different COUNTER instances). Older-format saves omit `m` entirely -- and in those same files, the `r`/`min`/`max` children also lack the numeric `@value` mirror present in newer saves, indicating `m` is a later addition to the format that predates those files. This tool models the attribute as the `clamp` property, defaulting to `\"off\"` when `m` is absent, matching the omission-implies-default convention this codebase already applies to other attributes (e.g. TIMER_TON/TOF/RTO/RTF's `units`/`@u`). The attribute's existence, its `0`/`1` value domain, and the omission pattern informing the default are verified by direct inspection of real save files.",
+          "text": "COUNTER's `object` element carries an `m` attribute (`\"0\"` or `\"1\"`) on real Stormworks-authored saves. Some older saves omit `m` entirely, and in those same saves the `r`/`min`/`max` children also lack the `@value` numeric mirror seen in newer saves -- `m` is a later addition to the format. This tool models `m` as the `clamp` property, defaulting to `\"off\"` when absent.",
           "confidence": "verified"
         },
         {
-          "category": "other",
-          "text": "`clamp`'s semantic meaning is: `m=\"1\"` (`clamp=\"on\"`) means `out` clamps at `min`/`max`; `m=\"0\"` or absent (`clamp=\"off\"`, the default) means `out` is unbounded past `min`/`max` rather than wrapping around or saturating. Unlike the attribute's existence/encoding (see the previous note), this specific on/off meaning and off-state behavior rest on the repo owner's own investigation, corroborated by the independent, community-maintained stormworks-utils/sw_mc_lib library (its `UpDownCounter` component parses the same `m` attribute into a boolean `clamp` field defaulting to false). Neither source is an official Stormworks source or decompiled game code, and the behavior has not been confirmed by directly observing a running microcontroller, so this stays inferred rather than verified.",
-          "confidence": "inferred"
-        },
-        {
           "category": "edge-case",
-          "text": "With `clamp=\"on\"`, `out` is clamped to [`min`, `max`]. With `clamp=\"off\"` (the default), `out` is unbounded: it keeps increasing past `max` or decreasing past `min` indefinitely rather than wrapping around to the opposite bound or saturating.",
+          "text": "With `clamp=\"on\"` (`m=\"1\"`), `out` clamps to [`min`, `max`]. With `clamp=\"off\"` (`m=\"0\"` or absent, the default), `out` is unbounded past those limits rather than wrapping around or saturating.",
           "confidence": "inferred"
         }
       ]
