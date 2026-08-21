@@ -711,9 +711,16 @@
             { "xmlPath": "object.max.@text", "valueType": "string" },
             { "xmlPath": "object.max.@value", "valueType": "number" }
           ]
+        },
+        {
+          "key": "clamp",
+          "valueType": "string",
+          "required": false,
+          "source": { "xmlPath": "object.@m" },
+          "enum": { "off": 0, "on": 1 }
         }
       ],
-      "defaults": { "reset_value": 0, "increment": 1, "min": 0, "max": 100 }
+      "defaults": { "reset_value": 0, "increment": 1, "min": 0, "max": 100, "clamp": "off" }
     },
     {
       "id": "ADD",

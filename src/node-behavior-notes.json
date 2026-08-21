@@ -237,12 +237,22 @@
       "notes": [
         {
           "category": "other",
-          "text": "COUNTER's three inputs are `up`, `down`, `reset` (booleans) -- there is no separate 'enable' input. Its properties are `increment` (default 1), `min`/`max` (default 0/100), and `reset_value` (default 0).",
+          "text": "COUNTER's three inputs are `up`, `down`, `reset` (booleans) -- there is no separate 'enable' input. Its properties are `increment` (default 1), `min`/`max` (default 0/100), `reset_value` (default 0), and `clamp` (`\"on\"` or `\"off\"`, default `\"off\"`).",
           "confidence": "verified"
         },
         {
           "category": "edge-case",
-          "text": "`out` changes by `increment` on every tick that `up` or `down` is held true -- continuously, not just on a rising edge -- clamped to [`min`, `max`].",
+          "text": "`out` changes by `increment` on every tick that `up` or `down` is held true -- continuously, not just on a rising edge. Whether `out` is bounded to [`min`, `max`] depends on `clamp`.",
+          "confidence": "inferred"
+        },
+        {
+          "category": "other",
+          "text": "COUNTER's `object` element carries an `m` attribute (`\"0\"` or `\"1\"`) on real Stormworks-authored saves. Some older saves omit `m` entirely, and in those same saves the `r`/`min`/`max` children also lack the `@value` numeric mirror seen in newer saves -- `m` is a later addition to the format. This tool models `m` as the `clamp` property, defaulting to `\"off\"` when absent.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "With `clamp=\"on\"` (`m=\"1\"`), `out` clamps to [`min`, `max`]. With `clamp=\"off\"` (`m=\"0\"` or absent, the default), `out` is unbounded past those limits rather than wrapping around or saturating.",
           "confidence": "inferred"
         }
       ]
