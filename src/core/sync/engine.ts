@@ -1,5 +1,4 @@
 import { normalizeComparableModule } from "../compare/comparable-node.js";
-import { compareComparableModuleGraphs } from "../compare/module-graph-comparator.js";
 import { flattenSwNetProject } from "../compare/project-flattener.js";
 import {
   type ComparableModuleGraph,
@@ -61,20 +60,15 @@ export function buildSynchronizationPlan(
     flattened.value.documentPathByInstanceId,
   );
   const newGraph = newNormalized.value;
-  const full = compareComparableModuleGraphs(oldGraph, newGraph, [], options);
-  const partial =
-    full.matchedPairs.length === oldGraph.nodes.length && full.matchedPairs.length === newGraph.nodes.length
-      ? {
-          certainPairs: full.matchedPairs,
-          unmatchedExisting: [],
-          unmatchedIncoming: [],
-          ambiguousExisting: [],
-          ambiguousIncoming: [],
-          optimalCorrespondenceCount: 1,
-          searchSteps: 0,
-          truncated: false,
-        }
-      : findPartialNodeCorrespondence(oldGraph, newGraph, options);
+  // `findPartialNodeCorrespondence` is the only correspondence search sync may trust as "certain": it
+  // reports a pair only when it is the single best-scoring one shared by every optimal search branch.
+  // `compareComparableModuleGraphs` (used by compare-dsl) intentionally answers a different question
+  // -- "does *any* structurally valid correspondence exist" -- and stops at the first one its
+  // backtracking search finds, tie-breaking by node id with no regard for labels or property values.
+  // A "complete" result from that search is not evidence of uniqueness, so it must never be reused
+  // here as a stand-in for a certain match; doing so previously let coincidental id ordering silently
+  // swap same-kind, same-shape nodes (see partial-matcher.test.ts's adjacent-property-node regression).
+  const partial = findPartialNodeCorrespondence(oldGraph, newGraph, options);
   const changes = classifyChanges(oldGraph, newGraph, partial.certainPairs, partial.unmatchedExisting, partial.unmatchedIncoming);
   const conflicts: SynchronizationConflict[] = [];
   const warnings: SynchronizationWarning[] = [];

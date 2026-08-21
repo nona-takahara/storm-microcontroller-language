@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type ComparableModuleGraph, type ComparableNode } from "../compare/types.js";
+import { type IrScalarValue } from "../ir.js";
 import { findPartialNodeCorrespondence } from "./partial-matcher.js";
 
 describe("findPartialNodeCorrespondence", () => {
@@ -39,9 +40,56 @@ describe("findPartialNodeCorrespondence", () => {
     const incoming = graph([node("b1", "TYPE"), node("b2", "TYPE")], []);
     expect(findPartialNodeCorrespondence(existing, incoming, { maxSearchSteps: 1 }).truncated).toBe(true);
   });
+
+  it("prioritizes the matching n label to resolve otherwise-symmetric same-type nodes", () => {
+    // Reproduces issue #71: three same-definitionId nodes with no distinguishing link structure,
+    // laid out at adjacent positions and re-imported with different (XML-assigned) ids. Positions
+    // are not part of ComparableNode identity, so the only signals available are the n label and
+    // the property value; the n label must decide the correspondence.
+    const existing = graph([
+      node("overspeed_threshold", "PROPERTY_NUMBER", { value: 32, n: "Over Speed Th. [m/s]" }),
+      node("cam_advance_current_limit_base", "PROPERTY_NUMBER", { value: 210, n: "Power Limit Current [A]" }),
+      node("brake_current_limit_scale", "PROPERTY_NUMBER", { value: 290, n: "Brake Limit@320kPa [A]" }),
+    ], []);
+    const incoming = graph([
+      node("n50", "PROPERTY_NUMBER", { value: 32, n: "Over Speed Th. [m/s]" }),
+      node("n51", "PROPERTY_NUMBER", { value: 210, n: "Power Limit Current [A]" }),
+      node("n52", "PROPERTY_NUMBER", { value: 290, n: "Brake Limit@320kPa [A]" }),
+    ], []);
+
+    const result = findPartialNodeCorrespondence(existing, incoming);
+
+    expect(result.optimalCorrespondenceCount).toBe(1);
+    expect(new Map(result.certainPairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(new Map([
+      ["overspeed_threshold", "n50"],
+      ["cam_advance_current_limit_base", "n51"],
+      ["brake_current_limit_scale", "n52"],
+    ]));
+    expect(result.ambiguousExisting).toEqual([]);
+  });
+
+  it("still blocks when neither the n label nor the property value disambiguates", () => {
+    // Companion safety test: two same-type nodes whose n labels collide and whose property values
+    // also differ from each other on both sides, so no signal -- structural, label, or value --
+    // picks out a unique correspondence. The engine must keep refusing to guess here.
+    const existing = graph([
+      node("gain_a", "PROPERTY_NUMBER", { value: 1, n: "Gain" }),
+      node("gain_b", "PROPERTY_NUMBER", { value: 2, n: "Gain" }),
+    ], []);
+    const incoming = graph([
+      node("m1", "PROPERTY_NUMBER", { value: 3, n: "Gain" }),
+      node("m2", "PROPERTY_NUMBER", { value: 4, n: "Gain" }),
+    ], []);
+
+    const result = findPartialNodeCorrespondence(existing, incoming);
+
+    expect(result.certainPairs).toEqual([]);
+    expect(result.ambiguousExisting).toHaveLength(2);
+    expect(result.optimalCorrespondenceCount).toBeGreaterThan(1);
+  });
 });
 
-function node(id: string, definitionId: string, properties: Record<string, number> = {}): ComparableNode {
+function node(id: string, definitionId: string, properties: Record<string, IrScalarValue> = {}): ComparableNode {
   return { node: { id, definitionId, layer: "logic", properties }, attributes: properties, literalInputs: {} };
 }
 
