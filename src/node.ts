@@ -10,3 +10,4 @@ export * from "./infra/fs/sw-net-layout-file-loader.js";
 export * from "./infra/fs/layout-dsl-runner.js";
 export * from "./infra/fs/network-compare-runner.js";
 export * from "./infra/fs/synchronization-runner.js";
+export * from "./infra/fs/split-module-runner.js";

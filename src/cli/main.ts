@@ -26,12 +26,14 @@ import {
   loadBundledNodeDefinitions,
   loadBundledStormworksSystemNotes,
   loadProjectSourceFromProjectJsonFile,
+  planSplitModuleFiles,
   readUtf8TextFile,
   resolveLayoutTargets,
   resolveProjectSource,
   runCompareDsl,
   runLayoutDslForTarget,
   serializeSourceDocumentTexts,
+  writeSplitModuleFiles,
   type LayoutTarget,
   type StormworksSwMclDocument,
   createErrorDiagnostic,
@@ -89,6 +91,8 @@ export async function main(argv: string[]): Promise<number> {
       return runCompareDslCommand(rest);
     case "spec":
       return runSpecCommand(rest);
+    case "split-module":
+      return runSplitModuleCommand(rest);
     default:
       printUsage();
       return command ? 1 : 0;
@@ -442,6 +446,55 @@ async function runSpecCommand(args: string[]): Promise<number> {
   return 0;
 }
 
+// Mechanically extract a chosen set of inst/use instanceIds out of one sw-net module into a
+// brand-new module, rewriting only the wiring that crosses the new boundary (issue #64).
+async function runSplitModuleCommand(args: string[]): Promise<number> {
+  const parsedArgs = parseSplitModuleArgs(args);
+
+  if (!parsedArgs) {
+    printUsage();
+    return 1;
+  }
+
+  const definitions = await loadBundledNodeDefinitions();
+  const result = await planSplitModuleFiles({
+    projectJsonPath: parsedArgs.projectJsonPath,
+    document: parsedArgs.document,
+    moduleId: parsedArgs.moduleId,
+    gateInstanceIds: parsedArgs.gateInstanceIds,
+    outSwNetPath: parsedArgs.outSwNetPath,
+    newModuleId: parsedArgs.newModuleId,
+    newInstanceId: parsedArgs.newInstanceId,
+    definitions,
+  });
+  const hasErrors = printDiagnostics(result.diagnostics);
+
+  if (!result.value) {
+    return 1;
+  }
+
+  const plan = result.value;
+
+  console.log(
+    cliTranslator.format("split.summary", {
+      count: plan.movedInstanceIds.length,
+      moduleId: plan.newModuleId,
+      path: plan.newSwNetPath,
+    }),
+  );
+
+  if (parsedArgs.dryRun) {
+    console.log(cliTranslator.format("split.result.dryRun"));
+    return hasErrors ? 1 : 0;
+  }
+
+  await writeSplitModuleFiles(plan);
+  console.error(cliTranslator.format("cli.wroteFile", { path: plan.sourceSwNetPath }));
+  console.error(cliTranslator.format("cli.wroteFile", { path: plan.newSwNetPath }));
+  console.log(cliTranslator.format("split.result.written"));
+  return hasErrors ? 1 : 0;
+}
+
 // Compute and write .sw-mcl layout files from the .sw-net graph, filling or regenerating positions via ELK.
 async function runLayoutDslCommand(args: string[]): Promise<number> {
   const parsedArgs = parseLayoutDslArgs(args);
@@ -729,6 +782,104 @@ function parseSpecArgs(args: string[]): SpecArgs | undefined {
   return { gateId, list, json };
 }
 
+interface SplitModuleArgs {
+  projectJsonPath: string;
+  moduleId?: string;
+  document?: string;
+  gateInstanceIds: string[];
+  outSwNetPath: string;
+  newModuleId?: string;
+  newInstanceId?: string;
+  dryRun: boolean;
+}
+
+// Parse split-module-specific command-line arguments.
+function parseSplitModuleArgs(args: string[]): SplitModuleArgs | undefined {
+  let projectJsonPath: string | undefined;
+  let moduleId: string | undefined;
+  let documentPath: string | undefined;
+  let gates: string | undefined;
+  let outSwNetPath: string | undefined;
+  let newModuleId: string | undefined;
+  let newInstanceId: string | undefined;
+  let dryRun = false;
+
+  const stringFlags: Record<string, (value: string) => void> = {
+    "--module": (value) => (moduleId = value),
+    "--document": (value) => (documentPath = value),
+    "--gates": (value) => (gates = value),
+    "--out": (value) => (outSwNetPath = value),
+    "--new-module": (value) => (newModuleId = value),
+    "--instance": (value) => (newInstanceId = value),
+  };
+  const alreadySet: Record<string, () => boolean> = {
+    "--module": () => moduleId !== undefined,
+    "--document": () => documentPath !== undefined,
+    "--gates": () => gates !== undefined,
+    "--out": () => outSwNetPath !== undefined,
+    "--new-module": () => newModuleId !== undefined,
+    "--instance": () => newInstanceId !== undefined,
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (!arg) {
+      return undefined;
+    }
+
+    if (arg === "--dry-run") {
+      dryRun = true;
+      continue;
+    }
+
+    const setFlag = stringFlags[arg];
+
+    if (setFlag) {
+      const next = args[index + 1];
+
+      if (!next || alreadySet[arg]!()) {
+        return undefined;
+      }
+
+      setFlag(next);
+      index += 1;
+      continue;
+    }
+
+    if (!projectJsonPath) {
+      projectJsonPath = arg;
+      continue;
+    }
+
+    return undefined;
+  }
+
+  if (!projectJsonPath || !gates || !outSwNetPath) {
+    return undefined;
+  }
+
+  const gateInstanceIds = gates
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+
+  if (gateInstanceIds.length === 0) {
+    return undefined;
+  }
+
+  return {
+    projectJsonPath,
+    moduleId,
+    document: documentPath,
+    gateInstanceIds,
+    outSwNetPath,
+    newModuleId,
+    newInstanceId,
+    dryRun,
+  };
+}
+
 // Parse xml2dsl-specific command-line arguments.
 interface Xml2DslArgs {
   inputPath: string;
@@ -900,6 +1051,9 @@ function printUsage(): void {
     "  storm-mcl layout-dsl <project.json> [--module <id>] [--document <path>] [--all-submodules] [--force] [--dry-run] [--grid-size <n>]",
   );
   console.log("  storm-mcl spec [<definitionId>] [--list] [--json]");
+  console.log(
+    "  storm-mcl split-module <project.json> --gates <id1,id2,...> --out <new.sw-net> [--module <id>] [--document <path>] [--new-module <id>] [--instance <id>] [--dry-run]",
+  );
   console.log("  --lang auto|en|ja");
   console.log(cliTranslator.format("cli.specEnglishOnly"));
 }
