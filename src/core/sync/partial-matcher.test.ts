@@ -68,6 +68,42 @@ describe("findPartialNodeCorrespondence", () => {
     expect(result.ambiguousExisting).toEqual([]);
   });
 
+  it("resolves a long chain of unlabeled same-type nodes anchored by one port within a tight step budget", () => {
+    // Regression guard for the blowup PR #72 introduced (issue #71 follow-up): once sync stopped
+    // reusing compare-dsl's full-match shortcut, every node the link-blind forcing rules could not
+    // resolve fell to this matcher's exhaustive fallback -- and a long chain of same-kind, unlabeled
+    // nodes is exactly the shape real circuits are full of, so real no-op re-imports were hitting the
+    // step budget and getting blocked. `mappedIncidentSignature`/`incidentSignatureAmongForced` let
+    // forcing cascade outward from the port anchor one link at a time instead, so this chain must
+    // resolve fully well under budget.
+    const length = 60;
+    const existingChainIds = Array.from({ length }, (_, i) => `existing-${i}`);
+    const incomingChainIds = Array.from({ length }, (_, i) => `incoming-${i}`);
+    const chainLinks = (ids: string[]) =>
+      ids.slice(0, -1).map((id, i) => ({ from: id, fromKey: "out", to: ids[i + 1]!, toKey: "in" }));
+
+    const existing = graph(
+      [port("old-port", "input"), ...existingChainIds.map((id) => node(id, "TYPE"))],
+      [{ from: "old-port", fromKey: "out", to: existingChainIds[0]!, toKey: "in" }, ...chainLinks(existingChainIds)],
+    );
+    const incoming = graph(
+      [port("new-port", "input"), ...incomingChainIds.map((id) => node(id, "TYPE"))],
+      [{ from: "new-port", fromKey: "out", to: incomingChainIds[0]!, toKey: "in" }, ...chainLinks(incomingChainIds)],
+    );
+
+    const result = findPartialNodeCorrespondence(existing, incoming);
+
+    expect(result.truncated).toBe(false);
+    expect(result.ambiguousExisting).toEqual([]);
+    expect(new Map(result.certainPairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(
+      new Map([
+        ["old-port", "new-port"],
+        ...existingChainIds.map((id, i) => [id, incomingChainIds[i]!] as const),
+      ]),
+    );
+    expect(result.searchSteps).toBeLessThan(200);
+  });
+
   it("still blocks when neither the n label nor the property value disambiguates", () => {
     // Companion safety test: two same-type nodes whose n labels collide and whose property values
     // also differ from each other on both sides, so no signal -- structural, label, or value --

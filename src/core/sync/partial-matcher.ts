@@ -152,10 +152,48 @@ function propagateCertainPairs(
 
   while (changed) {
     changed = false;
+    const bIdByAId = new Map(pairs.map((pair) => [pair.a.node.id, pair.b.node.id] as const));
     for (const nodeA of existing.nodes) {
       if (existingIds.has(nodeA.node.id)) {
         continue;
       }
+
+      // The strongest, least-presumptuous signal: a node whose links to already-forced neighbors
+      // have exactly one candidate with that same set of links to those same forced neighbors is
+      // that candidate, full stop -- no adjacency leniency, no labels, no properties involved. This
+      // mirrors the exact-match propagation compare-dsl's equivalence search already relies on
+      // (see `module-graph-comparator.ts`'s `propagateForcedPairs`) and is what lets a real,
+      // sparsely-linked circuit converge by cascading outward from its few naturally unique anchors
+      // (project ports, uniquely-labeled nodes) instead of falling straight to the exponential
+      // fallback search below for every node the cheaper rules beneath it cannot yet resolve. A node
+      // with no links to forced neighbors yet (signature is empty) skips this rule and falls to the
+      // ones below; a genuinely rewired node's signature can never match a wrong candidate's, so it
+      // also falls through rather than being mis-forced.
+      const requiredSignature = mappedIncidentSignature(existing.links, nodeA.node.id, bIdByAId);
+      if (requiredSignature !== "") {
+        const exactChoices = (candidates.get(nodeA) ?? []).filter(
+          (nodeB) =>
+            !incomingIds.has(nodeB.node.id) &&
+            incidentSignatureAmongForced(incoming.links, nodeB.node.id, incomingIds) === requiredSignature,
+        );
+        const isOnlyExactClaimant =
+          exactChoices.length === 1 &&
+          existing.nodes.filter(
+            (other) =>
+              !existingIds.has(other.node.id) &&
+              mappedIncidentSignature(existing.links, other.node.id, bIdByAId) === requiredSignature &&
+              (candidates.get(other) ?? []).some((candidate) => candidate.node.id === exactChoices[0]!.node.id),
+          ).length === 1;
+
+        if (isOnlyExactClaimant) {
+          pairs.push({ a: nodeA, b: exactChoices[0]! });
+          existingIds.add(nodeA.node.id);
+          incomingIds.add(exactChoices[0]!.node.id);
+          changed = true;
+          break;
+        }
+      }
+
       const choices = (candidates.get(nodeA) ?? []).filter(
         (nodeB) =>
           !incomingIds.has(nodeB.node.id) &&
@@ -223,6 +261,50 @@ function propagateCertainPairs(
 function nameLabel(node: ComparableNode): string | undefined {
   const value = node.attributes.n;
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * `nodeId`'s links to nodes already forced (per `existingToIncoming`), rewritten in terms of their
+ * incoming-side ids so the result is directly comparable to `incidentSignatureAmongForced` on the
+ * incoming graph. Links to not-yet-forced neighbors are excluded, not treated as mismatches.
+ */
+function mappedIncidentSignature(
+  links: ComparableModuleGraph["links"],
+  nodeId: string,
+  existingToIncoming: Map<string, string>,
+): string {
+  return links
+    .flatMap((link) => {
+      if (link.from.nodeId === nodeId && existingToIncoming.has(link.to.nodeId)) {
+        return [`out:${link.from.portKey}:${existingToIncoming.get(link.to.nodeId)}:${link.to.portKey}`];
+      }
+      if (link.to.nodeId === nodeId && existingToIncoming.has(link.from.nodeId)) {
+        return [`in:${link.to.portKey}:${existingToIncoming.get(link.from.nodeId)}:${link.from.portKey}`];
+      }
+      return [];
+    })
+    .sort()
+    .join("\n");
+}
+
+/** `nodeId`'s links restricted to neighbors in `forcedIds`, in the same format as `mappedIncidentSignature`. */
+function incidentSignatureAmongForced(
+  links: ComparableModuleGraph["links"],
+  nodeId: string,
+  forcedIds: Set<string>,
+): string {
+  return links
+    .flatMap((link) => {
+      if (link.from.nodeId === nodeId && forcedIds.has(link.to.nodeId)) {
+        return [`out:${link.from.portKey}:${link.to.nodeId}:${link.to.portKey}`];
+      }
+      if (link.to.nodeId === nodeId && forcedIds.has(link.from.nodeId)) {
+        return [`in:${link.to.portKey}:${link.from.nodeId}:${link.from.portKey}`];
+      }
+      return [];
+    })
+    .sort()
+    .join("\n");
 }
 
 function hasCompatibleCertainAdjacency(
