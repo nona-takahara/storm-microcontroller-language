@@ -154,6 +154,29 @@ export function createSwNetStatementInsertionEdit(
   return { start: endLineStart, end: endLineStart, newText: rendered };
 }
 
+/** Insert a rendered `import alias from "path"` line after the last existing import, or before the
+ * first module when the document has none yet. */
+export function createSwNetImportInsertionEdit(
+  source: SwNetSourceDocument,
+  renderedImport: string,
+): SwNetTextEdit {
+  const lastImport = source.ast.imports.at(-1);
+
+  if (lastImport) {
+    const insertAt = findNextLineStart(source.text, source.spanOf(lastImport).end);
+    return { start: insertAt, end: insertAt, newText: `${renderedImport}${source.newline}` };
+  }
+
+  const firstModule = source.ast.modules[0];
+
+  if (!firstModule) {
+    return { start: 0, end: 0, newText: `${renderedImport}${source.newline}` };
+  }
+
+  const insertAt = findLineStart(source.text, source.spanOf(firstModule).start);
+  return { start: insertAt, end: insertAt, newText: `${renderedImport}${source.newline}${source.newline}` };
+}
+
 function inferStatementIndent(
   source: SwNetSourceDocument,
   module: SwNetModule,

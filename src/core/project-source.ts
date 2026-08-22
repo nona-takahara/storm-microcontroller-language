@@ -1077,8 +1077,10 @@ function collectInstNetEdges(
 // Resolve one inst statement's port key to its declared signal kind, covering both static ports and
 // dynamic-input components (e.g. composite writers with a variable in1..inN). Falls back to "unknown"
 // whenever the definition, port, or dynamic-input signal isn't available, matching the existing
-// unknown-as-escape-hatch precedent used elsewhere in this module.
-function resolveInstPortSignal(
+// unknown-as-escape-hatch precedent used elsewhere in this module. Exported: the split engine
+// (src/core/split/engine.ts) reuses this exact resolution for the new module's synthesized ports so
+// the two features can't disagree on what an inst statement's own port signal is.
+export function resolveInstPortSignal(
   definition: ComponentDefinition | undefined,
   statement: SwNetInstStatement,
   key: string,

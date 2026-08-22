@@ -4,6 +4,7 @@ import { serializeSwNetStatement } from "../serializers/sw-net-document.js";
 import {
   applySwNetTextEdits,
   createSwNetElementRemovalEdit,
+  createSwNetImportInsertionEdit,
   createSwNetStatementInsertionEdit,
   parseSwNetSourceDocument,
 } from "./sw-net-source.js";
@@ -100,6 +101,28 @@ describe("sw-net text edits", () => {
     ]);
 
     expect(result).toContain("    inst LOGIC n7 : ->\r\nend");
+    expect(() => parseSwNetDocument(result)).not.toThrow();
+  });
+
+  it("inserts a new import before the first module when none exist yet", () => {
+    const text = "module main\nend\n";
+    const source = parseSwNetSourceDocument(text);
+    const result = applySwNetTextEdits(text, [
+      createSwNetImportInsertionEdit(source, 'import helper from "./helper.sw-net"'),
+    ]);
+
+    expect(result).toBe('import helper from "./helper.sw-net"\n\nmodule main\nend\n');
+    expect(() => parseSwNetDocument(result)).not.toThrow();
+  });
+
+  it("inserts a new import after the last existing import", () => {
+    const text = 'import a from "./a.sw-net"\nmodule main\nend\n';
+    const source = parseSwNetSourceDocument(text);
+    const result = applySwNetTextEdits(text, [
+      createSwNetImportInsertionEdit(source, 'import b from "./b.sw-net"'),
+    ]);
+
+    expect(result).toBe('import a from "./a.sw-net"\nimport b from "./b.sw-net"\nmodule main\nend\n');
     expect(() => parseSwNetDocument(result)).not.toThrow();
   });
 });

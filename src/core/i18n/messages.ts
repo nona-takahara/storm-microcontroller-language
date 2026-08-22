@@ -136,6 +136,13 @@ export const enMessages = {
   "sync.suggestion.duplicate-module": "duplicate the module for divergent use sites",
   "sync.suggestion.update-shared-module": "apply one common change to the shared module",
   "sync.suggestion.review-candidates": "review the listed modules, instances, and use sites",
+  "split.moduleNotFound": "Module {moduleId} was not found.",
+  "split.emptySelection": "No gate instance ids were provided to split.",
+  "split.gateNotFound": "Instance {instanceId} was not found in module {moduleId}.",
+  "split.instanceIdConflict": "Instance id {instanceId} is already used in module {moduleId}.",
+  "split.result.written": "Split applied. Files were written.",
+  "split.result.dryRun": "Dry run completed. No files were written.",
+  "split.summary": "Moved {count, plural, one {# instance} other {# instances}} into module {moduleId} ({path}).",
 } as const;
 
 export type MessageId = keyof typeof enMessages;
@@ -281,6 +288,13 @@ export interface MessageArgsById {
   "sync.suggestion.duplicate-module": NoMessageArguments;
   "sync.suggestion.update-shared-module": NoMessageArguments;
   "sync.suggestion.review-candidates": NoMessageArguments;
+  "split.moduleNotFound": { moduleId: string };
+  "split.emptySelection": NoMessageArguments;
+  "split.gateNotFound": { instanceId: string; moduleId: string };
+  "split.instanceIdConflict": { instanceId: string; moduleId: string };
+  "split.result.written": NoMessageArguments;
+  "split.result.dryRun": NoMessageArguments;
+  "split.summary": { count: number; moduleId: string; path: string };
 }
 
 export const jaMessages: Record<MessageId, string> = {
@@ -419,6 +433,13 @@ export const jaMessages: Record<MessageId, string> = {
   "sync.suggestion.duplicate-module": "差異のあるuse向けにmoduleを複製する",
   "sync.suggestion.update-shared-module": "共有moduleへ共通の変更を適用する",
   "sync.suggestion.review-candidates": "列挙されたmodule・instance・useを確認する",
+  "split.moduleNotFound": "モジュール {moduleId} が見つかりません。",
+  "split.emptySelection": "分割対象のinstance idが指定されていません。",
+  "split.gateNotFound": "instance {instanceId} はモジュール {moduleId} に見つかりません。",
+  "split.instanceIdConflict": "instance id {instanceId} はモジュール {moduleId} で既に使われています。",
+  "split.result.written": "分割を適用し、ファイルを書き込みました。",
+  "split.result.dryRun": "dry-runが完了しました。ファイルは変更していません。",
+  "split.summary": "{count}個のインスタンスをモジュール {moduleId}（{path}）へ移動しました。",
 };
 
 export type LocalizedMessage = {
