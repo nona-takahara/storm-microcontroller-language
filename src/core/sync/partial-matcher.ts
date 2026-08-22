@@ -21,7 +21,18 @@ export interface PartialCorrespondenceResult {
   truncated: boolean;
 }
 
-const DEFAULT_PARTIAL_SEARCH_STEPS = 20_000;
+// With the skip-branch pruning above, the search's remaining cost for a residual `propagateCertainPairs`
+// could not resolve is the number of full candidate assignments within that residual -- it must
+// enumerate every one to prove the best-scoring assignment is unique -- which is factorial in the
+// residual's size for a fully symmetric same-kind cluster (no distinguishing link or label, resolved
+// only by the soft property-value score). A real project (NITS_Simple_Bridge, see issue #71/#72's
+// regression follow-up) hit an 8-node fully symmetric residual on an otherwise no-op re-import; it
+// measures 178,882 steps to resolve. This budget covers that with headroom, plus a 9-node cluster
+// (1,609,940 measured), while still completing in low single-digit seconds. It does not make
+// arbitrarily large symmetric clusters tractable -- a 10-node cluster is already ~9x that -- but an
+// exhaustive search fundamentally can't scale past what a project actually produces; making bigger
+// clusters tractable needs a polynomial assignment-problem formulation instead, tracked separately.
+const DEFAULT_PARTIAL_SEARCH_STEPS = 2_000_000;
 
 /**
  * Find only correspondences shared by every optimal partial graph mapping. Object ids and property

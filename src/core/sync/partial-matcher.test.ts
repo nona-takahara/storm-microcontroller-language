@@ -106,6 +106,27 @@ describe("findPartialNodeCorrespondence", () => {
     expect(result.searchSteps).toBeLessThan(10_000);
   });
 
+  it("resolves a fully symmetric 8-node same-type cluster via property-value scoring alone", () => {
+    // Reproduces the shape a real project (NITS_Simple_Bridge) hit after both fixes above: 8 nodes
+    // sharing one definitionId, no links to each other or to any forced neighbor, and no `n` label --
+    // so `propagateCertainPairs` cannot force any of them, and every one of the 8 is a structurally
+    // valid candidate for every other. The unique correct answer exists (each node's `value` matches
+    // exactly one counterpart) but confirming it is unique requires enumerating on the order of 8!
+    // full assignments, which exceeded the previous, smaller step budget even with skip branches
+    // pruned (see the DEFAULT_PARTIAL_SEARCH_STEPS comment).
+    const size = 8;
+    const existingNodes = Array.from({ length: size }, (_, i) => node(`existing-${i}`, "TYPE", { value: i }));
+    const incomingNodes = Array.from({ length: size }, (_, i) => node(`incoming-${i}`, "TYPE", { value: i })).reverse();
+
+    const result = findPartialNodeCorrespondence(graph(existingNodes, []), graph(incomingNodes, []));
+
+    expect(result.truncated).toBe(false);
+    expect(result.ambiguousExisting).toEqual([]);
+    expect(new Map(result.certainPairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(
+      new Map(Array.from({ length: size }, (_, i) => [`existing-${i}`, `incoming-${i}`])),
+    );
+  });
+
   it("resolves a long chain of unlabeled same-type nodes anchored by one port within a tight step budget", () => {
     // Regression guard for the blowup PR #72 introduced (issue #71 follow-up): once sync stopped
     // reusing compare-dsl's full-match shortcut, every node the link-blind forcing rules could not
