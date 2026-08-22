@@ -64,6 +64,19 @@ export function findPartialNodeCorrespondence(
     }
     steps += 1;
 
+    // Branch-and-bound on the score's first (and most significant) component: with `current.length`
+    // pairs already decided and `ordered.length - index` nodes left to decide, no completion reached
+    // from here can match more than `current.length + (ordered.length - index)` pairs. If that can't
+    // reach the best full-match count found so far, every remaining branch here -- most importantly
+    // every branch that leaves a node unmatched (the unconditional `visit(index + 1)` skip call
+    // below), which otherwise turns this search from "try every candidate assignment" into "try
+    // every subset of every assignment" -- is provably worse and can be skipped outright. This does
+    // not change which correspondences end up in `certainPairs`: ties on the full score still reach
+    // the leaf and still accumulate into `optimal`, so ambiguity detection is unaffected.
+    if (current.length + (ordered.length - index) < bestScore[0]) {
+      return;
+    }
+
     if (index === ordered.length) {
       const score: CorrespondenceScore = [
         current.length,

@@ -68,6 +68,44 @@ describe("findPartialNodeCorrespondence", () => {
     expect(result.ambiguousExisting).toEqual([]);
   });
 
+  it("resolves many independent unlabeled twin pairs via property-value scoring within a tight step budget", () => {
+    // Regression guard for a second blowup source found while validating the chain-forcing fix
+    // above against real projects: once a full match is reached, `visit`'s unconditional "leave
+    // this node unmatched" branch keeps exploring every subset of every remaining assignment even
+    // though none of it can ever beat the match already found. Ten independent pairs of nodes that
+    // share a definitionId only within their own pair (so each has exactly its twin as the sole
+    // structural alternative, resolvable only by the softer property-value score, never forced by
+    // `propagateCertainPairs`) reproduce that: without pruning the subset branches this explores
+    // millions of leaves and exhausts the budget; with it, only the ~2^10 real twin-swap
+    // alternatives remain to check.
+    const pairCount = 10;
+    const existingNodes = Array.from({ length: pairCount }, (_, i) => [
+      node(`existing-${i}-a`, `TWIN_${i}`, { value: i * 10 + 1 }),
+      node(`existing-${i}-b`, `TWIN_${i}`, { value: i * 10 + 2 }),
+    ]).flat();
+    const incomingNodes = Array.from({ length: pairCount }, (_, i) => [
+      node(`incoming-${i}-b`, `TWIN_${i}`, { value: i * 10 + 2 }),
+      node(`incoming-${i}-a`, `TWIN_${i}`, { value: i * 10 + 1 }),
+    ]).flat();
+
+    const existing = graph(existingNodes, []);
+    const incoming = graph(incomingNodes, []);
+
+    const result = findPartialNodeCorrespondence(existing, incoming);
+
+    expect(result.truncated).toBe(false);
+    expect(result.ambiguousExisting).toEqual([]);
+    expect(new Map(result.certainPairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(
+      new Map(
+        Array.from({ length: pairCount }, (_, i) => [
+          [`existing-${i}-a`, `incoming-${i}-a`],
+          [`existing-${i}-b`, `incoming-${i}-b`],
+        ]).flat() as [string, string][],
+      ),
+    );
+    expect(result.searchSteps).toBeLessThan(10_000);
+  });
+
   it("resolves a long chain of unlabeled same-type nodes anchored by one port within a tight step budget", () => {
     // Regression guard for the blowup PR #72 introduced (issue #71 follow-up): once sync stopped
     // reusing compare-dsl's full-match shortcut, every node the link-blind forcing rules could not
