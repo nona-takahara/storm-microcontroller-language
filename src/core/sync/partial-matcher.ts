@@ -120,13 +120,6 @@ export function findPartialNodeCorrespondence(
   };
 
   visit(0);
-  // TEMPORARY diagnostic for debugging the issue #71/#72 regression fix against real projects.
-  // Remove before merging.
-  if (process.env.STORM_MCL_SYNC_DEBUG) {
-    console.error(
-      `[sync-debug] residual=${ordered.length} forced=${forced.pairs.length} steps=${steps} truncated=${truncated} optimalCount=${optimal.length}`,
-    );
-  }
   const completed = optimal.length > 0 ? optimal : [[...forced.pairs]];
   const certainPairs = intersectPairs(completed);
   const certainA = new Set(certainPairs.map((pair) => pair.a.node.id));
