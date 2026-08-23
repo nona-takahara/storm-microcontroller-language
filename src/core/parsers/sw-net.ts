@@ -419,7 +419,9 @@ class SwNetParser {
   /** Parse one `key=value` assignment. */
   private parseAssignment(): SwNetAssignment {
     const start = this.peek().start;
-    const key = this.expect("identifier").text;
+    const key = this.isToken("string")
+      ? expectStringTokenValue(this.expect("string"))
+      : this.expect("identifier").text;
     this.expect("equal");
 
     const assignment: SwNetAssignment = {
