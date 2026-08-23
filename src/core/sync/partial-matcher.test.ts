@@ -68,6 +68,101 @@ describe("findPartialNodeCorrespondence", () => {
     expect(result.ambiguousExisting).toEqual([]);
   });
 
+  it("resolves many independent unlabeled twin pairs via property-value scoring within a tight step budget", () => {
+    // Regression guard for a second blowup source found while validating the chain-forcing fix
+    // above against real projects: once a full match is reached, `visit`'s unconditional "leave
+    // this node unmatched" branch keeps exploring every subset of every remaining assignment even
+    // though none of it can ever beat the match already found. Ten independent pairs of nodes that
+    // share a definitionId only within their own pair (so each has exactly its twin as the sole
+    // structural alternative, resolvable only by the softer property-value score, never forced by
+    // `propagateCertainPairs`) reproduce that: without pruning the subset branches this explores
+    // millions of leaves and exhausts the budget; with it, only the ~2^10 real twin-swap
+    // alternatives remain to check.
+    const pairCount = 10;
+    const existingNodes = Array.from({ length: pairCount }, (_, i) => [
+      node(`existing-${i}-a`, `TWIN_${i}`, { value: i * 10 + 1 }),
+      node(`existing-${i}-b`, `TWIN_${i}`, { value: i * 10 + 2 }),
+    ]).flat();
+    const incomingNodes = Array.from({ length: pairCount }, (_, i) => [
+      node(`incoming-${i}-b`, `TWIN_${i}`, { value: i * 10 + 2 }),
+      node(`incoming-${i}-a`, `TWIN_${i}`, { value: i * 10 + 1 }),
+    ]).flat();
+
+    const existing = graph(existingNodes, []);
+    const incoming = graph(incomingNodes, []);
+
+    const result = findPartialNodeCorrespondence(existing, incoming);
+
+    expect(result.truncated).toBe(false);
+    expect(result.ambiguousExisting).toEqual([]);
+    expect(new Map(result.certainPairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(
+      new Map(
+        Array.from({ length: pairCount }, (_, i) => [
+          [`existing-${i}-a`, `incoming-${i}-a`],
+          [`existing-${i}-b`, `incoming-${i}-b`],
+        ]).flat() as [string, string][],
+      ),
+    );
+    expect(result.searchSteps).toBeLessThan(10_000);
+  });
+
+  it("resolves a fully symmetric 8-node same-type cluster via property-value scoring alone", () => {
+    // Reproduces the shape a real project (NITS_Simple_Bridge) hit after both fixes above: 8 nodes
+    // sharing one definitionId, no links to each other or to any forced neighbor, and no `n` label --
+    // so `propagateCertainPairs` cannot force any of them, and every one of the 8 is a structurally
+    // valid candidate for every other. The unique correct answer exists (each node's `value` matches
+    // exactly one counterpart) but confirming it is unique requires enumerating on the order of 8!
+    // full assignments, which exceeded the previous, smaller step budget even with skip branches
+    // pruned (see the DEFAULT_PARTIAL_SEARCH_STEPS comment).
+    const size = 8;
+    const existingNodes = Array.from({ length: size }, (_, i) => node(`existing-${i}`, "TYPE", { value: i }));
+    const incomingNodes = Array.from({ length: size }, (_, i) => node(`incoming-${i}`, "TYPE", { value: i })).reverse();
+
+    const result = findPartialNodeCorrespondence(graph(existingNodes, []), graph(incomingNodes, []));
+
+    expect(result.truncated).toBe(false);
+    expect(result.ambiguousExisting).toEqual([]);
+    expect(new Map(result.certainPairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(
+      new Map(Array.from({ length: size }, (_, i) => [`existing-${i}`, `incoming-${i}`])),
+    );
+  });
+
+  it("resolves a long chain of unlabeled same-type nodes anchored by one port within a tight step budget", () => {
+    // Regression guard for the blowup PR #72 introduced (issue #71 follow-up): once sync stopped
+    // reusing compare-dsl's full-match shortcut, every node the link-blind forcing rules could not
+    // resolve fell to this matcher's exhaustive fallback -- and a long chain of same-kind, unlabeled
+    // nodes is exactly the shape real circuits are full of, so real no-op re-imports were hitting the
+    // step budget and getting blocked. `mappedIncidentSignature`/`incidentSignatureAmongForced` let
+    // forcing cascade outward from the port anchor one link at a time instead, so this chain must
+    // resolve fully well under budget.
+    const length = 60;
+    const existingChainIds = Array.from({ length }, (_, i) => `existing-${i}`);
+    const incomingChainIds = Array.from({ length }, (_, i) => `incoming-${i}`);
+    const chainLinks = (ids: string[]) =>
+      ids.slice(0, -1).map((id, i) => ({ from: id, fromKey: "out", to: ids[i + 1]!, toKey: "in" }));
+
+    const existing = graph(
+      [port("old-port", "input"), ...existingChainIds.map((id) => node(id, "TYPE"))],
+      [{ from: "old-port", fromKey: "out", to: existingChainIds[0]!, toKey: "in" }, ...chainLinks(existingChainIds)],
+    );
+    const incoming = graph(
+      [port("new-port", "input"), ...incomingChainIds.map((id) => node(id, "TYPE"))],
+      [{ from: "new-port", fromKey: "out", to: incomingChainIds[0]!, toKey: "in" }, ...chainLinks(incomingChainIds)],
+    );
+
+    const result = findPartialNodeCorrespondence(existing, incoming);
+
+    expect(result.truncated).toBe(false);
+    expect(result.ambiguousExisting).toEqual([]);
+    expect(new Map(result.certainPairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(
+      new Map([
+        ["old-port", "new-port"],
+        ...existingChainIds.map((id, i) => [id, incomingChainIds[i]!] as const),
+      ]),
+    );
+    expect(result.searchSteps).toBeLessThan(200);
+  });
+
   it("still blocks when neither the n label nor the property value disambiguates", () => {
     // Companion safety test: two same-type nodes whose n labels collide and whose property values
     // also differ from each other on both sides, so no signal -- structural, label, or value --

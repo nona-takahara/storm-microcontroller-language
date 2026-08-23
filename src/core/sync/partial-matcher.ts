@@ -21,7 +21,18 @@ export interface PartialCorrespondenceResult {
   truncated: boolean;
 }
 
-const DEFAULT_PARTIAL_SEARCH_STEPS = 20_000;
+// With the skip-branch pruning above, the search's remaining cost for a residual `propagateCertainPairs`
+// could not resolve is the number of full candidate assignments within that residual -- it must
+// enumerate every one to prove the best-scoring assignment is unique -- which is factorial in the
+// residual's size for a fully symmetric same-kind cluster (no distinguishing link or label, resolved
+// only by the soft property-value score). A real project (NITS_Simple_Bridge, see issue #71/#72's
+// regression follow-up) hit an 8-node fully symmetric residual on an otherwise no-op re-import; it
+// measures 178,882 steps to resolve. This budget covers that with headroom, plus a 9-node cluster
+// (1,609,940 measured), while still completing in low single-digit seconds. It does not make
+// arbitrarily large symmetric clusters tractable -- a 10-node cluster is already ~9x that -- but an
+// exhaustive search fundamentally can't scale past what a project actually produces; making bigger
+// clusters tractable needs a polynomial assignment-problem formulation instead, tracked separately.
+const DEFAULT_PARTIAL_SEARCH_STEPS = 2_000_000;
 
 /**
  * Find only correspondences shared by every optimal partial graph mapping. Object ids and property
@@ -63,6 +74,19 @@ export function findPartialNodeCorrespondence(
       return;
     }
     steps += 1;
+
+    // Branch-and-bound on the score's first (and most significant) component: with `current.length`
+    // pairs already decided and `ordered.length - index` nodes left to decide, no completion reached
+    // from here can match more than `current.length + (ordered.length - index)` pairs. If that can't
+    // reach the best full-match count found so far, every remaining branch here -- most importantly
+    // every branch that leaves a node unmatched (the unconditional `visit(index + 1)` skip call
+    // below), which otherwise turns this search from "try every candidate assignment" into "try
+    // every subset of every assignment" -- is provably worse and can be skipped outright. This does
+    // not change which correspondences end up in `certainPairs`: ties on the full score still reach
+    // the leaf and still accumulate into `optimal`, so ambiguity detection is unaffected.
+    if (current.length + (ordered.length - index) < bestScore[0]) {
+      return;
+    }
 
     if (index === ordered.length) {
       const score: CorrespondenceScore = [
@@ -152,10 +176,48 @@ function propagateCertainPairs(
 
   while (changed) {
     changed = false;
+    const bIdByAId = new Map(pairs.map((pair) => [pair.a.node.id, pair.b.node.id] as const));
     for (const nodeA of existing.nodes) {
       if (existingIds.has(nodeA.node.id)) {
         continue;
       }
+
+      // The strongest, least-presumptuous signal: a node whose links to already-forced neighbors
+      // have exactly one candidate with that same set of links to those same forced neighbors is
+      // that candidate, full stop -- no adjacency leniency, no labels, no properties involved. This
+      // mirrors the exact-match propagation compare-dsl's equivalence search already relies on
+      // (see `module-graph-comparator.ts`'s `propagateForcedPairs`) and is what lets a real,
+      // sparsely-linked circuit converge by cascading outward from its few naturally unique anchors
+      // (project ports, uniquely-labeled nodes) instead of falling straight to the exponential
+      // fallback search below for every node the cheaper rules beneath it cannot yet resolve. A node
+      // with no links to forced neighbors yet (signature is empty) skips this rule and falls to the
+      // ones below; a genuinely rewired node's signature can never match a wrong candidate's, so it
+      // also falls through rather than being mis-forced.
+      const requiredSignature = mappedIncidentSignature(existing.links, nodeA.node.id, bIdByAId);
+      if (requiredSignature !== "") {
+        const exactChoices = (candidates.get(nodeA) ?? []).filter(
+          (nodeB) =>
+            !incomingIds.has(nodeB.node.id) &&
+            incidentSignatureAmongForced(incoming.links, nodeB.node.id, incomingIds) === requiredSignature,
+        );
+        const isOnlyExactClaimant =
+          exactChoices.length === 1 &&
+          existing.nodes.filter(
+            (other) =>
+              !existingIds.has(other.node.id) &&
+              mappedIncidentSignature(existing.links, other.node.id, bIdByAId) === requiredSignature &&
+              (candidates.get(other) ?? []).some((candidate) => candidate.node.id === exactChoices[0]!.node.id),
+          ).length === 1;
+
+        if (isOnlyExactClaimant) {
+          pairs.push({ a: nodeA, b: exactChoices[0]! });
+          existingIds.add(nodeA.node.id);
+          incomingIds.add(exactChoices[0]!.node.id);
+          changed = true;
+          break;
+        }
+      }
+
       const choices = (candidates.get(nodeA) ?? []).filter(
         (nodeB) =>
           !incomingIds.has(nodeB.node.id) &&
@@ -223,6 +285,50 @@ function propagateCertainPairs(
 function nameLabel(node: ComparableNode): string | undefined {
   const value = node.attributes.n;
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * `nodeId`'s links to nodes already forced (per `existingToIncoming`), rewritten in terms of their
+ * incoming-side ids so the result is directly comparable to `incidentSignatureAmongForced` on the
+ * incoming graph. Links to not-yet-forced neighbors are excluded, not treated as mismatches.
+ */
+function mappedIncidentSignature(
+  links: ComparableModuleGraph["links"],
+  nodeId: string,
+  existingToIncoming: Map<string, string>,
+): string {
+  return links
+    .flatMap((link) => {
+      if (link.from.nodeId === nodeId && existingToIncoming.has(link.to.nodeId)) {
+        return [`out:${link.from.portKey}:${existingToIncoming.get(link.to.nodeId)}:${link.to.portKey}`];
+      }
+      if (link.to.nodeId === nodeId && existingToIncoming.has(link.from.nodeId)) {
+        return [`in:${link.to.portKey}:${existingToIncoming.get(link.from.nodeId)}:${link.from.portKey}`];
+      }
+      return [];
+    })
+    .sort()
+    .join("\n");
+}
+
+/** `nodeId`'s links restricted to neighbors in `forcedIds`, in the same format as `mappedIncidentSignature`. */
+function incidentSignatureAmongForced(
+  links: ComparableModuleGraph["links"],
+  nodeId: string,
+  forcedIds: Set<string>,
+): string {
+  return links
+    .flatMap((link) => {
+      if (link.from.nodeId === nodeId && forcedIds.has(link.to.nodeId)) {
+        return [`out:${link.from.portKey}:${link.to.nodeId}:${link.to.portKey}`];
+      }
+      if (link.to.nodeId === nodeId && forcedIds.has(link.from.nodeId)) {
+        return [`in:${link.to.portKey}:${link.from.nodeId}:${link.from.portKey}`];
+      }
+      return [];
+    })
+    .sort()
+    .join("\n");
 }
 
 function hasCompatibleCertainAdjacency(
