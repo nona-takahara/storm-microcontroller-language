@@ -42,6 +42,25 @@ describe("findExactNodeCorrespondence", () => {
     expect(result?.ambiguousIncoming.map((item) => item.node.id)).toEqual(["new-a", "new-b"]);
   });
 
+  it("prefers a function expression over a conflicting display label", () => {
+    const existing = graph([
+      node("old-sum", { expression: "x+y", n: "left" }, "FUNC_NUM_3"),
+      node("old-product", { expression: "x*y", n: "right" }, "FUNC_NUM_3"),
+    ], []);
+    const incoming = graph([
+      node("new-product", { expression: "x*y", n: "left" }, "FUNC_NUM_3"),
+      node("new-sum", { expression: "x+y", n: "right" }, "FUNC_NUM_3"),
+    ], []);
+
+    const result = findExactNodeCorrespondence(existing, incoming);
+
+    expect(new Map(result?.pairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(new Map([
+      ["old-sum", "new-sum"],
+      ["old-product", "new-product"],
+    ]));
+    expect(result?.certainPairs).toHaveLength(2);
+  });
+
   it("never chooses a property-favored assignment that breaks cycle wiring", () => {
     const oldIds = ["old-0", "old-1", "old-2", "old-3"];
     const newIds = ["new-0", "new-1", "new-2", "new-3"];

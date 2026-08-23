@@ -1,4 +1,5 @@
 import { comparableNodeKind } from "./fingerprint.js";
+import { functionExpression } from "./correspondence-evidence.js";
 import { type ComparableModuleGraph, type ComparableNode, type MatchedNodePair } from "./types.js";
 
 export interface ExactCorrespondenceResult {
@@ -31,7 +32,7 @@ interface Assignment {
   cost: number;
 }
 
-type MatchScore = readonly [nameMatches: number, propertyMatches: number];
+type MatchScore = readonly [expressionMatches: number, nameMatches: number, propertyMatches: number];
 
 /**
  * Find a property-preferred, endpoint/port-preserving isomorphism without using instance ids as
@@ -86,9 +87,10 @@ export function findExactNodeCorrespondence(
       ),
       0,
     );
-    const scoreBase = maxPropertyMatches + 1;
+    const propertyBase = maxPropertyMatches + 1;
+    const nameBase = groupA.reduce((count, component) => count + component.nodes.length, 0) + 1;
     const costs = matches.map((row) => row.map((match) =>
-      match ? -(match.score[0] * scoreBase + match.score[1]) : Number.POSITIVE_INFINITY,
+      match ? -((match.score[0] * nameBase + match.score[1]) * propertyBase + match.score[2]) : Number.POSITIVE_INFINITY,
     ));
     const assignment = solveAssignment(costs);
     if (!assignment) return undefined;
@@ -351,7 +353,8 @@ function matchTreeComponents(
 
   const nodeAById = new Map(componentA.nodes.map((node) => [node.node.id, node] as const));
   const nodeBById = new Map(componentB.nodes.map((node) => [node.node.id, node] as const));
-  const scoreBase = componentA.nodes.reduce((count, node) => count + propertyKeys(node).length, 0) + 1;
+  const propertyBase = componentA.nodes.reduce((count, node) => count + propertyKeys(node).length, 0) + 1;
+  const nameBase = componentA.nodes.length + 1;
   const memo = new Map<string, ComponentMatch | undefined>();
   let searchSteps = 0;
 
@@ -379,7 +382,7 @@ function matchTreeComponents(
       childrenB.map((childB) => rootedMatch(childA, aId, childB, bId)),
     );
     const costs = childMatches.map((row) => row.map((match) =>
-      match ? -(match.score[0] * scoreBase + match.score[1]) : Number.POSITIVE_INFINITY,
+      match ? -((match.score[0] * nameBase + match.score[1]) * propertyBase + match.score[2]) : Number.POSITIVE_INFINITY,
     ));
     const assignment = solveAssignment(costs);
     if (!assignment) {
@@ -582,9 +585,10 @@ function ambiguityGroupsFromCandidates(
 
 function matchInterchangeableNodes(nodesA: ComparableNode[], nodesB: ComparableNode[]): ComponentMatch | undefined {
   const maxProperties = nodesA.reduce((count, node) => count + propertyKeys(node).length, 0);
-  const scoreBase = maxProperties + 1;
+  const propertyBase = maxProperties + 1;
+  const nameBase = nodesA.length + 1;
   const scores = nodesA.map((nodeA) => nodesB.map((nodeB) => pairScore(nodeA, nodeB)));
-  const costs = scores.map((row) => row.map((score) => -(score[0] * scoreBase + score[1])));
+  const costs = scores.map((row) => row.map((score) => -((score[0] * nameBase + score[1]) * propertyBase + score[2])));
   const assignment = solveAssignment(costs);
   if (!assignment) return undefined;
   const pairs = assignment.columns.map((column, row) => ({ a: nodesA[row]!, b: nodesB[column]! }));
@@ -649,6 +653,8 @@ function linkKey(link: ComparableModuleGraph["links"][number]): string {
 }
 
 function pairScore(a: ComparableNode, b: ComparableNode): MatchScore {
+  const expression = functionExpression(a);
+  const expressionMatches = expression !== undefined && expression === functionExpression(b) ? 1 : 0;
   const nameMatches = a.attributes.n !== undefined && a.attributes.n === b.attributes.n ? 1 : 0;
   const keys = new Set([...propertyKeys(a), ...propertyKeys(b)]);
   let propertyMatches = 0;
@@ -659,22 +665,25 @@ function pairScore(a: ComparableNode, b: ComparableNode): MatchScore {
     const right = source === "a" ? b.attributes[property] : b.literalInputs[property];
     if (left !== undefined && left === right) propertyMatches += 1;
   }
-  return [nameMatches, propertyMatches];
+  return [expressionMatches, nameMatches, propertyMatches];
 }
 
 function propertyKeys(node: ComparableNode): string[] {
   return [
-    ...Object.keys(node.attributes).filter((key) => key !== "n" && key !== "script_ref").map((key) => `a:${key}`),
+    ...Object.keys(node.attributes).filter((key) => key !== "n" && key !== "script_ref" && key !== "expression").map((key) => `a:${key}`),
     ...Object.keys(node.literalInputs).map((key) => `i:${key}`),
   ];
 }
 
 function sumScore(scores: MatchScore[]): MatchScore {
-  return scores.reduce<MatchScore>((sum, score) => [sum[0] + score[0], sum[1] + score[1]], [0, 0]);
+  return scores.reduce<MatchScore>(
+    (sum, score) => [sum[0] + score[0], sum[1] + score[1], sum[2] + score[2]],
+    [0, 0, 0],
+  );
 }
 
 function compareScore(left: MatchScore, right: MatchScore): number {
-  return left[0] - right[0] || left[1] - right[1];
+  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2];
 }
 
 /** Hungarian algorithm for a square finite/infinite cost matrix. */

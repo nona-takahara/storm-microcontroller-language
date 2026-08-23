@@ -1,4 +1,5 @@
 import { comparableNodeKind } from "../compare/fingerprint.js";
+import { functionExpression } from "../compare/correspondence-evidence.js";
 import { incidentKeys, mappedIncidentKeys } from "../compare/structural-correspondence.js";
 import {
   type ComparableModuleGraph,
@@ -69,7 +70,7 @@ export function findPartialNodeCorrespondence(
   const maxSteps = Math.max(0, options.maxSearchSteps ?? DEFAULT_PARTIAL_SEARCH_STEPS);
   const current = [...forced.pairs];
   const optimal: MatchedNodePair[][] = [];
-  let bestScore: CorrespondenceScore = [-1, -1, -1, -1];
+  let bestScore: CorrespondenceScore = [-1, -1, -1, -1, -1];
   let steps = 0;
   let truncated = false;
 
@@ -100,6 +101,7 @@ export function findPartialNodeCorrespondence(
       const score: CorrespondenceScore = [
         current.length,
         countPreservedLinks(existing, incoming, current),
+        countExpressionMatches(current),
         countNameMatches(current),
         countPropertyKeyMatches(current),
       ];
@@ -254,6 +256,32 @@ function propagateCertainPairs(
         break;
       }
 
+      // A function's expression is authored behavior, not a cosmetic label or a routine tunable.
+      // When it uniquely identifies one structurally eligible function, propagate it before `n` so
+      // label edits cannot move an expression (and its layout) to another same-kind function.
+      const expression = functionExpression(nodeA);
+      if (expression !== undefined) {
+        const expressionChoices = choices.filter((nodeB) => functionExpression(nodeB) === expression);
+        const unusedExpressionCandidates = (candidates.get(nodeA) ?? []).filter(
+          (nodeB) => !incomingIds.has(nodeB.node.id) && functionExpression(nodeB) === expression,
+        );
+        const isOnlyExpressionClaimant =
+          expressionChoices.length === 1 &&
+          unusedExpressionCandidates.length === 1 &&
+          existing.nodes.filter((other) =>
+            !existingIds.has(other.node.id) &&
+            functionExpression(other) === expression &&
+            (candidates.get(other) ?? []).some((candidate) => candidate.node.id === expressionChoices[0]!.node.id),
+          ).length === 1;
+        if (isOnlyExpressionClaimant) {
+          pairs.push({ a: nodeA, b: expressionChoices[0]! });
+          existingIds.add(nodeA.node.id);
+          incomingIds.add(expressionChoices[0]!.node.id);
+          changed = true;
+          break;
+        }
+      }
+
       // A cheap, linear-time counterpart to the structural-only rule above: when this node's `n`
       // display label picks out exactly one of its remaining structurally-valid candidates, and no
       // other remaining node sharing that same label could also validly claim that candidate, the
@@ -364,14 +392,22 @@ function linkKey(link: ComparableModuleGraph["links"][number]): string {
  * Score tuple compared lexicographically, most significant first:
  *  1. total matched pairs (more correspondence coverage always wins);
  *  2. preserved incident links (wiring topology is the strongest disambiguator once counts tie);
- *  3. matching `n` display-label attributes (a strong but weaker-than-wiring identity signal);
- *  4. matching ordinary property/literal-input values, counted per key. A mismatch never excludes
+ *  3. matching function expressions (authored behavior and the strongest property evidence);
+ *  4. matching `n` display-label attributes;
+ *  5. matching ordinary property/literal-input values, counted per key. A mismatch never excludes
  *     a candidate; unstable or correspondence-derived keys are excluded by `propertyEvidenceKeys`.
  */
-type CorrespondenceScore = [number, number, number, number];
+type CorrespondenceScore = [number, number, number, number, number];
 
 function compareScore(left: CorrespondenceScore, right: CorrespondenceScore): number {
-  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2] || left[3] - right[3];
+  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2] || left[3] - right[3] || left[4] - right[4];
+}
+
+function countExpressionMatches(pairs: MatchedNodePair[]): number {
+  return pairs.filter((pair) => {
+    const expression = functionExpression(pair.a);
+    return expression !== undefined && expression === functionExpression(pair.b);
+  }).length;
 }
 
 /** Count pairs whose `n` (display-label) attribute is present on both sides and equal. */
@@ -393,7 +429,7 @@ function propertyEvidenceKeys(attributes: ComparableNode["attributes"]): string[
   // `n` is the stronger display-label tier above. `script_ref` is derived from the temporary XML
   // instance id and is projected from the chosen correspondence, so using it as evidence would make
   // a generated name circularly decide its own identity.
-  return Object.keys(attributes).filter((key) => key !== "n" && key !== "script_ref");
+  return Object.keys(attributes).filter((key) => key !== "n" && key !== "script_ref" && key !== "expression");
 }
 
 function attributesEqual(left: IrScalarValue | undefined, right: IrScalarValue | undefined): boolean {
