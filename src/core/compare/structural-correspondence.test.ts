@@ -61,6 +61,24 @@ describe("findExactNodeCorrespondence", () => {
     expect(result?.certainPairs).toHaveLength(2);
   });
 
+  it("treats a Property Toggle label as strong display-name evidence", () => {
+    const existing = graph([
+      node("old-lights", { label: "Lights", n: "left" }, "PROPERTY_TOGGLE"),
+      node("old-heater", { label: "Heater", n: "right" }, "PROPERTY_TOGGLE"),
+    ], []);
+    const incoming = graph([
+      node("new-heater", { label: "Heater", n: "left" }, "PROPERTY_TOGGLE"),
+      node("new-lights", { label: "Lights", n: "right" }, "PROPERTY_TOGGLE"),
+    ], []);
+
+    const result = findExactNodeCorrespondence(existing, incoming);
+
+    expect(new Map(result?.pairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(new Map([
+      ["old-lights", "new-lights"],
+      ["old-heater", "new-heater"],
+    ]));
+  });
+
   it("never chooses a property-favored assignment that breaks cycle wiring", () => {
     const oldIds = ["old-0", "old-1", "old-2", "old-3"];
     const newIds = ["new-0", "new-1", "new-2", "new-3"];

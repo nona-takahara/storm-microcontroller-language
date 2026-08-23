@@ -202,6 +202,25 @@ describe("findPartialNodeCorrespondence", () => {
     ]));
     expect(result.unmatchedExisting.map((node) => node.node.id)).toEqual(["removed"]);
   });
+
+  it("propagates a Property Text name through the shared strong-evidence policy", () => {
+    const existing = graph([
+      node("old-title", "PROPERTY_TEXT", { name: "Train status" }),
+      node("old-warning", "PROPERTY_TEXT", { name: "Brake warning" }),
+      node("removed", "OTHER"),
+    ], []);
+    const incoming = graph([
+      node("new-warning", "PROPERTY_TEXT", { name: "Brake warning" }),
+      node("new-title", "PROPERTY_TEXT", { name: "Train status" }),
+    ], []);
+
+    const result = findPartialNodeCorrespondence(existing, incoming);
+
+    expect(new Map(result.certainPairs.map((pair) => [pair.a.node.id, pair.b.node.id]))).toEqual(new Map([
+      ["old-title", "new-title"],
+      ["old-warning", "new-warning"],
+    ]));
+  });
 });
 
 function node(id: string, definitionId: string, properties: Record<string, IrScalarValue> = {}): ComparableNode {

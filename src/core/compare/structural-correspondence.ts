@@ -1,5 +1,9 @@
 import { comparableNodeKind } from "./fingerprint.js";
-import { ordinaryAttributeEvidenceKeys, strongCorrespondenceEvidenceValue } from "./correspondence-evidence.js";
+import {
+  displayNameEvidenceValue,
+  ordinaryAttributeEvidenceKeys,
+  strongCorrespondenceEvidenceValue,
+} from "./correspondence-evidence.js";
 import { type ComparableModuleGraph, type ComparableNode, type MatchedNodePair } from "./types.js";
 
 export interface ExactCorrespondenceResult {
@@ -655,8 +659,8 @@ function linkKey(link: ComparableModuleGraph["links"][number]): string {
 function pairScore(a: ComparableNode, b: ComparableNode): MatchScore {
   const expression = strongCorrespondenceEvidenceValue(a, "expression");
   const expressionMatches = expression !== undefined && expression === strongCorrespondenceEvidenceValue(b, "expression") ? 1 : 0;
-  const name = strongCorrespondenceEvidenceValue(a, "n");
-  const nameMatches = name !== undefined && name === strongCorrespondenceEvidenceValue(b, "n") ? 1 : 0;
+  const displayName = displayNameEvidenceValue(a);
+  const nameMatches = displayName !== undefined && displayName === displayNameEvidenceValue(b) ? 1 : 0;
   const keys = new Set([...propertyKeys(a), ...propertyKeys(b)]);
   let propertyMatches = 0;
   for (const key of keys) {

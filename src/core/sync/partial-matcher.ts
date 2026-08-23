@@ -1,5 +1,6 @@
 import { comparableNodeKind } from "../compare/fingerprint.js";
 import {
+  displayNameEvidenceValue,
   ordinaryAttributeEvidenceKeys,
   STRONG_CORRESPONDENCE_EVIDENCE_KEYS,
   strongCorrespondenceEvidenceValue,
@@ -264,6 +265,10 @@ function propagateCertainPairs(
       // candidate-list check prevents a temporary adjacency narrowing from manufacturing certainty.
       let strongCandidate: ComparableNode | undefined;
       for (const evidenceKey of STRONG_CORRESPONDENCE_EVIDENCE_KEYS) {
+        if (
+          evidenceKey === "n" &&
+          strongCorrespondenceEvidenceValue(nodeA, "propertyLabel") !== undefined
+        ) continue;
         const value = strongCorrespondenceEvidenceValue(nodeA, evidenceKey);
         if (value === undefined) continue;
         const evidenceChoices = choices.filter(
@@ -377,7 +382,10 @@ function countExpressionMatches(pairs: MatchedNodePair[]): number {
 
 /** Count pairs whose `n` (display-label) attribute is present on both sides and equal. */
 function countNameMatches(pairs: MatchedNodePair[]): number {
-  return countStrongEvidenceMatches(pairs, "n");
+  return pairs.filter((pair) => {
+    const value = displayNameEvidenceValue(pair.a);
+    return value !== undefined && value === displayNameEvidenceValue(pair.b);
+  }).length;
 }
 
 function countStrongEvidenceMatches(
