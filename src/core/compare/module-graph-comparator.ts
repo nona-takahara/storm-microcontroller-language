@@ -3,6 +3,7 @@ import { type IrLink } from "../ir.js";
 import { type SwNetModule } from "../parsers/sw-net.js";
 import { normalizeComparableModule } from "./comparable-node.js";
 import { comparableNodeKind, compareNodeKindCounts } from "./fingerprint.js";
+import { incidentKeys, mappedIncidentKeys } from "./structural-correspondence.js";
 import {
   type ComparableModuleGraph,
   type ComparableNode,
@@ -156,8 +157,8 @@ function searchCorrespondence(
           (nodeB) =>
             !matchedB.has(nodeB.node.id) &&
             comparableNodeKind(nodeA) === comparableNodeKind(nodeB) &&
-            mappedIncidentKeys(a.links, nodeA.node.id, bIdByAId).join("\n") ===
-              incidentKeys(b.links, nodeB.node.id, matchedB).join("\n"),
+            mappedIncidentKeys(a, nodeA.node.id, bIdByAId).join("\n") ===
+              incidentKeys(b, nodeB.node.id, matchedB).join("\n"),
         ),
       }))
       .sort(
@@ -221,8 +222,8 @@ function propagateForcedPairs(a: ComparableModuleGraph, b: ComparableModuleGraph
         remainingB.filter(
           (nodeB) =>
             comparableNodeKind(nodeA) === comparableNodeKind(nodeB) &&
-            mappedIncidentKeys(a.links, nodeA.node.id, bIdByAId).join("\n") ===
-              incidentKeys(b.links, nodeB.node.id, matchedB).join("\n"),
+            mappedIncidentKeys(a, nodeA.node.id, bIdByAId).join("\n") ===
+              incidentKeys(b, nodeB.node.id, matchedB).join("\n"),
         ),
       );
     }
@@ -245,34 +246,6 @@ function propagateForcedPairs(a: ComparableModuleGraph, b: ComparableModuleGraph
   }
 
   return false;
-}
-
-function mappedIncidentKeys(links: IrLink[], nodeId: string, bIdByAId: Map<string, string>): string[] {
-  return links
-    .flatMap((link) => {
-      if (link.from.nodeId === nodeId && bIdByAId.has(link.to.nodeId)) {
-        return [`out:${link.from.portKey}:${bIdByAId.get(link.to.nodeId)}:${link.to.portKey}`];
-      }
-      if (link.to.nodeId === nodeId && bIdByAId.has(link.from.nodeId)) {
-        return [`in:${link.to.portKey}:${bIdByAId.get(link.from.nodeId)}:${link.from.portKey}`];
-      }
-      return [];
-    })
-    .sort();
-}
-
-function incidentKeys(links: IrLink[], nodeId: string, includedNodeIds: Set<string>): string[] {
-  return links
-    .flatMap((link) => {
-      if (link.from.nodeId === nodeId && includedNodeIds.has(link.to.nodeId)) {
-        return [`out:${link.from.portKey}:${link.to.nodeId}:${link.to.portKey}`];
-      }
-      if (link.to.nodeId === nodeId && includedNodeIds.has(link.from.nodeId)) {
-        return [`in:${link.to.portKey}:${link.from.nodeId}:${link.from.portKey}`];
-      }
-      return [];
-    })
-    .sort();
 }
 
 function groupNodesByKind(nodes: ComparableNode[]): Map<string, ComparableNode[]> {

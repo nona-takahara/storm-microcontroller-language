@@ -1,4 +1,5 @@
 import { comparableNodeKind } from "../compare/fingerprint.js";
+import { incidentKeys, mappedIncidentKeys } from "../compare/structural-correspondence.js";
 import {
   type ComparableModuleGraph,
   type ComparableNode,
@@ -19,6 +20,8 @@ export interface PartialCorrespondenceResult {
   optimalCorrespondenceCount: number;
   searchSteps: number;
   truncated: boolean;
+  /** Complete optimal mappings, available only when the search finished. Sync compares their projected outputs. */
+  optimalCorrespondences: MatchedNodePair[][];
 }
 
 // With the skip-branch pruning above, the search's remaining cost for a residual `propagateCertainPairs`
@@ -33,6 +36,11 @@ export interface PartialCorrespondenceResult {
 // exhaustive search fundamentally can't scale past what a project actually produces; making bigger
 // clusters tractable needs a polynomial assignment-problem formulation instead, tracked separately.
 const DEFAULT_PARTIAL_SEARCH_STEPS = 2_000_000;
+// Keep the exhaustive fallback's memory bounded as well as its running time. Exact-equivalence
+// symmetry is handled by the polynomial/exact path; a changed graph that still produces more than
+// this many equally optimal partial mappings is safer to report as search exhaustion than to retain
+// an unbounded factorial result set merely to compare projected outputs.
+const MAX_RETAINED_OPTIMAL_CORRESPONDENCES = 10_000;
 
 /**
  * Find only correspondences shared by every optimal partial graph mapping. Object ids and property
@@ -93,7 +101,7 @@ export function findPartialNodeCorrespondence(
         current.length,
         countPreservedLinks(existing, incoming, current),
         countNameMatches(current),
-        countPropertyMatches(current),
+        countPropertyKeyMatches(current),
       ];
       const comparison = compareScore(score, bestScore);
       if (comparison > 0) {
@@ -101,6 +109,10 @@ export function findPartialNodeCorrespondence(
         optimal.length = 0;
         optimal.push([...current]);
       } else if (comparison === 0) {
+        if (optimal.length >= MAX_RETAINED_OPTIMAL_CORRESPONDENCES) {
+          truncated = true;
+          return;
+        }
         optimal.push([...current]);
       }
       return;
@@ -121,7 +133,9 @@ export function findPartialNodeCorrespondence(
 
   visit(0);
   const completed = optimal.length > 0 ? optimal : [[...forced.pairs]];
-  const certainPairs = intersectPairs(completed);
+  // Once search is truncated, unexplored branches may invalidate every search-derived conclusion.
+  // Only fixed-point propagation pairs were proved independently of the incomplete enumeration.
+  const certainPairs = truncated ? forced.pairs : intersectPairs(completed);
   const certainA = new Set(certainPairs.map((pair) => pair.a.node.id));
   const certainB = new Set(certainPairs.map((pair) => pair.b.node.id));
   const everMatchedA = new Set(completed.flatMap((pairs) => pairs.map((pair) => pair.a.node.id)));
@@ -129,17 +143,18 @@ export function findPartialNodeCorrespondence(
 
   return {
     certainPairs,
-    unmatchedExisting: existing.nodes.filter((node) => !everMatchedA.has(node.node.id)),
-    unmatchedIncoming: incoming.nodes.filter((node) => !everMatchedB.has(node.node.id)),
-    ambiguousExisting: existing.nodes.filter(
-      (node) => everMatchedA.has(node.node.id) && !certainA.has(node.node.id),
+    unmatchedExisting: truncated ? [] : existing.nodes.filter((node) => !everMatchedA.has(node.node.id)),
+    unmatchedIncoming: truncated ? [] : incoming.nodes.filter((node) => !everMatchedB.has(node.node.id)),
+    ambiguousExisting: existing.nodes.filter((node) =>
+      truncated ? !certainA.has(node.node.id) : everMatchedA.has(node.node.id) && !certainA.has(node.node.id),
     ),
-    ambiguousIncoming: incoming.nodes.filter(
-      (node) => everMatchedB.has(node.node.id) && !certainB.has(node.node.id),
+    ambiguousIncoming: incoming.nodes.filter((node) =>
+      truncated ? !certainB.has(node.node.id) : everMatchedB.has(node.node.id) && !certainB.has(node.node.id),
     ),
     optimalCorrespondenceCount: completed.length,
     searchSteps: steps,
     truncated,
+    optimalCorrespondences: truncated ? [] : completed.map((pairs) => [...pairs]),
   };
 }
 
@@ -193,19 +208,19 @@ function propagateCertainPairs(
       // with no links to forced neighbors yet (signature is empty) skips this rule and falls to the
       // ones below; a genuinely rewired node's signature can never match a wrong candidate's, so it
       // also falls through rather than being mis-forced.
-      const requiredSignature = mappedIncidentSignature(existing.links, nodeA.node.id, bIdByAId);
+      const requiredSignature = mappedIncidentKeys(existing, nodeA.node.id, bIdByAId).join("\n");
       if (requiredSignature !== "") {
         const exactChoices = (candidates.get(nodeA) ?? []).filter(
           (nodeB) =>
             !incomingIds.has(nodeB.node.id) &&
-            incidentSignatureAmongForced(incoming.links, nodeB.node.id, incomingIds) === requiredSignature,
+            incidentKeys(incoming, nodeB.node.id, incomingIds).join("\n") === requiredSignature,
         );
         const isOnlyExactClaimant =
           exactChoices.length === 1 &&
           existing.nodes.filter(
             (other) =>
               !existingIds.has(other.node.id) &&
-              mappedIncidentSignature(existing.links, other.node.id, bIdByAId) === requiredSignature &&
+              mappedIncidentKeys(existing, other.node.id, bIdByAId).join("\n") === requiredSignature &&
               (candidates.get(other) ?? []).some((candidate) => candidate.node.id === exactChoices[0]!.node.id),
           ).length === 1;
 
@@ -287,50 +302,6 @@ function nameLabel(node: ComparableNode): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-/**
- * `nodeId`'s links to nodes already forced (per `existingToIncoming`), rewritten in terms of their
- * incoming-side ids so the result is directly comparable to `incidentSignatureAmongForced` on the
- * incoming graph. Links to not-yet-forced neighbors are excluded, not treated as mismatches.
- */
-function mappedIncidentSignature(
-  links: ComparableModuleGraph["links"],
-  nodeId: string,
-  existingToIncoming: Map<string, string>,
-): string {
-  return links
-    .flatMap((link) => {
-      if (link.from.nodeId === nodeId && existingToIncoming.has(link.to.nodeId)) {
-        return [`out:${link.from.portKey}:${existingToIncoming.get(link.to.nodeId)}:${link.to.portKey}`];
-      }
-      if (link.to.nodeId === nodeId && existingToIncoming.has(link.from.nodeId)) {
-        return [`in:${link.to.portKey}:${existingToIncoming.get(link.from.nodeId)}:${link.from.portKey}`];
-      }
-      return [];
-    })
-    .sort()
-    .join("\n");
-}
-
-/** `nodeId`'s links restricted to neighbors in `forcedIds`, in the same format as `mappedIncidentSignature`. */
-function incidentSignatureAmongForced(
-  links: ComparableModuleGraph["links"],
-  nodeId: string,
-  forcedIds: Set<string>,
-): string {
-  return links
-    .flatMap((link) => {
-      if (link.from.nodeId === nodeId && forcedIds.has(link.to.nodeId)) {
-        return [`out:${link.from.portKey}:${link.to.nodeId}:${link.to.portKey}`];
-      }
-      if (link.to.nodeId === nodeId && forcedIds.has(link.from.nodeId)) {
-        return [`in:${link.to.portKey}:${link.from.nodeId}:${link.from.portKey}`];
-      }
-      return [];
-    })
-    .sort()
-    .join("\n");
-}
-
 function hasCompatibleCertainAdjacency(
   existing: ComparableModuleGraph,
   incoming: ComparableModuleGraph,
@@ -394,8 +365,8 @@ function linkKey(link: ComparableModuleGraph["links"][number]): string {
  *  1. total matched pairs (more correspondence coverage always wins);
  *  2. preserved incident links (wiring topology is the strongest disambiguator once counts tie);
  *  3. matching `n` display-label attributes (a strong but weaker-than-wiring identity signal);
- *  4. matching non-`n` property values, one point per pair at most (a strong signal too, but a
- *     mismatch here never subtracts — it is deliberately not a veto, only the absence of a bonus).
+ *  4. matching ordinary property/literal-input values, counted per key. A mismatch never excludes
+ *     a candidate; unstable or correspondence-derived keys are excluded by `propertyEvidenceKeys`.
  */
 type CorrespondenceScore = [number, number, number, number];
 
@@ -408,15 +379,21 @@ function countNameMatches(pairs: MatchedNodePair[]): number {
   return pairs.filter((pair) => attributesEqual(pair.a.attributes.n, pair.b.attributes.n)).length;
 }
 
-/**
- * Count pairs whose non-`n` attributes are fully equal, capped at one point per pair so a
- * property-rich node cannot outweigh several sparser ones in the same search branch.
- */
-function countPropertyMatches(pairs: MatchedNodePair[]): number {
-  return pairs.filter((pair) => {
-    const keys = new Set([...Object.keys(pair.a.attributes), ...Object.keys(pair.b.attributes)].filter((key) => key !== "n"));
-    return keys.size > 0 && [...keys].every((key) => attributesEqual(pair.a.attributes[key], pair.b.attributes[key]));
-  }).length;
+function countPropertyKeyMatches(pairs: MatchedNodePair[]): number {
+  return pairs.reduce((count, pair) => {
+    const attributeKeys = new Set([...propertyEvidenceKeys(pair.a.attributes), ...propertyEvidenceKeys(pair.b.attributes)]);
+    const literalKeys = new Set([...Object.keys(pair.a.literalInputs), ...Object.keys(pair.b.literalInputs)]);
+    return count +
+      [...attributeKeys].filter((key) => attributesEqual(pair.a.attributes[key], pair.b.attributes[key])).length +
+      [...literalKeys].filter((key) => attributesEqual(pair.a.literalInputs[key], pair.b.literalInputs[key])).length;
+  }, 0);
+}
+
+function propertyEvidenceKeys(attributes: ComparableNode["attributes"]): string[] {
+  // `n` is the stronger display-label tier above. `script_ref` is derived from the temporary XML
+  // instance id and is projected from the chosen correspondence, so using it as evidence would make
+  // a generated name circularly decide its own identity.
+  return Object.keys(attributes).filter((key) => key !== "n" && key !== "script_ref");
 }
 
 function attributesEqual(left: IrScalarValue | undefined, right: IrScalarValue | undefined): boolean {

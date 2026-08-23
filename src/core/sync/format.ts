@@ -22,7 +22,27 @@ export function formatSynchronizationReport(
       kind: formatChangeKind(change.kind, translator),
       node: formatNode(node),
     }));
+    for (const [key, values] of Object.entries(change.propertyChanges ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
+      lines.push(translator.format("sync.change.property", {
+        key,
+        before: formatValue(values.before),
+        after: formatValue(values.after),
+      }));
+    }
+    if (change.connections && (change.connections.before.length > 0 || change.connections.after.length > 0)) {
+      lines.push(translator.format("sync.change.connections", {
+        before: change.connections.before.join(", ") || "-",
+        after: change.connections.after.join(", ") || "-",
+      }));
+    }
   }
+
+  const luaItems = [
+    ...plan.lua.create.map((script) => translator.format("sync.lua.change", { kind: translator.format("sync.kind.added"), path: formatLuaPath(script) })),
+    ...plan.lua.update.map((script) => translator.format("sync.lua.change", { kind: translator.format("sync.kind.updated"), path: formatLuaPath(script) })),
+    ...plan.lua.remove.map((script) => translator.format("sync.lua.change", { kind: translator.format("sync.kind.removed"), path: formatLuaPath(script) })),
+  ];
+  if (luaItems.length > 0) lines.push("", translator.format("sync.lua", { count: luaItems.length }), ...luaItems);
 
   if (plan.warnings.length > 0) {
     lines.push("", translator.format("sync.warnings", { count: plan.warnings.length }));
@@ -34,6 +54,7 @@ export function formatSynchronizationReport(
         kind: translator.format(warning.kind === "layout-overwrite" ? "sync.warning.layout-overwrite" : "sync.warning.layout-projection"),
         impacts: `${warning.impacts.map(formatImpact).join(", ")}${position}`,
       }));
+      if (warning.reason) lines.push(translator.format("sync.reason", { reason: warning.reason }));
     }
   }
 
@@ -44,10 +65,18 @@ export function formatSynchronizationReport(
         kind: formatConflictKind(conflict.kind, translator),
         impacts: conflict.impacts.map(formatImpact).join(", "),
       }));
+      lines.push(translator.format("sync.reason", { reason: conflict.reason }));
       for (const suggestion of conflict.suggestions) {
         lines.push(translator.format("sync.suggestion", {
           suggestion: formatSuggestion(suggestion.kind, translator),
         }));
+        if (suggestion.description) lines.push(translator.format("sync.suggestion.description", { description: suggestion.description }));
+        for (const [key, value] of Object.entries(suggestion.details ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
+          lines.push(translator.format("sync.suggestion.detail", {
+            key,
+            value: Array.isArray(value) ? value.join(", ") : value,
+          }));
+        }
       }
     }
   }
@@ -61,6 +90,14 @@ export function formatSynchronizationReport(
         : "sync.result.blocked",
   ));
   return lines.join("\n");
+}
+
+function formatValue(value: unknown): string {
+  return value === undefined ? "<absent>" : JSON.stringify(value);
+}
+
+function formatLuaPath(script: { documentPath: string; path: string }): string {
+  return `${script.documentPath}::${script.path}`;
 }
 
 function formatNode(node: SynchronizationPlan["changes"][number]["incoming"]): string {
