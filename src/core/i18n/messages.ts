@@ -110,11 +110,18 @@ export const enMessages = {
   "layout.autoFailed": "Auto-layout failed for {path}: {detail}",
   "sync.changes": "Changes ({count}):",
   "sync.change": "- {kind}: {node}",
+  "sync.change.property": "  property {key}: {before} -> {after}",
+  "sync.change.connections": "  connections: [{before}] -> [{after}]",
+  "sync.lua": "Lua sidecars ({count}):",
+  "sync.lua.change": "- {kind}: {path} (body not shown)",
   "sync.warnings": "Warnings ({count}):",
   "sync.warning": "- {kind}: {impacts}",
+  "sync.reason": "  Reason: {reason}",
   "sync.conflicts": "Blocking conflicts ({count}):",
   "sync.conflict": "- {kind}: {impacts}",
   "sync.suggestion": "  Suggested edit: {suggestion}",
+  "sync.suggestion.description": "    {description}",
+  "sync.suggestion.detail": "    {key}: {value}",
   "sync.summary": "Summary: {added} added, {removed} removed, {updated} updated, {rewired} rewired, {conflicts} blocking conflicts.",
   "sync.result.written": "Synchronization applied. Files were written.",
   "sync.result.dryRun": "Dry run completed. No files were written.",
@@ -262,11 +269,18 @@ export interface MessageArgsById {
   "layout.autoFailed": { path: string; detail: string };
   "sync.changes": { count: number };
   "sync.change": { kind: string; node: string };
+  "sync.change.property": { key: string; before: string; after: string };
+  "sync.change.connections": { before: string; after: string };
+  "sync.lua": { count: number };
+  "sync.lua.change": { kind: string; path: string };
   "sync.warnings": { count: number };
   "sync.warning": { kind: string; impacts: string };
+  "sync.reason": { reason: string };
   "sync.conflicts": { count: number };
   "sync.conflict": { kind: string; impacts: string };
   "sync.suggestion": { suggestion: string };
+  "sync.suggestion.description": { description: string };
+  "sync.suggestion.detail": { key: string; value: string };
   "sync.summary": { added: number; removed: number; updated: number; rewired: number; conflicts: number };
   "sync.result.written": NoMessageArguments;
   "sync.result.dryRun": NoMessageArguments;
@@ -407,11 +421,18 @@ export const jaMessages: Record<MessageId, string> = {
   "layout.autoFailed": "{path} の自動レイアウトに失敗しました: {detail}",
   "sync.changes": "変更（{count}件）:",
   "sync.change": "- {kind}: {node}",
+  "sync.change.property": "  property {key}: {before} -> {after}",
+  "sync.change.connections": "  接続: [{before}] -> [{after}]",
+  "sync.lua": "Lua sidecar（{count}件）:",
+  "sync.lua.change": "- {kind}: {path}（本文は省略）",
   "sync.warnings": "警告（{count}件）:",
   "sync.warning": "- {kind}: {impacts}",
+  "sync.reason": "  理由: {reason}",
   "sync.conflicts": "ブロッキング競合（{count}件）:",
   "sync.conflict": "- {kind}: {impacts}",
   "sync.suggestion": "  編集候補: {suggestion}",
+  "sync.suggestion.description": "    {description}",
+  "sync.suggestion.detail": "    {key}: {value}",
   "sync.summary": "集計: 追加 {added}、削除 {removed}、更新 {updated}、配線変更 {rewired}、ブロッキング競合 {conflicts}。",
   "sync.result.written": "同期を適用し、ファイルを書き込みました。",
   "sync.result.dryRun": "dry-runが完了しました。ファイルは変更していません。",

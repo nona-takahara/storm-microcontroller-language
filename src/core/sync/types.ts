@@ -12,6 +12,7 @@ export interface SynchronizationNodeRef {
   moduleId?: string;
   instanceId?: string;
   usePath?: string[];
+  port?: { direction: "in" | "out"; name: string; signal: string; occurrence: number };
 }
 
 export interface SynchronizationChange {
@@ -19,6 +20,7 @@ export interface SynchronizationChange {
   existing?: SynchronizationNodeRef;
   incoming?: SynchronizationNodeRef;
   propertyChanges?: Record<string, { before?: IrScalarValue; after?: IrScalarValue }>;
+  connections?: { before: string[]; after: string[] };
 }
 
 export type SynchronizationConflictKind =
@@ -62,9 +64,9 @@ export interface SynchronizationSourceEditPlan {
 }
 
 export interface SynchronizationLuaPlan {
-  create: Record<string, string>;
-  update: Record<string, string>;
-  remove: string[];
+  create: Array<{ documentPath: string; path: string; text: string }>;
+  update: Array<{ documentPath: string; path: string; text: string }>;
+  remove: Array<{ documentPath: string; path: string }>;
 }
 
 export interface SynchronizationLayoutUpdate {

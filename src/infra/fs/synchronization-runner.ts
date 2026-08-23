@@ -66,9 +66,11 @@ function prepareSynchronizedProject(
     if (text === undefined) throw new Error(`Exact sw-net source text is unavailable for ${document.documentId}.`);
     const swMcl = layoutByDocument.get(document.documentId) ?? document.swMcl;
     const scripts = { ...document.scripts };
-    for (const path of plan.lua.remove) delete scripts[path];
-    if (document.documentId === existing.projectSource.entryDocument.documentId) {
-      Object.assign(scripts, plan.lua.create, plan.lua.update);
+    for (const script of plan.lua.remove) {
+      if (script.documentPath === document.documentId) delete scripts[script.path];
+    }
+    for (const script of [...plan.lua.create, ...plan.lua.update]) {
+      if (script.documentPath === document.documentId) scripts[script.path] = script.text;
     }
     const parsed = parseSourceDocumentTexts({
       documentId: document.documentId,
@@ -99,6 +101,7 @@ function buildFileOperations(
   const copyAll = options.outputDirectory !== undefined;
   const editedDocuments = new Set(plan.sourceEdits.map((edit) => edit.documentPath));
   const layoutDocuments = new Set(plan.layouts.map((layout) => layout.documentPath));
+  const writtenLua = new Set([...plan.lua.create, ...plan.lua.update].map((script) => `${script.documentPath}\0${script.path}`));
   const operations: PendingFileOperation[] = [
     { path: join(targetRoot, "project.json"), text: `${JSON.stringify(plan.project, null, 2)}\n` },
   ];
@@ -113,7 +116,7 @@ function buildFileOperations(
       operations.push({ path: replaceExtension(targetDocumentPath, ".sw-mcl"), text: `${JSON.stringify(document.swMcl, null, 2)}\n` });
     }
     for (const [scriptPath, text] of Object.entries(document.scripts)) {
-      if (copyAll || scriptPath in plan.lua.create || scriptPath in plan.lua.update) {
+      if (copyAll || writtenLua.has(`${document.documentId}\0${scriptPath}`)) {
         const sourceAsset = resolveRelativeSwNetAssetPath(document.documentId, scriptPath);
         const relativeAsset = safeRelativePath(sourceRoot, sourceAsset);
         operations.push({ path: resolve(targetRoot, relativeAsset), text });
@@ -122,13 +125,19 @@ function buildFileOperations(
   }
 
   if (!copyAll) {
-    for (const scriptPath of plan.lua.remove) {
-      for (const document of existing.documents) {
-        if (!(scriptPath in document.scripts)) continue;
-        const target = resolveRelativeSwNetAssetPath(document.documentId, scriptPath);
-        safeRelativePath(sourceRoot, target);
-        operations.push({ path: target });
-      }
+    const retainedScriptTargets = new Set([...prepared.documentById.values()].flatMap((document) =>
+      Object.keys(document.scripts).map((scriptPath) => resolve(resolveRelativeSwNetAssetPath(document.documentId, scriptPath))),
+    ));
+    for (const script of plan.lua.remove) {
+      const document = existing.documents.find((candidate) => candidate.documentId === script.documentPath);
+      if (!document || !(script.path in document.scripts)) continue;
+      const target = resolveRelativeSwNetAssetPath(document.documentId, script.path);
+      safeRelativePath(sourceRoot, target);
+      // Different sw-net documents can intentionally resolve the same relative script reference to
+      // one physical sidecar. A document-scoped removal must not delete that asset while any
+      // synchronized document still exposes it.
+      if (retainedScriptTargets.has(resolve(target))) continue;
+      operations.push({ path: target });
     }
   }
   return deduplicateOperations(operations);
@@ -185,7 +194,13 @@ function replaceExtension(path: string, extension: string): string {
 
 function deduplicateOperations(operations: PendingFileOperation[]): PendingFileOperation[] {
   const result = new Map<string, PendingFileOperation>();
-  for (const operation of operations) result.set(operation.path, operation);
+  for (const operation of operations) {
+    const previous = result.get(operation.path);
+    if (previous && previous.text !== operation.text) {
+      throw new Error(`Conflicting synchronization operations target the same physical file: ${operation.path}`);
+    }
+    result.set(operation.path, operation);
+  }
   return [...result.values()];
 }
 

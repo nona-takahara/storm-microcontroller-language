@@ -1,5 +1,12 @@
 import { comparableNodeKind } from "../compare/fingerprint.js";
 import {
+  displayNameEvidenceValue,
+  ordinaryAttributeEvidenceKeys,
+  STRONG_CORRESPONDENCE_EVIDENCE_KEYS,
+  strongCorrespondenceEvidenceValue,
+} from "../compare/correspondence-evidence.js";
+import { incidentKeys, mappedIncidentKeys } from "../compare/structural-correspondence.js";
+import {
   type ComparableModuleGraph,
   type ComparableNode,
   type MatchedNodePair,
@@ -19,6 +26,8 @@ export interface PartialCorrespondenceResult {
   optimalCorrespondenceCount: number;
   searchSteps: number;
   truncated: boolean;
+  /** Complete optimal mappings, available only when the search finished. Sync compares their projected outputs. */
+  optimalCorrespondences: MatchedNodePair[][];
 }
 
 // With the skip-branch pruning above, the search's remaining cost for a residual `propagateCertainPairs`
@@ -33,6 +42,11 @@ export interface PartialCorrespondenceResult {
 // exhaustive search fundamentally can't scale past what a project actually produces; making bigger
 // clusters tractable needs a polynomial assignment-problem formulation instead, tracked separately.
 const DEFAULT_PARTIAL_SEARCH_STEPS = 2_000_000;
+// Keep the exhaustive fallback's memory bounded as well as its running time. Exact-equivalence
+// symmetry is handled by the polynomial/exact path; a changed graph that still produces more than
+// this many equally optimal partial mappings is safer to report as search exhaustion than to retain
+// an unbounded factorial result set merely to compare projected outputs.
+const MAX_RETAINED_OPTIMAL_CORRESPONDENCES = 10_000;
 
 /**
  * Find only correspondences shared by every optimal partial graph mapping. Object ids and property
@@ -61,7 +75,7 @@ export function findPartialNodeCorrespondence(
   const maxSteps = Math.max(0, options.maxSearchSteps ?? DEFAULT_PARTIAL_SEARCH_STEPS);
   const current = [...forced.pairs];
   const optimal: MatchedNodePair[][] = [];
-  let bestScore: CorrespondenceScore = [-1, -1, -1, -1];
+  let bestScore: CorrespondenceScore = [-1, -1, -1, -1, -1];
   let steps = 0;
   let truncated = false;
 
@@ -92,8 +106,9 @@ export function findPartialNodeCorrespondence(
       const score: CorrespondenceScore = [
         current.length,
         countPreservedLinks(existing, incoming, current),
+        countExpressionMatches(current),
         countNameMatches(current),
-        countPropertyMatches(current),
+        countPropertyKeyMatches(current),
       ];
       const comparison = compareScore(score, bestScore);
       if (comparison > 0) {
@@ -101,6 +116,10 @@ export function findPartialNodeCorrespondence(
         optimal.length = 0;
         optimal.push([...current]);
       } else if (comparison === 0) {
+        if (optimal.length >= MAX_RETAINED_OPTIMAL_CORRESPONDENCES) {
+          truncated = true;
+          return;
+        }
         optimal.push([...current]);
       }
       return;
@@ -121,7 +140,9 @@ export function findPartialNodeCorrespondence(
 
   visit(0);
   const completed = optimal.length > 0 ? optimal : [[...forced.pairs]];
-  const certainPairs = intersectPairs(completed);
+  // Once search is truncated, unexplored branches may invalidate every search-derived conclusion.
+  // Only fixed-point propagation pairs were proved independently of the incomplete enumeration.
+  const certainPairs = truncated ? forced.pairs : intersectPairs(completed);
   const certainA = new Set(certainPairs.map((pair) => pair.a.node.id));
   const certainB = new Set(certainPairs.map((pair) => pair.b.node.id));
   const everMatchedA = new Set(completed.flatMap((pairs) => pairs.map((pair) => pair.a.node.id)));
@@ -129,17 +150,18 @@ export function findPartialNodeCorrespondence(
 
   return {
     certainPairs,
-    unmatchedExisting: existing.nodes.filter((node) => !everMatchedA.has(node.node.id)),
-    unmatchedIncoming: incoming.nodes.filter((node) => !everMatchedB.has(node.node.id)),
-    ambiguousExisting: existing.nodes.filter(
-      (node) => everMatchedA.has(node.node.id) && !certainA.has(node.node.id),
+    unmatchedExisting: truncated ? [] : existing.nodes.filter((node) => !everMatchedA.has(node.node.id)),
+    unmatchedIncoming: truncated ? [] : incoming.nodes.filter((node) => !everMatchedB.has(node.node.id)),
+    ambiguousExisting: existing.nodes.filter((node) =>
+      truncated ? !certainA.has(node.node.id) : everMatchedA.has(node.node.id) && !certainA.has(node.node.id),
     ),
-    ambiguousIncoming: incoming.nodes.filter(
-      (node) => everMatchedB.has(node.node.id) && !certainB.has(node.node.id),
+    ambiguousIncoming: incoming.nodes.filter((node) =>
+      truncated ? !certainB.has(node.node.id) : everMatchedB.has(node.node.id) && !certainB.has(node.node.id),
     ),
     optimalCorrespondenceCount: completed.length,
     searchSteps: steps,
     truncated,
+    optimalCorrespondences: truncated ? [] : completed.map((pairs) => [...pairs]),
   };
 }
 
@@ -193,19 +215,19 @@ function propagateCertainPairs(
       // with no links to forced neighbors yet (signature is empty) skips this rule and falls to the
       // ones below; a genuinely rewired node's signature can never match a wrong candidate's, so it
       // also falls through rather than being mis-forced.
-      const requiredSignature = mappedIncidentSignature(existing.links, nodeA.node.id, bIdByAId);
+      const requiredSignature = mappedIncidentKeys(existing, nodeA.node.id, bIdByAId).join("\n");
       if (requiredSignature !== "") {
         const exactChoices = (candidates.get(nodeA) ?? []).filter(
           (nodeB) =>
             !incomingIds.has(nodeB.node.id) &&
-            incidentSignatureAmongForced(incoming.links, nodeB.node.id, incomingIds) === requiredSignature,
+            incidentKeys(incoming, nodeB.node.id, incomingIds).join("\n") === requiredSignature,
         );
         const isOnlyExactClaimant =
           exactChoices.length === 1 &&
           existing.nodes.filter(
             (other) =>
               !existingIds.has(other.node.id) &&
-              mappedIncidentSignature(existing.links, other.node.id, bIdByAId) === requiredSignature &&
+              mappedIncidentKeys(existing, other.node.id, bIdByAId).join("\n") === requiredSignature &&
               (candidates.get(other) ?? []).some((candidate) => candidate.node.id === exactChoices[0]!.node.id),
           ).length === 1;
 
@@ -239,96 +261,46 @@ function propagateCertainPairs(
         break;
       }
 
-      // A cheap, linear-time counterpart to the structural-only rule above: when this node's `n`
-      // display label picks out exactly one of its remaining structurally-valid candidates, and no
-      // other remaining node sharing that same label could also validly claim that candidate, the
-      // label alone is decisive. Without this, a cluster of same-kind nodes disambiguated only by
-      // distinct labels (issue #71's actual shape) falls entirely to the exponential backtracking
-      // search below and can exhaust its step budget well before a realistic cluster size.
-      const label = nameLabel(nodeA);
-      if (label !== undefined) {
-        const labelChoices = choices.filter((nodeB) => nameLabel(nodeB) === label);
-        // `choices` is already narrowed by adjacency compatibility against pairs forced so far, and
-        // that narrowing is deliberately lenient (a missing edge on either side does not disqualify a
-        // candidate, see `hasCompatibleCertainAdjacency`). So a single label match in `choices` alone
-        // is not proof of uniqueness -- it could just be that adjacency happened to rule the other
-        // same-label incoming node out at this point in the fixed-point loop. Require the label to
-        // also pick out exactly one candidate in nodeA's full (adjacency-unfiltered) candidate list.
-        const unusedLabelCandidates = (candidates.get(nodeA) ?? []).filter(
-          (nodeB) => !incomingIds.has(nodeB.node.id) && nameLabel(nodeB) === label,
+      // Strong authored evidence is propagated in the shared policy's priority order. The full
+      // candidate-list check prevents a temporary adjacency narrowing from manufacturing certainty.
+      let strongCandidate: ComparableNode | undefined;
+      for (const evidenceKey of STRONG_CORRESPONDENCE_EVIDENCE_KEYS) {
+        if (
+          evidenceKey === "n" &&
+          strongCorrespondenceEvidenceValue(nodeA, "propertyLabel") !== undefined
+        ) continue;
+        const value = strongCorrespondenceEvidenceValue(nodeA, evidenceKey);
+        if (value === undefined) continue;
+        const evidenceChoices = choices.filter(
+          (nodeB) => strongCorrespondenceEvidenceValue(nodeB, evidenceKey) === value,
         );
-        const isOnlyLabelClaimant =
-          labelChoices.length === 1 &&
-          unusedLabelCandidates.length === 1 &&
-          existing.nodes.filter(
-            (other) =>
-              !existingIds.has(other.node.id) &&
-              nameLabel(other) === label &&
-              (candidates.get(other) ?? []).some((candidate) => candidate.node.id === labelChoices[0]!.node.id),
+        const unusedEvidenceCandidates = (candidates.get(nodeA) ?? []).filter(
+          (nodeB) => !incomingIds.has(nodeB.node.id) && strongCorrespondenceEvidenceValue(nodeB, evidenceKey) === value,
+        );
+        const isOnlyEvidenceClaimant =
+          evidenceChoices.length === 1 &&
+          unusedEvidenceCandidates.length === 1 &&
+          existing.nodes.filter((other) =>
+            !existingIds.has(other.node.id) &&
+            strongCorrespondenceEvidenceValue(other, evidenceKey) === value &&
+            (candidates.get(other) ?? []).some((candidate) => candidate.node.id === evidenceChoices[0]!.node.id),
           ).length === 1;
-
-        if (isOnlyLabelClaimant) {
-          pairs.push({ a: nodeA, b: labelChoices[0]! });
-          existingIds.add(nodeA.node.id);
-          incomingIds.add(labelChoices[0]!.node.id);
-          changed = true;
+        if (isOnlyEvidenceClaimant) {
+          strongCandidate = evidenceChoices[0]!;
           break;
         }
+      }
+      if (strongCandidate) {
+        pairs.push({ a: nodeA, b: strongCandidate });
+        existingIds.add(nodeA.node.id);
+        incomingIds.add(strongCandidate.node.id);
+        changed = true;
+        break;
       }
     }
   }
 
   return { pairs, existingIds };
-}
-
-/** The Stormworks in-game custom display name, when the DSL/XML source set a non-empty one. */
-function nameLabel(node: ComparableNode): string | undefined {
-  const value = node.attributes.n;
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-/**
- * `nodeId`'s links to nodes already forced (per `existingToIncoming`), rewritten in terms of their
- * incoming-side ids so the result is directly comparable to `incidentSignatureAmongForced` on the
- * incoming graph. Links to not-yet-forced neighbors are excluded, not treated as mismatches.
- */
-function mappedIncidentSignature(
-  links: ComparableModuleGraph["links"],
-  nodeId: string,
-  existingToIncoming: Map<string, string>,
-): string {
-  return links
-    .flatMap((link) => {
-      if (link.from.nodeId === nodeId && existingToIncoming.has(link.to.nodeId)) {
-        return [`out:${link.from.portKey}:${existingToIncoming.get(link.to.nodeId)}:${link.to.portKey}`];
-      }
-      if (link.to.nodeId === nodeId && existingToIncoming.has(link.from.nodeId)) {
-        return [`in:${link.to.portKey}:${existingToIncoming.get(link.from.nodeId)}:${link.from.portKey}`];
-      }
-      return [];
-    })
-    .sort()
-    .join("\n");
-}
-
-/** `nodeId`'s links restricted to neighbors in `forcedIds`, in the same format as `mappedIncidentSignature`. */
-function incidentSignatureAmongForced(
-  links: ComparableModuleGraph["links"],
-  nodeId: string,
-  forcedIds: Set<string>,
-): string {
-  return links
-    .flatMap((link) => {
-      if (link.from.nodeId === nodeId && forcedIds.has(link.to.nodeId)) {
-        return [`out:${link.from.portKey}:${link.to.nodeId}:${link.to.portKey}`];
-      }
-      if (link.to.nodeId === nodeId && forcedIds.has(link.from.nodeId)) {
-        return [`in:${link.to.portKey}:${link.from.nodeId}:${link.from.portKey}`];
-      }
-      return [];
-    })
-    .sort()
-    .join("\n");
 }
 
 function hasCompatibleCertainAdjacency(
@@ -393,30 +365,47 @@ function linkKey(link: ComparableModuleGraph["links"][number]): string {
  * Score tuple compared lexicographically, most significant first:
  *  1. total matched pairs (more correspondence coverage always wins);
  *  2. preserved incident links (wiring topology is the strongest disambiguator once counts tie);
- *  3. matching `n` display-label attributes (a strong but weaker-than-wiring identity signal);
- *  4. matching non-`n` property values, one point per pair at most (a strong signal too, but a
- *     mismatch here never subtracts — it is deliberately not a veto, only the absence of a bonus).
+ *  3. matching function expressions (authored behavior and the strongest property evidence);
+ *  4. matching `n` display-label attributes;
+ *  5. matching ordinary property/literal-input values, counted per key. A mismatch never excludes
+ *     a candidate; strong and correspondence-derived keys are excluded by the shared policy.
  */
-type CorrespondenceScore = [number, number, number, number];
+type CorrespondenceScore = [number, number, number, number, number];
 
 function compareScore(left: CorrespondenceScore, right: CorrespondenceScore): number {
-  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2] || left[3] - right[3];
+  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2] || left[3] - right[3] || left[4] - right[4];
+}
+
+function countExpressionMatches(pairs: MatchedNodePair[]): number {
+  return countStrongEvidenceMatches(pairs, "expression");
 }
 
 /** Count pairs whose `n` (display-label) attribute is present on both sides and equal. */
 function countNameMatches(pairs: MatchedNodePair[]): number {
-  return pairs.filter((pair) => attributesEqual(pair.a.attributes.n, pair.b.attributes.n)).length;
+  return pairs.filter((pair) => {
+    const value = displayNameEvidenceValue(pair.a);
+    return value !== undefined && value === displayNameEvidenceValue(pair.b);
+  }).length;
 }
 
-/**
- * Count pairs whose non-`n` attributes are fully equal, capped at one point per pair so a
- * property-rich node cannot outweigh several sparser ones in the same search branch.
- */
-function countPropertyMatches(pairs: MatchedNodePair[]): number {
+function countStrongEvidenceMatches(
+  pairs: MatchedNodePair[],
+  key: (typeof STRONG_CORRESPONDENCE_EVIDENCE_KEYS)[number],
+): number {
   return pairs.filter((pair) => {
-    const keys = new Set([...Object.keys(pair.a.attributes), ...Object.keys(pair.b.attributes)].filter((key) => key !== "n"));
-    return keys.size > 0 && [...keys].every((key) => attributesEqual(pair.a.attributes[key], pair.b.attributes[key]));
+    const value = strongCorrespondenceEvidenceValue(pair.a, key);
+    return value !== undefined && value === strongCorrespondenceEvidenceValue(pair.b, key);
   }).length;
+}
+
+function countPropertyKeyMatches(pairs: MatchedNodePair[]): number {
+  return pairs.reduce((count, pair) => {
+    const attributeKeys = new Set([...ordinaryAttributeEvidenceKeys(pair.a), ...ordinaryAttributeEvidenceKeys(pair.b)]);
+    const literalKeys = new Set([...Object.keys(pair.a.literalInputs), ...Object.keys(pair.b.literalInputs)]);
+    return count +
+      [...attributeKeys].filter((key) => attributesEqual(pair.a.attributes[key], pair.b.attributes[key])).length +
+      [...literalKeys].filter((key) => attributesEqual(pair.a.literalInputs[key], pair.b.literalInputs[key])).length;
+  }, 0);
 }
 
 function attributesEqual(left: IrScalarValue | undefined, right: IrScalarValue | undefined): boolean {

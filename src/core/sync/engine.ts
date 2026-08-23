@@ -1,5 +1,6 @@
 import { normalizeComparableModule } from "../compare/comparable-node.js";
 import { flattenSwNetProject } from "../compare/project-flattener.js";
+import { findExactNodeCorrespondence } from "../compare/structural-correspondence.js";
 import {
   type ComparableModuleGraph,
   type ComparableNode,
@@ -60,42 +61,74 @@ export function buildSynchronizationPlan(
     flattened.value.documentPathByInstanceId,
   );
   const newGraph = newNormalized.value;
-  // `findPartialNodeCorrespondence` is the only correspondence search sync may trust as "certain": it
-  // reports a pair only when it is the single best-scoring one shared by every optimal search branch.
-  // `compareComparableModuleGraphs` (used by compare-dsl) intentionally answers a different question
-  // -- "does *any* structurally valid correspondence exist" -- and stops at the first one its
-  // backtracking search finds, tie-breaking by node id with no regard for labels or property values.
-  // A "complete" result from that search is not evidence of uniqueness, so it must never be reused
-  // here as a stand-in for a certain match; doing so previously let coincidental id ordering silently
-  // swap same-kind, same-shape nodes (see partial-matcher.test.ts's adjacent-property-node regression).
-  const partial = findPartialNodeCorrespondence(oldGraph, newGraph, options);
-  const changes = classifyChanges(oldGraph, newGraph, partial.certainPairs, partial.unmatchedExisting, partial.unmatchedIncoming);
+  // Exact structural equivalence and changed-network inference have different completion contracts.
+  // The exact path preserves every endpoint/port link and uses assignment for interchangeable
+  // disconnected components, so a no-op re-import never consumes the partial matcher's budget. Do
+  // not replace it with compare-dsl's first-found mapping: sync needs property-preferred mappings and
+  // must still inspect whether alternative mappings project different edits (issue #71 / PR #81).
+  const exact = findExactNodeCorrespondence(oldGraph, newGraph);
+  const partial = exact ? undefined : findPartialNodeCorrespondence(oldGraph, newGraph, options);
+  const ambiguousExisting = exact?.ambiguousExisting ?? partial!.ambiguousExisting;
+  const ambiguousIncoming = exact?.ambiguousIncoming ?? partial!.ambiguousIncoming;
+  const partialHasAmbiguity = Boolean(partial && !partial.truncated && (ambiguousExisting.length > 0 || ambiguousIncoming.length > 0));
+  const partialAmbiguityChangesOutput = partialHasAmbiguity
+    ? partialCorrespondenceOutputsDiffer(incoming, oldGraph, newGraph, partial!.optimalCorrespondences)
+    : false;
+  const stablePartialRepresentative = partialHasAmbiguity && !partialAmbiguityChangesOutput
+    ? partial!.optimalCorrespondences[0]
+    : undefined;
+  const correspondencePairs = exact?.pairs ?? stablePartialRepresentative ?? partial!.certainPairs;
+  const matchedExistingIds = new Set(correspondencePairs.map((pair) => pair.a.node.id));
+  const matchedIncomingIds = new Set(correspondencePairs.map((pair) => pair.b.node.id));
+  const unmatchedExisting = exact ? [] : stablePartialRepresentative
+    ? oldGraph.nodes.filter((node) => !matchedExistingIds.has(node.node.id))
+    : partial!.unmatchedExisting;
+  const unmatchedIncoming = exact ? [] : stablePartialRepresentative
+    ? newGraph.nodes.filter((node) => !matchedIncomingIds.has(node.node.id))
+    : partial!.unmatchedIncoming;
+  const changes = classifyChanges(oldGraph, newGraph, correspondencePairs, unmatchedExisting, unmatchedIncoming);
   const conflicts: SynchronizationConflict[] = [];
   const warnings: SynchronizationWarning[] = [];
 
-  if (partial.truncated || partial.ambiguousExisting.length > 0 || partial.ambiguousIncoming.length > 0) {
+  const exactAmbiguityChangesOutput = exact && ambiguousExisting.length > 0
+    ? correspondenceAmbiguityChangesOutput(incoming, exact.ambiguityGroups)
+    : false;
+  if (partial?.truncated || partialAmbiguityChangesOutput || exactAmbiguityChangesOutput) {
     conflicts.push({
       kind: "ambiguous-correspondence",
-      reason: partial.truncated
-        ? `Partial correspondence search exhausted its budget after ${partial.searchSteps} steps.`
-        : `${partial.optimalCorrespondenceCount} optimal correspondences disagree on one or more node pairs.`,
+      reason: partial?.truncated
+        ? `Partial correspondence search exhausted its budget after ${partial.searchSteps} steps. ${partial.certainPairs.length} matched pairs are certain; ${ambiguousExisting.length} existing and ${ambiguousIncoming.length} incoming nodes remain unresolved. Applicable changes listed in this report were not written because synchronization is atomic.`
+        : exact
+          ? `${exact.alternativeCount} or more exact structural correspondences project different property, layout, or Lua edits.`
+          : `${partial!.optimalCorrespondenceCount} optimal partial correspondences project different source, layout, wiring, placement, or Lua outputs.`,
       impacts: [
-        ...partial.ambiguousExisting.map((node) => impactFromNode(node)),
-        ...partial.ambiguousIncoming.map((node) => ({ instanceId: node.node.id })),
+        ...ambiguousExisting.map((node) => impactFromNode(node)),
+        ...ambiguousIncoming.map((node) => ({ instanceId: node.node.id })),
       ],
       suggestions: [{
         kind: "review-candidates",
-        description: "Review the symmetric or otherwise indistinguishable nodes and make their local wiring distinguishable.",
-        impacts: partial.ambiguousExisting.map((node) => impactFromNode(node)),
+        description: "Review the listed candidates and the property, layout, and Lua content that would be projected to each existing instance.",
+        impacts: ambiguousExisting.map((node) => impactFromNode(node)),
+        details: {
+          existingCandidates: ambiguousExisting.map((node) => node.node.id),
+          incomingCandidates: ambiguousIncoming.map((node) => node.node.id),
+          existingOutputs: describeExistingCandidateOutputs(existing, ambiguousExisting),
+          incomingOutputs: describeIncomingCandidateOutputs(incoming, ambiguousIncoming),
+        },
       }],
     });
   }
 
-  const pairByIncomingId = new Map(partial.certainPairs.map((pair) => [pair.b.node.id, pair] as const));
-  const placements = planAddedPlacements(newGraph, partial.unmatchedIncoming, pairByIncomingId, conflicts);
-  detectPortBoundaryChanges(changes, conflicts);
-  detectSharedModuleDivergence(oldGraph.nodes, newGraph, changes, partial.certainPairs, conflicts);
-  const projectedLayout = projectLayoutToExistingModules(existing, incoming, partial.certainPairs, placements, warnings);
+  const pairByIncomingId = new Map(correspondencePairs.map((pair) => [pair.b.node.id, pair] as const));
+  const occupiedLuaNames = existing.documents.flatMap((document) => Object.keys(document.scripts)).flatMap((path) => {
+    const match = /^scripts\/([^/]+)\.lua$/u.exec(path);
+    return match ? [match[1]!] : [];
+  });
+  const placements = planAddedPlacements(oldGraph.nodes, occupiedLuaNames, newGraph, unmatchedIncoming, pairByIncomingId, conflicts);
+  applyAddedPlacementRefs(changes, placements, newGraph, correspondencePairs);
+  detectPortBoundaryChanges(existing, changes, conflicts);
+  detectSharedModuleDivergence(oldGraph.nodes, newGraph, changes, correspondencePairs, conflicts);
+  const projectedLayout = projectLayoutToExistingModules(existing, incoming, correspondencePairs, placements, warnings);
 
   const project = {
     ...incoming.project,
@@ -103,13 +136,14 @@ export function buildSynchronizationPlan(
       ? { ...existing.projectSource.project.submodule }
       : incoming.project.submodule,
   };
-  const lua = planLua(existing.documents, incoming.entryDocument);
+  const luaProjection = projectLuaIdentity(existing, incoming, correspondencePairs, placements);
+  const lua = planLua(existing.documents, luaProjection.scripts);
   let sourceEdits: SynchronizationPlan["sourceEdits"] = [];
   let layouts: SynchronizationLayoutUpdate[] = [];
 
   if (conflicts.length === 0) {
-    sourceEdits = buildSourceEdits(existing, incomingModule, newGraph, partial.certainPairs, changes, placements);
-    layouts = buildLayoutUpdates(existing.documents, partial.certainPairs, placements, projectedLayout);
+    sourceEdits = buildSourceEdits(existing, luaProjection.module, newGraph, correspondencePairs, changes, placements);
+    layouts = buildLayoutUpdates(existing.documents, correspondencePairs, placements, projectedLayout);
   }
 
   return {
@@ -185,11 +219,24 @@ function classifyChanges(
 ): SynchronizationChange[] {
   const changes: SynchronizationChange[] = [];
   const incomingIdByExistingId = new Map(pairs.map((pair) => [pair.a.node.id, pair.b.node.id] as const));
+  const existingDisplayIds = new Map(existing.nodes.map((node) => [node.node.id, nodeRef(node).instanceId ?? node.node.id] as const));
+  const incomingDisplayIds = new Map(incoming.nodes.map((node) => {
+    const pair = pairs.find((candidate) => candidate.b.node.id === node.node.id);
+    return [node.node.id, pair ? nodeRef(pair.a).instanceId ?? pair.a.node.id : node.node.id] as const;
+  }));
   for (const node of removed) {
-    changes.push({ kind: "removed", existing: nodeRef(node) });
+    changes.push({
+      kind: "removed",
+      existing: nodeRef(node),
+      connections: { before: connectionSnapshot(existing, node.node.id, existingDisplayIds), after: [] },
+    });
   }
   for (const node of added) {
-    changes.push({ kind: "added", incoming: nodeRef(node) });
+    changes.push({
+      kind: "added",
+      incoming: nodeRef(node),
+      connections: { before: [], after: connectionSnapshot(incoming, node.node.id, incomingDisplayIds) },
+    });
   }
   for (const pair of pairs) {
     const propertyChanges = compareProperties(pair.a.attributes, pair.b.attributes);
@@ -197,10 +244,34 @@ function classifyChanges(
       changes.push({ kind: "updated", existing: nodeRef(pair.a), incoming: nodeRef(pair.b), propertyChanges });
     }
     if (incidentSignature(existing.links, pair.a.node.id, incomingIdByExistingId) !== incidentSignature(incoming.links, pair.b.node.id)) {
-      changes.push({ kind: "rewired", existing: nodeRef(pair.a), incoming: nodeRef(pair.b) });
+      changes.push({
+        kind: "rewired",
+        existing: nodeRef(pair.a),
+        incoming: nodeRef(pair.b),
+        connections: {
+          before: connectionSnapshot(existing, pair.a.node.id, existingDisplayIds),
+          after: connectionSnapshot(incoming, pair.b.node.id, incomingDisplayIds),
+        },
+      });
     }
   }
   return changes;
+}
+
+function connectionSnapshot(
+  graph: ComparableModuleGraph,
+  nodeId: string,
+  displayIds: Map<string, string>,
+): string[] {
+  return graph.links.flatMap((link) => {
+    if (link.from.nodeId === nodeId) {
+      return [`out ${link.from.portKey} -> ${displayIds.get(link.to.nodeId) ?? link.to.nodeId}.${link.to.portKey}`];
+    }
+    if (link.to.nodeId === nodeId) {
+      return [`in ${link.to.portKey} <- ${displayIds.get(link.from.nodeId) ?? link.from.nodeId}.${link.from.portKey}`];
+    }
+    return [];
+  }).sort();
 }
 
 function compareProperties(
@@ -209,11 +280,123 @@ function compareProperties(
 ): Record<string, { before?: IrScalarValue; after?: IrScalarValue }> {
   const result: Record<string, { before?: IrScalarValue; after?: IrScalarValue }> = {};
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    // The importer derives this path from its temporary instance id. Matched Lua nodes retain the
+    // existing sidecar identity; the path is projected separately by `projectLuaIdentity`.
+    if (key === "script_ref") continue;
     if (before[key] !== after[key]) {
       result[key] = { before: before[key], after: after[key] };
     }
   }
   return result;
+}
+
+function correspondenceAmbiguityChangesOutput(
+  incoming: StormworksProjectSource,
+  groups: Array<{ existing: ComparableNode[]; incoming: ComparableNode[] }>,
+): boolean {
+  const incomingPositions = new Map(
+    incoming.entryDocument.swMcl?.instances.map((instance) => [instance.id, instance.position] as const) ?? [],
+  );
+  const statementById = new Map(
+    selectIncomingModule(incoming).statements.map((statement) => [statement.instanceId, statement] as const),
+  );
+  const payload = (node: ComparableNode): string => {
+    const statement = statementById.get(node.node.id);
+    const scriptRef = statement?.kind === "inst" ? getScriptRef(statement) : undefined;
+    return JSON.stringify({
+      definitionId: node.node.definitionId,
+      attributes: Object.fromEntries(Object.entries(node.attributes).filter(([key]) => key !== "script_ref")),
+      literalInputs: node.literalInputs,
+      position: incomingPositions.get(node.node.id),
+      script: scriptRef ? incoming.entryDocument.scripts[scriptRef] : undefined,
+    });
+  };
+
+  // Different existing locations alone do not make the result ambiguous. If every incoming payload
+  // within one independently interchangeable group is identical, each candidate location receives
+  // the same source/layout/Lua content regardless of which representative isomorphism was chosen.
+  return groups.some((group) => group.existing.length > 0 && new Set(group.incoming.map(payload)).size > 1);
+}
+
+function partialCorrespondenceOutputsDiffer(
+  incoming: StormworksProjectSource,
+  existingGraph: ComparableModuleGraph,
+  incomingGraph: ComparableModuleGraph,
+  correspondences: MatchedNodePair[][],
+): boolean {
+  const positions = new Map(
+    incoming.entryDocument.swMcl?.instances.map((instance) => [instance.id, instance.position] as const) ?? [],
+  );
+  const statements = new Map(selectIncomingModule(incoming).statements.map((statement) => [statement.instanceId, statement] as const));
+  const payload = (node: ComparableNode): object => {
+    const statement = statements.get(node.node.id);
+    const scriptRef = statement?.kind === "inst" ? getScriptRef(statement) : undefined;
+    return {
+      definitionId: node.node.definitionId,
+      attributes: Object.fromEntries(Object.entries(node.attributes).filter(([key]) => key !== "script_ref").sort(([a], [b]) => a.localeCompare(b))),
+      literalInputs: Object.fromEntries(Object.entries(node.literalInputs).sort(([a], [b]) => a.localeCompare(b))),
+      position: positions.get(node.node.id),
+      script: scriptRef ? incoming.entryDocument.scripts[scriptRef] : undefined,
+    };
+  };
+  const fingerprints = correspondences.map((pairs) => {
+    const pairByExistingId = new Map(pairs.map((pair) => [pair.a.node.id, pair] as const));
+    const existingIdByIncomingId = new Map(pairs.map((pair) => [pair.b.node.id, pair.a.node.id] as const));
+    const matchedIncomingIds = new Set(existingIdByIncomingId.keys());
+    const existingProjection = existingGraph.nodes.slice().sort((a, b) => a.node.id.localeCompare(b.node.id)).map((node) => {
+      const pair = pairByExistingId.get(node.node.id);
+      return pair
+        ? [node.node.id, payload(pair.b), incidentSignature(incomingGraph.links, pair.b.node.id, existingIdByIncomingId)]
+        : [node.node.id, "removed"];
+    });
+    const additions = incomingGraph.nodes.filter((node) => !matchedIncomingIds.has(node.node.id))
+      .sort((a, b) => a.node.id.localeCompare(b.node.id))
+      .map((node) => [node.node.id, payload(node), incidentSignature(incomingGraph.links, node.node.id, existingIdByIncomingId)]);
+    return JSON.stringify({ existingProjection, additions });
+  });
+  return new Set(fingerprints).size > 1;
+}
+
+function describeIncomingCandidateOutputs(
+  incoming: StormworksProjectSource,
+  nodes: ComparableNode[],
+): string[] {
+  const positions = new Map(
+    incoming.entryDocument.swMcl?.instances.map((instance) => [instance.id, instance.position] as const) ?? [],
+  );
+  const statements = new Map(selectIncomingModule(incoming).statements.map((statement) => [statement.instanceId, statement] as const));
+  return nodes.map((node) => {
+    const statement = statements.get(node.node.id);
+    const scriptRef = statement?.kind === "inst" ? getScriptRef(statement) : undefined;
+    const position = positions.get(node.node.id);
+    const properties = Object.fromEntries(Object.entries(node.attributes).filter(([key]) => key !== "script_ref"));
+    return [
+      `${node.node.id}: properties=${JSON.stringify(properties)}`,
+      `position=${position ? `(${position.x}, ${position.y})` : "unchanged/absent"}`,
+      `lua=${scriptRef ? `${scriptRef} (${incoming.entryDocument.scripts[scriptRef] === undefined ? "body missing" : "body present; content omitted"})` : "none"}`,
+    ].join(", ");
+  });
+}
+
+function describeExistingCandidateOutputs(
+  existing: ResolvedStormworksProjectSource,
+  nodes: ComparableNode[],
+): string[] {
+  const documentById = new Map(existing.documents.map((document) => [document.documentId, document] as const));
+  return nodes.map((node) => {
+    const ref = nodeRef(node);
+    const document = ref.documentPath ? documentById.get(ref.documentPath) : undefined;
+    const statement = document?.swNet.modules.find((module) => module.id === ref.moduleId)?.statements
+      .find((candidate) => candidate.instanceId === ref.instanceId);
+    const scriptRef = statement?.kind === "inst" ? getScriptRef(statement) : undefined;
+    const position = document?.swMcl?.instances.find((instance) => instance.id === ref.instanceId)?.position;
+    const properties = Object.fromEntries(Object.entries(node.attributes).filter(([key]) => key !== "script_ref"));
+    return [
+      `${formatNodeRefLocation(ref)}: properties=${JSON.stringify(properties)}`,
+      `position=${position ? `(${position.x}, ${position.y})` : "unchanged/absent"}`,
+      `lua=${scriptRef ? `${ref.documentPath ?? "?"}::${scriptRef} (${document?.scripts[scriptRef] === undefined ? "body missing" : "body present; content omitted"})` : "none"}`,
+    ].join(", ");
+  });
 }
 
 function incidentSignature(links: IrLink[], nodeId: string, mappedIds?: Map<string, string>): string {
@@ -230,14 +413,52 @@ function incidentSignature(links: IrLink[], nodeId: string, mappedIds?: Map<stri
 
 interface AddedPlacement { node: ComparableNode; documentPath: string; moduleId: string; usePath: string[]; instanceId: string }
 
+function applyAddedPlacementRefs(
+  changes: SynchronizationChange[],
+  placements: AddedPlacement[],
+  incoming: ComparableModuleGraph,
+  pairs: MatchedNodePair[],
+): void {
+  const placementByNodeId = new Map(placements.map((placement) => [placement.node.node.id, placement] as const));
+  const pairByIncomingId = new Map(pairs.map((pair) => [pair.b.node.id, pair] as const));
+  const displayIds = new Map(incoming.nodes.map((node) => {
+    const placement = placementByNodeId.get(node.node.id);
+    const pair = pairByIncomingId.get(node.node.id);
+    return [node.node.id, placement?.instanceId ?? (pair ? nodeRef(pair.a).instanceId : undefined) ?? node.node.id] as const;
+  }));
+  for (const change of changes) {
+    if (!change.incoming) continue;
+    if (change.kind === "added") {
+      const placement = placementByNodeId.get(change.incoming.nodeId);
+      if (placement) {
+        change.incoming = {
+          ...change.incoming,
+          documentPath: placement.documentPath,
+          moduleId: placement.moduleId,
+          instanceId: placement.instanceId,
+          usePath: placement.usePath,
+        };
+      }
+    }
+    if (change.connections) {
+      change.connections.after = connectionSnapshot(incoming, change.incoming.nodeId, displayIds);
+    }
+  }
+}
+
 function planAddedPlacements(
+  existingNodes: ComparableNode[],
+  occupiedLuaNames: string[],
   incoming: ComparableModuleGraph,
   added: ComparableNode[],
   pairByIncomingId: Map<string, MatchedNodePair>,
   conflicts: SynchronizationConflict[],
 ): AddedPlacement[] {
   const placements: AddedPlacement[] = [];
-  const occupied = new Set([...pairByIncomingId.values()].map((pair) => pair.a.provenance?.instanceIds.at(-1)).filter((id): id is string => Boolean(id)));
+  const occupied = new Set([
+    ...existingNodes.map((node) => node.provenance?.instanceIds.at(-1)).filter((id): id is string => Boolean(id)),
+    ...occupiedLuaNames,
+  ]);
   for (const node of added.filter((item) => !item.port)) {
     const neighbors = incoming.links.flatMap((link) => link.from.nodeId === node.node.id ? [link.to.nodeId] : link.to.nodeId === node.node.id ? [link.from.nodeId] : []);
     const contexts = new Map<string, { provenance: ProvenancePath; documentPath: string }>();
@@ -273,20 +494,55 @@ function planAddedPlacements(
   return placements;
 }
 
-function detectPortBoundaryChanges(changes: SynchronizationChange[], conflicts: SynchronizationConflict[]): void {
+function detectPortBoundaryChanges(
+  existing: ResolvedStormworksProjectSource,
+  changes: SynchronizationChange[],
+  conflicts: SynchronizationConflict[],
+): void {
   const ports = changes.filter((change) => (change.existing?.nodeId ?? change.incoming?.nodeId)?.startsWith("port:"));
   if (ports.length === 0) return;
   const impacts = ports.map((change) => ({ moduleId: change.existing?.moduleId, instanceId: change.existing?.instanceId ?? change.incoming?.instanceId }));
+  const portDetails = ports.flatMap((change) => [change.existing, change.incoming].flatMap((ref) => ref?.port ? [
+    `${ref.port.direction} ${JSON.stringify(ref.port.name)} : ${ref.port.signal} occurrence=${ref.port.occurrence} at ${formatNodeRefLocation(ref)}`,
+  ] : []));
+  const pinAssignments = ports.flatMap((change) => {
+    const before = change.connections?.before ?? [];
+    const after = change.connections?.after ?? [];
+    const ref = change.existing ?? change.incoming;
+    const location = ref ? formatNodeRefLocation(ref) : "unknown port";
+    return [
+      ...(before.length > 0 ? before.map((binding) => `${location} before: ${binding}`) : [`${location} before: unbound`]),
+      ...(after.length > 0 ? after.map((binding) => `${location} after: ${binding}`) : [`${location} after: unbound`]),
+    ];
+  });
+  const affectedModuleKeys = new Set(ports.flatMap((change) => [change.existing, change.incoming].flatMap((ref) =>
+    ref?.documentPath && ref.moduleId ? [`${ref.documentPath}\0${ref.moduleId}`] : [],
+  )));
+  const useBindings = existing.swNet.uses.filter((use) =>
+    affectedModuleKeys.has(`${use.target.documentPath}\0${use.target.moduleId}`),
+  ).map((use) =>
+    `${use.caller.documentPath}::${use.caller.moduleId}: ${serializeSwNetStatement(use.statement)}`,
+  );
   conflicts.push({
     kind: "module-boundary",
     reason: "Project or module ports changed and require explicit module-boundary edits.",
     impacts,
     suggestions: [
-      { kind: "add-module-port", description: "Add or remove the affected module port declarations.", impacts },
-      { kind: "add-pin-assignment", description: "Update internal pin assignments for the changed ports.", impacts },
-      { kind: "add-use-binding", description: "Update every affected use binding.", impacts },
+      {
+        kind: "add-module-port",
+        description: "Add or remove the affected module port declarations.",
+        impacts,
+        details: { affectedPorts: portDetails },
+      },
+      { kind: "add-pin-assignment", description: "Update internal pin assignments for the changed ports.", impacts, details: { pinAssignments } },
+      { kind: "add-use-binding", description: "Update every affected use binding.", impacts, details: { useBindings: useBindings.length > 0 ? useBindings : ["entry module surface (no enclosing use)"] } },
     ],
   });
+}
+
+function formatNodeRefLocation(ref: SynchronizationNodeRef): string {
+  return [ref.documentPath, ref.moduleId, ...(ref.usePath ?? []), ref.instanceId]
+    .filter((value): value is string => Boolean(value)).join("::") || ref.nodeId;
 }
 
 function detectSharedModuleDivergence(
@@ -319,17 +575,34 @@ function detectSharedModuleDivergence(
     }));
     if (signatures.size > 1) {
       const impacts = group.map(impactFromNode);
+      const changedUses = group.filter((node) => changes.some((change) => change.existing?.nodeId === node.node.id)).map((node) => formatImpactDetail(impactFromNode(node)));
+      const unchangedUses = group.filter((node) => !changes.some((change) => change.existing?.nodeId === node.node.id)).map((node) => formatImpactDetail(impactFromNode(node)));
       conflicts.push({
         kind: "shared-module-divergence",
         reason: "Different expansions of one shared module require different local changes.",
         impacts,
         suggestions: [
-          { kind: "duplicate-module", description: "Duplicate the module for the use sites that diverge, then apply the local change there.", impacts },
-          { kind: "update-shared-module", description: "Apply one common change to every use of the shared module.", impacts },
+          {
+            kind: "duplicate-module",
+            description: "Duplicate the module for the use sites that diverge, then apply the local change there.",
+            impacts,
+            details: { changedUses, unchangedUses },
+          },
+          {
+            kind: "update-shared-module",
+            description: "Apply one common change to every use of the shared module.",
+            impacts,
+            details: { changedUses, unchangedUses },
+          },
         ],
       });
     }
   }
+}
+
+function formatImpactDetail(impact: SynchronizationImpact): string {
+  return [impact.documentPath, impact.moduleId, ...(impact.usePath ?? []), impact.instanceId]
+    .filter((value): value is string => Boolean(value)).join("::") || "?";
 }
 
 function structuralIncidentSignature(graph: ComparableModuleGraph, node: ComparableNode): string {
@@ -605,15 +878,106 @@ function updateLayoutInstance(
   updates.set(documentPath, cloned);
 }
 
-function planLua(documents: StormworksSourceDocument[], incoming: StormworksSourceDocument): SynchronizationPlan["lua"] {
-  const existingScripts = Object.assign({}, ...documents.map((document) => document.scripts));
-  const create: Record<string, string> = {};
-  const update: Record<string, string> = {};
-  for (const [path, text] of Object.entries(incoming.scripts)) {
-    if (!(path in existingScripts)) create[path] = text;
-    else if (existingScripts[path] !== text) update[path] = text;
+interface LuaIdentityProjection {
+  module: SwNetModule;
+  scripts: Array<{ documentPath: string; path: string; text: string }>;
+}
+
+function projectLuaIdentity(
+  existing: ResolvedStormworksProjectSource,
+  incoming: StormworksProjectSource,
+  pairs: MatchedNodePair[],
+  placements: AddedPlacement[],
+): LuaIdentityProjection {
+  const incomingModule = selectIncomingModule(incoming);
+  const targetByIncomingId = new Map<string, { documentPath: string; path: string }>();
+  const targetsByIncomingPath = new Map<string, Map<string, { documentPath: string; path: string }>>();
+  const existingDocumentByPath = new Map(existing.documents.map((document) => [document.documentId, document] as const));
+  const incomingStatementById = new Map(incomingModule.statements.map((statement) => [statement.instanceId, statement] as const));
+
+  for (const pair of pairs) {
+    const incomingStatement = incomingStatementById.get(pair.b.node.id);
+    const incomingPath = incomingStatement?.kind === "inst" ? getScriptRef(incomingStatement) : undefined;
+    const provenance = pair.a.provenance;
+    const documentPath = pair.a.node.source?.path;
+    if (!incomingPath || !provenance || !documentPath) continue;
+    const existingStatement = existingDocumentByPath.get(documentPath)?.swNet.modules
+      .find((module) => module.id === provenance.moduleId)?.statements
+      .find((statement) => statement.instanceId === provenance.instanceIds.at(-1));
+    const existingPath = existingStatement?.kind === "inst" ? getScriptRef(existingStatement) : undefined;
+    if (existingPath) {
+      const target = { documentPath, path: existingPath };
+      targetByIncomingId.set(pair.b.node.id, target);
+      const targets = targetsByIncomingPath.get(incomingPath) ?? new Map<string, typeof target>();
+      targets.set(`${documentPath}\0${existingPath}`, target);
+      targetsByIncomingPath.set(incomingPath, targets);
+    }
   }
-  return { create, update, remove: Object.keys(existingScripts).filter((path) => !(path in incoming.scripts)).sort() };
+  for (const placement of placements) {
+    const statement = incomingStatementById.get(placement.node.node.id);
+    const incomingPath = statement?.kind === "inst" ? getScriptRef(statement) : undefined;
+    if (incomingPath) {
+      const target = { documentPath: placement.documentPath, path: `scripts/${placement.instanceId}.lua` };
+      targetByIncomingId.set(placement.node.node.id, target);
+      const targets = targetsByIncomingPath.get(incomingPath) ?? new Map<string, typeof target>();
+      targets.set(`${target.documentPath}\0${target.path}`, target);
+      targetsByIncomingPath.set(incomingPath, targets);
+    }
+  }
+
+  const rewriteAttributes = (statement: SwNetStatement): SwNetStatement => {
+    if (statement.kind !== "inst") return statement;
+    const target = targetByIncomingId.get(statement.instanceId);
+    return {
+      ...statement,
+      attributes: statement.attributes.map((attribute) =>
+        target && attribute.key === "script_ref" && attribute.value.kind === "string"
+          ? { ...attribute, value: { ...attribute.value, value: target.path } }
+          : attribute,
+      ),
+    };
+  };
+  const module: SwNetModule = {
+    ...incomingModule,
+    statements: incomingModule.statements.map(rewriteAttributes),
+  };
+  const scripts = new Map<string, { documentPath: string; path: string; text: string }>();
+  for (const [path, text] of Object.entries(incoming.entryDocument.scripts)) {
+    const targets = targetsByIncomingPath.get(path);
+    if (targets && targets.size > 0) {
+      for (const target of targets.values()) scripts.set(`${target.documentPath}\0${target.path}`, { ...target, text });
+    } else {
+      const documentPath = incoming.entryDocument.documentId;
+      scripts.set(`${documentPath}\0${path}`, { documentPath, path, text });
+    }
+  }
+  return { module, scripts: [...scripts.values()] };
+}
+
+function getScriptRef(statement: Extract<SwNetStatement, { kind: "inst" }>): string | undefined {
+  const value = statement.attributes.find((attribute) => attribute.key === "script_ref")?.value;
+  return value?.kind === "string" ? value.value : undefined;
+}
+
+function planLua(
+  documents: StormworksSourceDocument[],
+  incomingScripts: Array<{ documentPath: string; path: string; text: string }>,
+): SynchronizationPlan["lua"] {
+  const existingScripts = new Map(documents.flatMap((document) => Object.entries(document.scripts).map(([path, text]) => [
+    `${document.documentId}\0${path}`,
+    { documentPath: document.documentId, path, text },
+  ] as const)));
+  const incomingByKey = new Map(incomingScripts.map((script) => [`${script.documentPath}\0${script.path}`, script] as const));
+  const create = incomingScripts.filter((script) => !existingScripts.has(`${script.documentPath}\0${script.path}`));
+  const update = incomingScripts.filter((script) => {
+    const existing = existingScripts.get(`${script.documentPath}\0${script.path}`);
+    return existing !== undefined && existing.text !== script.text;
+  });
+  const remove = [...existingScripts].filter(([key]) => !incomingByKey.has(key)).map(([, script]) => ({
+    documentPath: script.documentPath,
+    path: script.path,
+  })).sort((left, right) => left.documentPath.localeCompare(right.documentPath) || left.path.localeCompare(right.path));
+  return { create, update, remove };
 }
 
 function nodeRef(node: ComparableNode): SynchronizationNodeRef {
@@ -624,6 +988,7 @@ function nodeRef(node: ComparableNode): SynchronizationNodeRef {
     moduleId: node.provenance?.moduleId,
     instanceId: node.provenance?.instanceIds.at(-1) ?? node.node.id,
     usePath: node.provenance?.instanceIds.slice(0, -1),
+    port: node.port ? { ...node.port } : undefined,
   };
 }
 
