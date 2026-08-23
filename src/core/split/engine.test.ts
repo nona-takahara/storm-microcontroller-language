@@ -260,4 +260,31 @@ describe("buildSplitModulePlan", () => {
     expect(statementsById.get("reader1")!.inputs).toEqual([{ key: "a", value: { kind: "string", value: "x" } }]);
     expect(statementsById.get("reader2")!.inputs).toEqual([{ key: "a", value: { kind: "string", value: "x_2" } }]);
   });
+
+  it("quotes replacement use bindings when boundary port names contain spaces", () => {
+    const source = parseSwNetSourceDocument([
+      "module main",
+      '  port in "Ext In" : number',
+      '  port out "Ext Out" : number',
+      '  inst ABS gate_in : a="Ext In" -> out=gate_in_out',
+      '  inst ABS gate_out : a=gate_in_out -> out="Ext Out"',
+      "end",
+      "",
+    ].join("\n"));
+
+    const result = buildSplitModulePlan({
+      definitions,
+      source,
+      moduleId: "main",
+      gateInstanceIds: ["gate_in", "gate_out"],
+      newModuleId: "extracted",
+      newInstanceId: "extracted",
+      newImportAlias: "extracted",
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    const rewritten = applySwNetTextEdits(source.text, result.value!.sourceEdits);
+    expect(rewritten).toContain('use extracted.extracted extracted : "Ext In"="Ext In" -> "Ext Out"="Ext Out"');
+    expect(() => parseSwNetDocument(rewritten)).not.toThrow();
+  });
 });

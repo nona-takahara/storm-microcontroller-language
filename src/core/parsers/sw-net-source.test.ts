@@ -42,6 +42,18 @@ describe("parseSwNetSourceDocument", () => {
 });
 
 describe("sw-net text edits", () => {
+  it("round-trips quoted assignment keys used by human-readable module ports", () => {
+    const statement = parseSwNetDocument(
+      'module main\n  use child nested : "Ext In"="source" -> "Ext Out"="sink"\nend\n',
+    ).modules[0]!.statements[0]!;
+
+    expect(statement.inputs).toEqual([{ key: "Ext In", value: { kind: "string", value: "source" } }]);
+    expect(statement.outputs).toEqual([{ key: "Ext Out", value: { kind: "string", value: "sink" } }]);
+    expect(serializeSwNetStatement(statement)).toBe(
+      'use child nested : "Ext In"="source" -> "Ext Out"="sink"',
+    );
+  });
+
   it("rejects overlapping and out-of-range edits", () => {
     expect(() =>
       applySwNetTextEdits("abcdef", [

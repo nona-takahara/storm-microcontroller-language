@@ -96,7 +96,17 @@ function serializePinAssignments(inputs: SwNetAssignment[], outputs: SwNetAssign
 
 // Serialize a comma-separated assignment list.
 function serializeAssignments(assignments: SwNetAssignment[]): string {
-  return assignments.map((assignment) => `${assignment.key}=${serializeExpression(assignment.value)}`).join(", ");
+  return assignments
+    .map((assignment) => `${formatAssignmentKey(assignment.key)}=${serializeExpression(assignment.value)}`)
+    .join(", ");
+}
+
+// Keep conventional gate-pin keys compact, but quote module-port names that are not identifier
+// tokens. `true`, `false`, and `null` are lexer literals rather than identifiers as well.
+function formatAssignmentKey(key: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/u.test(key) && key !== "true" && key !== "false" && key !== "null"
+    ? key
+    : JSON.stringify(key);
 }
 
 // Serialize one sw-net expression back to source text.
