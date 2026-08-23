@@ -1,5 +1,9 @@
 import { comparableNodeKind } from "../compare/fingerprint.js";
-import { functionExpression } from "../compare/correspondence-evidence.js";
+import {
+  ordinaryAttributeEvidenceKeys,
+  STRONG_CORRESPONDENCE_EVIDENCE_KEYS,
+  strongCorrespondenceEvidenceValue,
+} from "../compare/correspondence-evidence.js";
 import { incidentKeys, mappedIncidentKeys } from "../compare/structural-correspondence.js";
 import {
   type ComparableModuleGraph,
@@ -256,78 +260,42 @@ function propagateCertainPairs(
         break;
       }
 
-      // A function's expression is authored behavior, not a cosmetic label or a routine tunable.
-      // When it uniquely identifies one structurally eligible function, propagate it before `n` so
-      // label edits cannot move an expression (and its layout) to another same-kind function.
-      const expression = functionExpression(nodeA);
-      if (expression !== undefined) {
-        const expressionChoices = choices.filter((nodeB) => functionExpression(nodeB) === expression);
-        const unusedExpressionCandidates = (candidates.get(nodeA) ?? []).filter(
-          (nodeB) => !incomingIds.has(nodeB.node.id) && functionExpression(nodeB) === expression,
+      // Strong authored evidence is propagated in the shared policy's priority order. The full
+      // candidate-list check prevents a temporary adjacency narrowing from manufacturing certainty.
+      let strongCandidate: ComparableNode | undefined;
+      for (const evidenceKey of STRONG_CORRESPONDENCE_EVIDENCE_KEYS) {
+        const value = strongCorrespondenceEvidenceValue(nodeA, evidenceKey);
+        if (value === undefined) continue;
+        const evidenceChoices = choices.filter(
+          (nodeB) => strongCorrespondenceEvidenceValue(nodeB, evidenceKey) === value,
         );
-        const isOnlyExpressionClaimant =
-          expressionChoices.length === 1 &&
-          unusedExpressionCandidates.length === 1 &&
+        const unusedEvidenceCandidates = (candidates.get(nodeA) ?? []).filter(
+          (nodeB) => !incomingIds.has(nodeB.node.id) && strongCorrespondenceEvidenceValue(nodeB, evidenceKey) === value,
+        );
+        const isOnlyEvidenceClaimant =
+          evidenceChoices.length === 1 &&
+          unusedEvidenceCandidates.length === 1 &&
           existing.nodes.filter((other) =>
             !existingIds.has(other.node.id) &&
-            functionExpression(other) === expression &&
-            (candidates.get(other) ?? []).some((candidate) => candidate.node.id === expressionChoices[0]!.node.id),
+            strongCorrespondenceEvidenceValue(other, evidenceKey) === value &&
+            (candidates.get(other) ?? []).some((candidate) => candidate.node.id === evidenceChoices[0]!.node.id),
           ).length === 1;
-        if (isOnlyExpressionClaimant) {
-          pairs.push({ a: nodeA, b: expressionChoices[0]! });
-          existingIds.add(nodeA.node.id);
-          incomingIds.add(expressionChoices[0]!.node.id);
-          changed = true;
+        if (isOnlyEvidenceClaimant) {
+          strongCandidate = evidenceChoices[0]!;
           break;
         }
       }
-
-      // A cheap, linear-time counterpart to the structural-only rule above: when this node's `n`
-      // display label picks out exactly one of its remaining structurally-valid candidates, and no
-      // other remaining node sharing that same label could also validly claim that candidate, the
-      // label alone is decisive. Without this, a cluster of same-kind nodes disambiguated only by
-      // distinct labels (issue #71's actual shape) falls entirely to the exponential backtracking
-      // search below and can exhaust its step budget well before a realistic cluster size.
-      const label = nameLabel(nodeA);
-      if (label !== undefined) {
-        const labelChoices = choices.filter((nodeB) => nameLabel(nodeB) === label);
-        // `choices` is already narrowed by adjacency compatibility against pairs forced so far, and
-        // that narrowing is deliberately lenient (a missing edge on either side does not disqualify a
-        // candidate, see `hasCompatibleCertainAdjacency`). So a single label match in `choices` alone
-        // is not proof of uniqueness -- it could just be that adjacency happened to rule the other
-        // same-label incoming node out at this point in the fixed-point loop. Require the label to
-        // also pick out exactly one candidate in nodeA's full (adjacency-unfiltered) candidate list.
-        const unusedLabelCandidates = (candidates.get(nodeA) ?? []).filter(
-          (nodeB) => !incomingIds.has(nodeB.node.id) && nameLabel(nodeB) === label,
-        );
-        const isOnlyLabelClaimant =
-          labelChoices.length === 1 &&
-          unusedLabelCandidates.length === 1 &&
-          existing.nodes.filter(
-            (other) =>
-              !existingIds.has(other.node.id) &&
-              nameLabel(other) === label &&
-              (candidates.get(other) ?? []).some((candidate) => candidate.node.id === labelChoices[0]!.node.id),
-          ).length === 1;
-
-        if (isOnlyLabelClaimant) {
-          pairs.push({ a: nodeA, b: labelChoices[0]! });
-          existingIds.add(nodeA.node.id);
-          incomingIds.add(labelChoices[0]!.node.id);
-          changed = true;
-          break;
-        }
+      if (strongCandidate) {
+        pairs.push({ a: nodeA, b: strongCandidate });
+        existingIds.add(nodeA.node.id);
+        incomingIds.add(strongCandidate.node.id);
+        changed = true;
+        break;
       }
     }
   }
 
   return { pairs, existingIds };
-}
-
-/** The Stormworks in-game custom display name, when the DSL/XML source set a non-empty one. */
-function nameLabel(node: ComparableNode): string | undefined {
-  const value = node.attributes.n;
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function hasCompatibleCertainAdjacency(
@@ -395,7 +363,7 @@ function linkKey(link: ComparableModuleGraph["links"][number]): string {
  *  3. matching function expressions (authored behavior and the strongest property evidence);
  *  4. matching `n` display-label attributes;
  *  5. matching ordinary property/literal-input values, counted per key. A mismatch never excludes
- *     a candidate; unstable or correspondence-derived keys are excluded by `propertyEvidenceKeys`.
+ *     a candidate; strong and correspondence-derived keys are excluded by the shared policy.
  */
 type CorrespondenceScore = [number, number, number, number, number];
 
@@ -404,32 +372,32 @@ function compareScore(left: CorrespondenceScore, right: CorrespondenceScore): nu
 }
 
 function countExpressionMatches(pairs: MatchedNodePair[]): number {
-  return pairs.filter((pair) => {
-    const expression = functionExpression(pair.a);
-    return expression !== undefined && expression === functionExpression(pair.b);
-  }).length;
+  return countStrongEvidenceMatches(pairs, "expression");
 }
 
 /** Count pairs whose `n` (display-label) attribute is present on both sides and equal. */
 function countNameMatches(pairs: MatchedNodePair[]): number {
-  return pairs.filter((pair) => attributesEqual(pair.a.attributes.n, pair.b.attributes.n)).length;
+  return countStrongEvidenceMatches(pairs, "n");
+}
+
+function countStrongEvidenceMatches(
+  pairs: MatchedNodePair[],
+  key: (typeof STRONG_CORRESPONDENCE_EVIDENCE_KEYS)[number],
+): number {
+  return pairs.filter((pair) => {
+    const value = strongCorrespondenceEvidenceValue(pair.a, key);
+    return value !== undefined && value === strongCorrespondenceEvidenceValue(pair.b, key);
+  }).length;
 }
 
 function countPropertyKeyMatches(pairs: MatchedNodePair[]): number {
   return pairs.reduce((count, pair) => {
-    const attributeKeys = new Set([...propertyEvidenceKeys(pair.a.attributes), ...propertyEvidenceKeys(pair.b.attributes)]);
+    const attributeKeys = new Set([...ordinaryAttributeEvidenceKeys(pair.a), ...ordinaryAttributeEvidenceKeys(pair.b)]);
     const literalKeys = new Set([...Object.keys(pair.a.literalInputs), ...Object.keys(pair.b.literalInputs)]);
     return count +
       [...attributeKeys].filter((key) => attributesEqual(pair.a.attributes[key], pair.b.attributes[key])).length +
       [...literalKeys].filter((key) => attributesEqual(pair.a.literalInputs[key], pair.b.literalInputs[key])).length;
   }, 0);
-}
-
-function propertyEvidenceKeys(attributes: ComparableNode["attributes"]): string[] {
-  // `n` is the stronger display-label tier above. `script_ref` is derived from the temporary XML
-  // instance id and is projected from the chosen correspondence, so using it as evidence would make
-  // a generated name circularly decide its own identity.
-  return Object.keys(attributes).filter((key) => key !== "n" && key !== "script_ref" && key !== "expression");
 }
 
 function attributesEqual(left: IrScalarValue | undefined, right: IrScalarValue | undefined): boolean {
