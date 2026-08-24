@@ -28,6 +28,8 @@
     "cli": "node --import tsx ./src/cli/main.ts",
     "mcp": "node --import tsx ./src/mcp/server.ts",
     "test": "vitest run --config vitest.config.ts",
+    "test:smoke": "vitest run --config vitest.config.ts src/smoke",
+    "test:area": "vitest run --config vitest.config.ts",
     "prepack": "npm run build"
   },
   "keywords": [

@@ -1,27 +1,17 @@
 # AGENTS.md
 
-Guidance for AI agents working directly with the user in this repository. This is the canonical repository instruction file; tool-specific instruction files should import it rather than duplicate it.
-
-## Working with the user
-
-- Treat the user as the decision-maker and collaborate with them directly. Do not assume a Claude-to-Codex role split, an external orchestrator, or a `codex exec` handoff workflow.
-- For implementation requests, inspect the relevant code, make reasonable in-scope decisions, implement, validate, and report the result. Ask the user when a missing choice would materially change the outcome or expand the requested scope.
-- For investigation, design, review, or planning requests, keep implementation separate unless the user also asks for changes. Share intermediate findings when they help the user steer an important decision.
-- Preserve unrelated user changes in the working tree. Do not commit, push, open a pull request, or otherwise publish changes unless the user explicitly asks.
-
-## Environment
-
-- This repository's Node/pnpm/TypeScript toolchain is **WSL/pnpm-canonical**. There is no Windows-side toolchain or host-switching wrapper. Run `pnpm build`, `pnpm check`, `pnpm cli`, and `pnpm mcp` directly from the WSL shell.
-- Do not start long-running or interactive processes such as development servers or watchers unless explicitly asked.
-- Adding a dependency (`pnpm add` or similar) requires npm-registry network access. If the current environment does not permit it, report the blocker instead of borrowing dependencies or generated files from another project, hand-editing `pnpm-lock.yaml`, or weakening the sandbox without the user's approval.
-- In a git worktree, sandbox restrictions can make the main repository's `.git/worktrees/<name>/` metadata read-only. If `git add` or `git commit` fails for that reason, leave the validated changes uncommitted and report the exact files; do not fight the restriction with destructive or out-of-repository workarounds.
+Project-specific guidance for working on storm-microcontroller-language. Keep machine-specific tool paths and personal workflow preferences in an untracked `AGENTS.override.md` instead.
 
 ## Commands
+
+Use the pnpm version declared by `packageManager` in `package.json`.
 
 ```bash
 pnpm build          # tsc compile + copy bundled JSON assets to dist/
 pnpm check          # type-check only (no emit)
-pnpm test           # Vitest suite
+pnpm test           # full Vitest suite (release validation)
+pnpm test:smoke     # PR-gating CLI round-trip smoke test
+pnpm test:area <paths...> # tests under the changed areas, e.g. src/core/sync src/infra/fs/synchronization-runner.test.ts
 pnpm cli <args>     # run the CLI directly via tsx (no build required)
 ```
 
@@ -39,9 +29,10 @@ pnpm cli spec [<definitionId>] [--list] [--json]
 
 ## Validation before finishing
 
-- `pnpm check` (`tsc --noEmit`) must pass for code changes.
-- Most of the repository has no automated test suite. Exercise the relevant `pnpm cli <subcommand>` against a real or sample project when behavior changes.
-- Vitest covers comparison logic and cross-cutting behavior such as localization. Run `pnpm test` when those areas change.
+- `pnpm test:smoke` is the required pull-request gate. It starts the real CLI entry point and exercises the parameterized English/Japanese DSL -> XML -> DSL synchronization round trip, including implicit layout and quoted bindings.
+- For code changes, run `pnpm check` and only the tests relevant to the changed area before opening the pull request. Use `pnpm test:area` with one or more paths, for example `pnpm test:area src/core/compare` or `pnpm test:area src/core/sync src/infra/fs/synchronization-runner.test.ts`.
+- Record the exact local commands and their result summaries in the pull request. Add a focused CLI exercise when behavior is not adequately represented by the selected automated tests.
+- The complete `pnpm test` suite and `pnpm build` run in GitHub Actions when a GitHub Release is created. Running the full suite for every pull request is not required.
 - For documentation-only changes, inspect the rendered source/diff and verify internal references and commands; code validation is not required unless the documentation change depends on current runtime behavior.
 - If validation cannot run, state what was not run and why. Do not imply that an unrun check passed.
 
@@ -101,19 +92,5 @@ TypeScript (ESM, Node >=18), `elkjs` for auto-layout, `fast-xml-parser`, `intl-m
 
 ## Scope and file discipline
 
-- Implement only what the user asked for. Do not add unrelated refactors, speculative abstractions, or cleanup that does not contribute to the requested result.
-- Prefer a coherent completed structure over the smallest textual diff when the task genuinely requires broader changes, but explain the scope and preserve unrelated work.
 - Do not modify `CLAUDE.md`, `AGENTS.md`, `README.md`, `README-ja.md`, `GUIDE-ja.md`, or dependency/script entries in `package.json` unless the user explicitly requests it. If one appears necessary, discuss it with the user instead of changing it incidentally.
 - Do not edit generated files by hand when a repository command is responsible for generating them.
-
-## External blockers
-
-When a permission, network, tool, or environment problem prevents progress, exhaust safe in-repository diagnostics, then stop and explain:
-
-- what outcome you were trying to reach,
-- the exact blocker and relevant error,
-- what you already checked or attempted,
-- the state of any uncommitted changes, and
-- the smallest user action or permission change that would unblock the work.
-
-Do not route around the blocker by touching files outside this repository, borrowing another project's `node_modules` or lockfile, aggressively deleting files, or leaving the repository in an inconsistent state. Genuine implementation decisions remain the agent's responsibility; use this blocker protocol only for constraints that cannot be resolved within the authorized scope.
