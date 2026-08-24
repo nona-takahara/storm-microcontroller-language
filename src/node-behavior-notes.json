@@ -121,8 +121,14 @@
       "displayName": "Clamp",
       "category": "arithmetic",
       "status": "todo",
-      "relatedIssues": [],
-      "notes": []
+      "relatedIssues": [1],
+      "notes": [
+        {
+          "category": "serialization",
+          "text": "`min` and `max` follow storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
+          "confidence": "verified"
+        }
+      ]
     },
     "composite_in": {
       "displayName": "Project Input Composite",
@@ -243,8 +249,14 @@
       "displayName": "Constant Number",
       "category": "value",
       "status": "todo",
-      "relatedIssues": [],
-      "notes": []
+      "relatedIssues": [1],
+      "notes": [
+        {
+          "category": "serialization",
+          "text": "CONST imports its DSL `value` from XML `@text`, not from the cached numeric `@value`. Export regenerates both XML attributes from the parsed DSL value, following storm-mcl's paired numeric `@text`/`@value` convention.",
+          "confidence": "verified"
+        }
+      ]
     },
     "CONST_BOOL": {
       "displayName": "Constant On",
@@ -257,8 +269,13 @@
       "displayName": "Up/Down Counter",
       "category": "control",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [1],
       "notes": [
+        {
+          "category": "serialization",
+          "text": "`reset_value`, `increment`, `min`, and `max` follow storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
+          "confidence": "verified"
+        },
         {
           "category": "other",
           "text": "COUNTER's three inputs are `up`, `down`, `reset` (booleans) -- there is no separate 'enable' input. Its properties are `increment` (default 1), `min`/`max` (default 0/100), `reset_value` (default 0), and `clamp` (`\"on\"` or `\"off\"`, default `\"off\"`).",
@@ -317,9 +334,16 @@
       "category": "arithmetic",
       "status": "todo",
       "relatedIssues": [
+        1,
         11
       ],
-      "notes": []
+      "notes": [
+        {
+          "category": "serialization",
+          "text": "`epsilon` follows storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
+          "confidence": "verified"
+        }
+      ]
     },
     "FUNC_NUM_1": {
       "displayName": "Function (x)",
@@ -436,9 +460,15 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [
+        1,
         4
       ],
       "notes": [
+        {
+          "category": "serialization",
+          "text": "`reset_value` follows storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
+          "confidence": "verified"
+        },
         {
           "category": "initial-state",
           "text": "At startup (load time), `out` equals the `reset_value` property (default 0) -- the DSL makes this value explicit rather than leaving it implicit.",
@@ -555,8 +585,13 @@
       "displayName": "PID Controller",
       "category": "control",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [1],
       "notes": [
+        {
+          "category": "serialization",
+          "text": "`kp`, `ki`, and `kd` follow storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
+          "confidence": "verified"
+        },
         {
           "category": "initial-state",
           "text": "While `active` is false, the internal integral term is held at 0 and `out` is 0.",
@@ -593,15 +628,27 @@
       "displayName": "Property Number",
       "category": "property",
       "status": "todo",
-      "relatedIssues": [],
-      "notes": []
+      "relatedIssues": [1],
+      "notes": [
+        {
+          "category": "serialization",
+          "text": "`value` follows storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
+          "confidence": "verified"
+        }
+      ]
     },
     "PROPERTY_SLIDER": {
       "displayName": "Property Slider",
       "category": "property",
       "status": "todo",
-      "relatedIssues": [],
-      "notes": []
+      "relatedIssues": [1],
+      "notes": [
+        {
+          "category": "serialization",
+          "text": "`min` and `max` follow storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value. `increment` and `value` use only `@text` in the current XML mapping.",
+          "confidence": "verified"
+        }
+      ]
     },
     "PROPERTY_TEXT": {
       "displayName": "Property Text",
@@ -671,6 +718,11 @@
       ],
       "notes": [
         {
+          "category": "serialization",
+          "text": "`min` and `max` follow storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
+          "confidence": "verified"
+        },
+        {
           "category": "other",
           "text": "Setting `min` equal to `max` makes THRESHOLD behave like an exact-equality check (EQUAL without an epsilon tolerance).",
           "confidence": "verified"
@@ -681,11 +733,11 @@
       "displayName": "Timer (RTF)",
       "category": "control",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [75],
       "notes": [
         {
           "category": "other",
-          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "text": "`units` accepts \"seconds\" or \"ticks\". Seconds is the default and corresponds to an omitted XML `u` attribute; Stormworks also reads an explicit `u=\"0\"` as seconds and omits it when saving. Ticks corresponds to `u=\"1\"` and interprets `duration` at the 60 Hz tick rate. The disappearance of an explicit `u=\"0\"` during normalization is not a semantic change.",
           "confidence": "verified"
         }
       ]
@@ -694,11 +746,11 @@
       "displayName": "Timer (RTO)",
       "category": "control",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [75],
       "notes": [
         {
           "category": "other",
-          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "text": "`units` accepts \"seconds\" or \"ticks\". Seconds is the default and corresponds to an omitted XML `u` attribute; Stormworks also reads an explicit `u=\"0\"` as seconds and omits it when saving. Ticks corresponds to `u=\"1\"` and interprets `duration` at the 60 Hz tick rate. The disappearance of an explicit `u=\"0\"` during normalization is not a semantic change.",
           "confidence": "verified"
         }
       ]
@@ -707,11 +759,11 @@
       "displayName": "Timer (TOF)",
       "category": "control",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [75],
       "notes": [
         {
           "category": "other",
-          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "text": "`units` accepts \"seconds\" or \"ticks\". Seconds is the default and corresponds to an omitted XML `u` attribute; Stormworks also reads an explicit `u=\"0\"` as seconds and omits it when saving. Ticks corresponds to `u=\"1\"` and interprets `duration` at the 60 Hz tick rate. The disappearance of an explicit `u=\"0\"` during normalization is not a semantic change.",
           "confidence": "verified"
         }
       ]
@@ -720,11 +772,11 @@
       "displayName": "Timer (TON)",
       "category": "control",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [75],
       "notes": [
         {
           "category": "other",
-          "text": "The `units` property (default \"seconds\"; the only other allowed value is \"ticks\") selects whether `duration` is interpreted in seconds or in ticks (60 Hz).",
+          "text": "`units` accepts \"seconds\" or \"ticks\". Seconds is the default and corresponds to an omitted XML `u` attribute; Stormworks also reads an explicit `u=\"0\"` as seconds and omits it when saving. Ticks corresponds to `u=\"1\"` and interprets `duration` at the 60 Hz tick rate. The disappearance of an explicit `u=\"0\"` during normalization is not a semantic change.",
           "confidence": "verified"
         }
       ]

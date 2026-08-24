@@ -28,7 +28,12 @@ export const TOOL_CONVENTIONS: ToolConventionNote[] = [
   {
     topic: "which default-valued properties get omitted from exported XML",
     text:
-      "If you explicitly write a property whose value equals its declared default, storm-mcl normally still emits it to XML as-is. Two known exceptions omit a matching-default value instead: (a) xmlDelta-encoded properties (e.g. composite channel/offset encodings), and (b) empty-string defaults. Separately and unconditionally, a numeric `@value` mirror attribute is dropped whenever the value is exactly 0, regardless of that property's own default.",
+      "If you explicitly write a property whose value equals its declared default, storm-mcl normally still emits it to XML as-is. Two known exceptions omit a matching-default value instead: (a) xmlDelta-encoded properties (e.g. composite channel/offset encodings), and (b) empty-string defaults.",
+  },
+  {
+    topic: "paired numeric @text and @value attributes",
+    text:
+      "For component properties whose XML stores paired numeric `@text` and `@value` attributes, storm-mcl treats `@text` as authoritative on import. On export it writes the parsed DSL value back to both attributes without reproducing Stormworks' approximately six-decimal cache rounding; an exact-zero numeric `@value` is omitted. Original numeric spelling and stale cached `@value` data are not preserved. storm-mcl does not guarantee how Stormworks interprets an exported `@value` with more than six fractional digits, so designs that depend on that precision must be verified in Stormworks. This convention does not apply where text and value may have independent meanings, such as dropdown/selector items.",
   },
   {
     topic: ".sw-mcl (layout file) is optional, and 1 file = 1 module",
