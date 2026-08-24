@@ -965,7 +965,7 @@
       "ports": {
         "inputs": [
           { "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } },
-          { "key": "channel_input", "signal": "number", "label": "Start Channel", "activeWhen": { "property": "channel", "equals": -1 }, "stormworks": { "xmlKey": "inoff" } }
+          { "key": "channel_input", "signal": "number", "label": "Start Channel", "activeWhen": { "property": "channel", "equals": -1 }, "stormworks": { "xmlKey": "in2" } }
         ],
         "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
       },
@@ -982,7 +982,7 @@
       "ports": {
         "inputs": [
           { "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } },
-          { "key": "channel_input", "signal": "number", "label": "Start Channel", "activeWhen": { "property": "channel", "equals": -1 }, "stormworks": { "xmlKey": "inoff" } }
+          { "key": "channel_input", "signal": "number", "label": "Start Channel", "activeWhen": { "property": "channel", "equals": -1 }, "stormworks": { "xmlKey": "in2" } }
         ],
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },
@@ -1229,6 +1229,13 @@
             "stormworks": {
               "xmlKey": "inc"
             }
+          },
+          {
+            "key": "offset_input",
+            "signal": "number",
+            "label": "Start Channel",
+            "activeWhen": { "property": "offset", "equals": -1 },
+            "stormworks": { "xmlKey": "inoff" }
           }
         ],
         "outputs": [
@@ -1282,6 +1289,13 @@
             "stormworks": {
               "xmlKey": "inc"
             }
+          },
+          {
+            "key": "offset_input",
+            "signal": "number",
+            "label": "Start Channel",
+            "activeWhen": { "property": "offset", "equals": -1 },
+            "stormworks": { "xmlKey": "inoff" }
           }
         ],
         "outputs": [

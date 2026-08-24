@@ -1274,7 +1274,7 @@ function resolveSourcePortKey(
   return "out1";
 }
 
-// Resolve an XML input tag such as in1/in2/inc into the normalized target port key.
+// Resolve an XML input tag such as in1/in2/inc/inoff into the normalized target port key.
 function resolveTargetPortKey(definition: ComponentDefinition | undefined, rawPortKey: string): string {
   if (!definition) {
     return rawPortKey;
@@ -1409,9 +1409,9 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return undefined;
 }
 
-// Treat in1/in2/inc-style child names as XML input bindings.
+// Treat numbered inputs and Stormworks' named composite bindings as XML inputs.
 function isInputTagName(name: string): boolean {
-  return name === "inc" || /^in\d+$/.test(name);
+  return name === "inc" || name === "inoff" || /^in\d+$/.test(name);
 }
 
 // Describe one XML input record for diagnostics when no stable source path is available.
