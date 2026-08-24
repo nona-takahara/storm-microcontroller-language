@@ -15,7 +15,7 @@ import {
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { indexNetProducers } from "../shared/producer-index.js";
 import { resolveStatementTypeName } from "../shared/module-net-graph.js";
-import { computeGateShape, GATE_FIRST_PORT_OFFSET, GATE_MIN_HEIGHT, GATE_PORT_ROW_HEIGHT, GATE_WIDTH } from "./gate-shape.js";
+import { computeGateShape, GATE_FIRST_PORT_OFFSET, GATE_MIN_HEIGHT, GATE_WIDTH } from "./gate-shape.js";
 
 export interface AutoLayoutExistingPositions {
   ports: Map<string, IrVector2>;
@@ -83,7 +83,7 @@ const DEFAULT_LAYER_SPACING = 0.25;
 const DEFAULT_GRID_SIZE = 0.25;
 // Default half-width of the fit target: roughly ±32 around the origin (see AutoLayoutOptions.maxExtent).
 const DEFAULT_MAX_EXTENT = 32;
-const BOUNDARY_PORT_HEIGHT = GATE_PORT_ROW_HEIGHT + GATE_MIN_HEIGHT;
+const BOUNDARY_PORT_HEIGHT = GATE_MIN_HEIGHT;
 
 const PORT_NODE_ID_PREFIX = "p$";
 const INSTANCE_NODE_ID_PREFIX = "n$";

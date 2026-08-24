@@ -74,7 +74,7 @@ describe("computeSwNetModuleLayout flow constraints", () => {
 
     expect(structure.children[0]).toMatchObject({
       width: 1,
-      height: 0.75,
+      height: 0.5,
       layoutOptions: {
         "elk.layered.layering.layerConstraint": "FIRST_SEPARATE",
         "elk.portConstraints": "FIXED_POS",

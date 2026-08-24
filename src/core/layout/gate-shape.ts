@@ -1,6 +1,6 @@
 // Reusable gate geometry shared by layout and straight-wire readability work. Coordinates are
 // local to the gate's top-left corner. The first connection starts 1.5 grid rows down, while gate
-// height is the longer connection column's row count plus a fixed 0.5 units.
+// height is the longer connection column's row count plus a fixed 0.25 units, with a 0.5 minimum.
 import { findCompatibleComponentDefinition, type NodeDefinitionRegistry } from "../definitions/loader.js";
 import { type NodePortActivationCondition } from "../definitions/schema.js";
 import { type SwNetAssignment, type SwNetStatement } from "../parsers/sw-net.js";
@@ -8,6 +8,7 @@ import { type SwNetAssignment, type SwNetStatement } from "../parsers/sw-net.js"
 export const GATE_WIDTH = 1;
 export const GATE_PORT_ROW_HEIGHT = 0.25;
 export const GATE_MIN_HEIGHT = 0.5;
+export const GATE_HEIGHT_PADDING = 0.25;
 export const GATE_FIRST_PORT_OFFSET = 1.5 * GATE_PORT_ROW_HEIGHT;
 
 export interface GatePortShape {
@@ -27,7 +28,10 @@ export interface GateShape {
 export function computeGateShape(statement: SwNetStatement, definitions: NodeDefinitionRegistry): GateShape {
   const inputKeys = effectivePortKeys(statement, "input", definitions);
   const outputKeys = effectivePortKeys(statement, "output", definitions);
-  const height = Math.max(GATE_MIN_HEIGHT, Math.max(inputKeys.length, outputKeys.length) * GATE_PORT_ROW_HEIGHT + GATE_MIN_HEIGHT);
+  const height = Math.max(
+    GATE_MIN_HEIGHT,
+    Math.max(inputKeys.length, outputKeys.length) * GATE_PORT_ROW_HEIGHT + GATE_HEIGHT_PADDING,
+  );
 
   return {
     width: GATE_WIDTH,

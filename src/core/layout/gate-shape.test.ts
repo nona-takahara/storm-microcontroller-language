@@ -21,7 +21,7 @@ describe("computeGateShape", () => {
   it("places both sides after 1.5 rows of top padding at a fixed 0.25 pitch", () => {
     const shape = computeGateShape(unknownGate(["a"], ["x", "y", "z"]), definitions);
 
-    expect(shape).toMatchObject({ width: 1, height: 1.25 });
+    expect(shape).toMatchObject({ width: 1, height: 1 });
     expect(shape.inputs.map(({ position }) => position)).toEqual([{ x: 0, y: 0.375 }]);
     expect(shape.outputs.map(({ position }) => position)).toEqual([
       { x: 1, y: 0.375 },
@@ -30,9 +30,10 @@ describe("computeGateShape", () => {
     ]);
   });
 
-  it("keeps half a unit of total padding around the longest side", () => {
+  it("adds 0.25 to the longest side's rows with a 0.5 minimum", () => {
     expect(computeGateShape(unknownGate([], []), definitions).height).toBe(0.5);
-    expect(computeGateShape(unknownGate(["a", "b"], []), definitions).height).toBe(1);
+    expect(computeGateShape(unknownGate(["a"], []), definitions).height).toBe(0.5);
+    expect(computeGateShape(unknownGate(["a", "b"], []), definitions).height).toBe(0.75);
   });
 
   it("orders Composite Write inputs as composite, dynamic values, then external offset", () => {
@@ -50,7 +51,7 @@ describe("computeGateShape", () => {
 
     const shape = computeGateShape(statement, definitions);
 
-    expect(shape.height).toBe(1.75);
+    expect(shape.height).toBe(1.5);
     expect(shape.inputs.map(({ key, position }) => ({ key, y: position.y }))).toEqual([
       { key: "inc", y: 0.375 },
       { key: "in1", y: 0.625 },
