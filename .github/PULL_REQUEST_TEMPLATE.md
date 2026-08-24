@@ -18,14 +18,22 @@
 
 ## How to test / テスト方法
 
-<!-- Commands run, e.g. `pnpm check`, `pnpm cli check-dsl ...` / 実行したコマンドなど -->
+The PR smoke test runs automatically. List only the checks selected for this change, with a short result summary.
+PRのスモークテストは自動実行されます。この変更に必要な確認だけを選び、結果の要約とともに記載してください。
 
-- [ ] `pnpm check`
-- [ ] `pnpm build`
-- [ ] Round-trip sample test data through `dsl2xml`/`xml2dsl` and verify / 適当なテストデータで dsl2xml、xml2dsl を実施してのチェック
-- [ ] (Optional) Round-trip through Stormworks: exported microcontroller → DSL conversion → XML conversion → load in Stormworks → re-export and verify / (任意) Stormworksで出力したマイクロコントローラー→DSL変換→XML変換→Stormworks読み取り→再出力チェック
+<!--
+Examples / 記入例:
+- `pnpm check` — passed / 成功
+- `pnpm test:area src/core/sync src/infra/fs/synchronization-runner.test.ts` — 35 tests passed / 35件成功
+- `pnpm cli check-dsl path/to/project.json` — no diagnostics / 診断なし
+
+The full test suite runs when a GitHub Release is created; do not run it routinely for a PR.
+フルテストはGitHub Release作成時に実行されるため、通常のPRでは実行不要です。
+-->
+
+-
 
 ## Checklist / チェックリスト
 
-- [ ] I have tested the change locally / ローカルで動作確認した
+- [ ] I listed the relevant local checks and their results above / 関連するローカル確認と結果を上に記載した
 - [ ] Documentation updated if needed / 必要に応じてドキュメントを更新した
