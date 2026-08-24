@@ -1,10 +1,32 @@
 import { describe, expect, it } from "vitest";
 
 import { type IrScalarValue } from "../ir.js";
-import { findExactNodeCorrespondence } from "./structural-correspondence.js";
+import { findExactNodeCorrespondence, incidentKeys, mappedIncidentKeys } from "./structural-correspondence.js";
 import { type ComparableModuleGraph, type ComparableNode } from "./types.js";
 
 describe("findExactNodeCorrespondence", () => {
+  it("preserves directed, parallel, and self-loop incident keys", () => {
+    const subject = graph([node("a"), node("b")], [
+      { from: "a", to: "b", fromKey: "first", toKey: "left" },
+      { from: "a", to: "b", fromKey: "second", toKey: "right" },
+      { from: "b", to: "a", fromKey: "back", toKey: "return" },
+      { from: "a", to: "a", fromKey: "self-out", toKey: "self-in" },
+    ]);
+
+    expect(incidentKeys(subject, "a", new Set(["a", "b"]))).toEqual([
+      "in:return:b:back",
+      "out:first:b:left",
+      "out:second:b:right",
+      "out:self-out:a:self-in",
+    ]);
+    expect(mappedIncidentKeys(subject, "a", new Map([["a", "x"], ["b", "y"]]))).toEqual([
+      "in:return:y:back",
+      "out:first:y:left",
+      "out:second:y:right",
+      "out:self-out:x:self-in",
+    ]);
+  });
+
   it("assigns twelve independent same-kind nodes by key-level properties without permutation search", () => {
     const size = 12;
     const existing = graph(Array.from({ length: size }, (_, index) => node(`old-${index}`, { value: index })), []);
