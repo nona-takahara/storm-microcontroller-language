@@ -6,6 +6,7 @@ import type {
   ComponentBinding,
   ComponentDynamicInputsBinding,
   DefinitionValueType,
+  NodePortActivationCondition,
   NodePortDefinition,
   ProjectNodeBinding,
 } from "../definitions/schema.js";
@@ -22,6 +23,7 @@ export interface GateSpecPort {
   key: string;
   signal: IrSignalKind;
   label?: string;
+  activeWhen?: NodePortActivationCondition;
 }
 
 export interface GateSpecProperty {
@@ -171,7 +173,9 @@ function buildUsageExample(
     .join(", ");
   const propertiesSuffix = propertyAssignments.length > 0 ? ` (${propertyAssignments})` : "";
 
-  const staticInputAssignments = inputs.map((port) => `${port.key}=${toNetPlaceholder(port.key)}`);
+  const staticInputAssignments = inputs
+    .filter((port) => isPortActiveForExample(port, properties))
+    .map((port) => `${port.key}=${toNetPlaceholder(port.key)}`);
   const dynamicInputAssignments = (dynamicInputs?.exampleKeys ?? []).map((key) => `${key}=${toNetPlaceholder(key)}`);
   const inputAssignments = [...staticInputAssignments, ...dynamicInputAssignments].join(", ");
   const outputAssignments = outputs.map((port) => `${port.key}=${toNetPlaceholder(port.key)}`).join(", ");
@@ -191,19 +195,35 @@ function buildUsageExample(
 }
 
 function formatExamplePropertyValue(property: GateSpecProperty): string {
+  const value = getExamplePropertyValue(property);
+  return property.valueType === "string" ? JSON.stringify(String(value)) : String(value);
+}
+
+function getExamplePropertyValue(property: GateSpecProperty): IrScalarValue {
   if (property.default !== undefined) {
-    return property.valueType === "string" ? JSON.stringify(String(property.default)) : String(property.default);
+    return property.default;
   }
 
   if (property.enumOptions && property.enumOptions.length > 0) {
-    return JSON.stringify(property.enumOptions[0]);
+    return property.enumOptions[0]!;
   }
 
   if (property.valueType === "string") {
-    return '"..."';
+    return "...";
   }
 
-  return property.valueType === "boolean" ? "false" : "0";
+  return property.valueType === "boolean" ? false : 0;
+}
+
+// Omit a conditionally inactive fixed port from the minimal example. If the referenced property
+// cannot be resolved, keep the port visible rather than presenting an uncertain condition as false.
+function isPortActiveForExample(port: GateSpecPort, properties: GateSpecProperty[]): boolean {
+  if (!port.activeWhen) {
+    return true;
+  }
+
+  const property = properties.find((candidate) => candidate.key === port.activeWhen!.property);
+  return property === undefined || Object.is(getExamplePropertyValue(property), port.activeWhen.equals);
 }
 
 function toNetPlaceholder(portKey: string): string {
@@ -380,7 +400,7 @@ export function formatSpecOverviewText(overview: SpecOverview): string {
 }
 
 function toGateSpecPort(port: NodePortDefinition): GateSpecPort {
-  return { key: port.key, signal: port.signal, label: port.label };
+  return { key: port.key, signal: port.signal, label: port.label, activeWhen: port.activeWhen };
 }
 
 function formatProjectNodeBinding(binding: ProjectNodeBinding): string {
@@ -414,7 +434,13 @@ function formatPortLines(ports: GateSpecPort[]): string[] {
     return ["  (none)"];
   }
 
-  return ports.map((port) => `  ${port.key}: ${port.signal}${port.label ? ` ("${port.label}")` : ""}`);
+  return ports.map((port) => {
+    const label = port.label ? ` ("${port.label}")` : "";
+    const condition = port.activeWhen
+      ? ` (active when ${port.activeWhen.property}=${JSON.stringify(port.activeWhen.equals)})`
+      : "";
+    return `  ${port.key}: ${port.signal}${label}${condition}`;
+  });
 }
 
 function formatDynamicInputsLines(dynamicInputs: GateSpecDynamicInputs): string[] {

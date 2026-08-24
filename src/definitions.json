@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "10",
+  "schemaVersion": "11",
   "nodes": [
     {
       "id": "composite_in",
@@ -965,7 +965,7 @@
       "ports": {
         "inputs": [
           { "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } },
-          { "key": "channel_input", "signal": "number", "label": "Start Channel", "stormworks": { "xmlKey": "inoff" } }
+          { "key": "channel_input", "signal": "number", "label": "Start Channel", "activeWhen": { "property": "channel", "equals": -1 }, "stormworks": { "xmlKey": "inoff" } }
         ],
         "outputs": [{ "key": "out", "signal": "number", "label": "Out" }]
       },
@@ -982,7 +982,7 @@
       "ports": {
         "inputs": [
           { "key": "composite", "signal": "composite", "label": "Composite", "stormworks": { "xmlKey": "in1" } },
-          { "key": "channel_input", "signal": "number", "label": "Start Channel", "stormworks": { "xmlKey": "inoff" } }
+          { "key": "channel_input", "signal": "number", "label": "Start Channel", "activeWhen": { "property": "channel", "equals": -1 }, "stormworks": { "xmlKey": "inoff" } }
         ],
         "outputs": [{ "key": "out", "signal": "boolean", "label": "Out" }]
       },

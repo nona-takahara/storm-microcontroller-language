@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1",
-  "generatedFrom": "src/definitions.json (schemaVersion 10)",
+  "generatedFrom": "src/definitions.json (schemaVersion 11)",
   "entries": {
     "ABS": {
       "displayName": "Abs",
@@ -143,18 +143,32 @@
       "category": "composite-read",
       "status": "todo",
       "relatedIssues": [
-        3
+        3,
+        62
       ],
-      "notes": []
+      "notes": [
+        {
+          "category": "ports",
+          "text": "`channel_input` is active only when `channel=-1`; any other `channel` value selects a fixed composite channel and supersedes that input.",
+          "confidence": "verified"
+        }
+      ]
     },
     "COMPOSITE_READ_NUMBER": {
       "displayName": "Composite Read Number",
       "category": "composite-read",
       "status": "todo",
       "relatedIssues": [
-        3
+        3,
+        62
       ],
-      "notes": []
+      "notes": [
+        {
+          "category": "ports",
+          "text": "`channel_input` is active only when `channel=-1`; any other `channel` value selects a fixed composite channel and supersedes that input.",
+          "confidence": "verified"
+        }
+      ]
     },
     "COMPOSITE_SWITCHBOX": {
       "displayName": "Composite Switchbox",
@@ -193,8 +207,13 @@
       "displayName": "Composite Write Boolean",
       "category": "composite-write",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [62],
       "notes": [
+        {
+          "category": "ports",
+          "text": "The `count` property determines how many dynamic boolean inputs exist: `in1` through `in<count>`.",
+          "confidence": "verified"
+        },
         {
           "category": "edge-case",
           "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged, matching COMPOSITE_WRITE_NUMBER's confirmed behavior.",
@@ -206,8 +225,13 @@
       "displayName": "Composite Write Number",
       "category": "composite-write",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [62],
       "notes": [
+        {
+          "category": "ports",
+          "text": "The `count` property determines how many dynamic number inputs exist: `in1` through `in<count>`.",
+          "confidence": "verified"
+        },
         {
           "category": "edge-case",
           "text": "Composite channels not selected as a write target (i.e. outside `offset`..`offset+count-1`) are not overwritten with a new value; `out` passes the corresponding channel of `inc` through unchanged.",
