@@ -1,6 +1,6 @@
 {
   "name": "storm-microcontroller-language",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Stormworks microcontroller XML and DSL conversion toolkit",
   "type": "module",
   "main": "./dist/index.js",
