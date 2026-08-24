@@ -36,7 +36,16 @@ interface Assignment {
   cost: number;
 }
 
+interface GraphLinkIndex {
+  incidentByNodeId: Map<string, ComparableModuleGraph["links"]>;
+  relationKeysByNodePair: Map<string, string[]>;
+}
+
 type MatchScore = readonly [expressionMatches: number, nameMatches: number, propertyMatches: number];
+
+// Comparable graphs are immutable snapshots for the lifetime of a comparison. Reusing this index
+// avoids turning every candidate check into another full scan of the graph's links.
+const graphLinkIndexes = new WeakMap<ComparableModuleGraph, GraphLinkIndex>();
 
 /**
  * Find a property-preferred, endpoint/port-preserving isomorphism without using instance ids as
@@ -146,7 +155,7 @@ export function mappedIncidentKeys(
   nodeId: string,
   mappedNeighborIds: Map<string, string>,
 ): string[] {
-  return graph.links.flatMap((link) => {
+  return incidentLinks(graph, nodeId).flatMap((link) => {
     if (link.from.nodeId === nodeId && mappedNeighborIds.has(link.to.nodeId)) {
       return [`out:${link.from.portKey}:${mappedNeighborIds.get(link.to.nodeId)}:${link.to.portKey}`];
     }
@@ -163,7 +172,7 @@ export function incidentKeys(
   nodeId: string,
   includedNodeIds: Set<string>,
 ): string[] {
-  return graph.links.flatMap((link) => {
+  return incidentLinks(graph, nodeId).flatMap((link) => {
     if (link.from.nodeId === nodeId && includedNodeIds.has(link.to.nodeId)) {
       return [`out:${link.from.portKey}:${link.to.nodeId}:${link.to.portKey}`];
     }
@@ -626,15 +635,51 @@ function isFullyInterchangeableComponent(graph: ComparableModuleGraph, component
 }
 
 function relationKeys(graph: ComparableModuleGraph, fromId: string, toId: string): string[] {
-  return graph.links.flatMap((link) => {
-    if (link.from.nodeId === fromId && link.to.nodeId === toId) {
-      return [`out:${link.from.portKey}:${link.to.portKey}`];
+  return graphLinkIndex(graph).relationKeysByNodePair.get(nodePairKey(fromId, toId)) ?? [];
+}
+
+function incidentLinks(graph: ComparableModuleGraph, nodeId: string): ComparableModuleGraph["links"] {
+  return graphLinkIndex(graph).incidentByNodeId.get(nodeId) ?? [];
+}
+
+function graphLinkIndex(graph: ComparableModuleGraph): GraphLinkIndex {
+  const cached = graphLinkIndexes.get(graph);
+  if (cached) return cached;
+
+  const incidentByNodeId = new Map<string, ComparableModuleGraph["links"]>();
+  const relationKeysByNodePair = new Map<string, string[]>();
+  for (const link of graph.links) {
+    appendMapValue(incidentByNodeId, link.from.nodeId, link);
+    if (link.to.nodeId !== link.from.nodeId) appendMapValue(incidentByNodeId, link.to.nodeId, link);
+
+    appendMapValue(
+      relationKeysByNodePair,
+      nodePairKey(link.from.nodeId, link.to.nodeId),
+      `out:${link.from.portKey}:${link.to.portKey}`,
+    );
+    if (link.to.nodeId !== link.from.nodeId) {
+      appendMapValue(
+        relationKeysByNodePair,
+        nodePairKey(link.to.nodeId, link.from.nodeId),
+        `in:${link.to.portKey}:${link.from.portKey}`,
+      );
     }
-    if (link.from.nodeId === toId && link.to.nodeId === fromId) {
-      return [`in:${link.to.portKey}:${link.from.portKey}`];
-    }
-    return [];
-  }).sort();
+  }
+  for (const keys of relationKeysByNodePair.values()) keys.sort();
+
+  const result = { incidentByNodeId, relationKeysByNodePair };
+  graphLinkIndexes.set(graph, result);
+  return result;
+}
+
+function appendMapValue<T>(map: Map<string, T[]>, key: string, value: T): void {
+  const values = map.get(key);
+  if (values) values.push(value);
+  else map.set(key, [value]);
+}
+
+function nodePairKey(fromId: string, toId: string): string {
+  return `${fromId}\u0000${toId}`;
 }
 
 function preservesComponentLinks(
