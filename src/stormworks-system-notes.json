@@ -94,6 +94,23 @@
           "confidence": "verified"
         }
       ]
+    },
+    "numeric-property-text-value-cache": {
+      "title": "Numeric property text and runtime value cache",
+      "status": "done",
+      "relatedIssues": [
+        1
+      ],
+      "notes": [
+        {
+          "text": "For numeric component properties that store paired XML `@text` and `@value` attributes, `@text` is the value shown and edited by the Stormworks editor, while `@value` is a cached value used by the running logic. Confirming an edit recomputes `@value` from `@text`; until that happens, a stale `@value` may continue to affect runtime behavior.",
+          "confidence": "verified"
+        },
+        {
+          "text": "Stormworks rounds this cached value to about six decimal places when it obtains it. This does not quantize intermediate logic calculations. The exact tie-breaking and floating-point conversion rules are intentionally unspecified.",
+          "confidence": "verified"
+        }
+      ]
     }
   }
 }

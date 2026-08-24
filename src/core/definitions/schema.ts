@@ -9,7 +9,7 @@ import {
   expectStringWith,
 } from "../shared/json-schema-helpers.js";
 
-export const NODE_DEFINITIONS_SCHEMA_VERSION = "10";
+export const NODE_DEFINITIONS_SCHEMA_VERSION = "11";
 
 export type DefinitionValueType = "boolean" | "number" | "string";
 
@@ -63,7 +63,13 @@ export interface NodePortDefinition {
   key: string;
   signal: IrSignalKind;
   label?: string;
+  activeWhen?: NodePortActivationCondition;
   stormworks?: NodePortStormworksBinding;
+}
+
+export interface NodePortActivationCondition {
+  property: string;
+  equals: IrScalarValue;
 }
 
 export interface NodePropertyDefinition {
@@ -236,10 +242,26 @@ function parseNodePortDefinition(input: unknown, path: string): NodePortDefiniti
     key: expectString(record.key, `${path}.key`),
     signal: parseSignalKind(record.signal, `${path}.signal`),
     label: record.label === undefined ? undefined : expectString(record.label, `${path}.label`),
+    activeWhen:
+      record.activeWhen === undefined
+        ? undefined
+        : parseNodePortActivationCondition(record.activeWhen, `${path}.activeWhen`),
     stormworks:
       record.stormworks === undefined
         ? undefined
         : parseNodePortStormworksBinding(record.stormworks, `${path}.stormworks`),
+  };
+}
+
+// Parse the DSL-level property condition that makes a fixed port active. Consumers should resolve
+// an omitted instance property through the definition's defaults; an unresolved condition should
+// remain unknown rather than being treated as definitely inactive.
+function parseNodePortActivationCondition(input: unknown, path: string): NodePortActivationCondition {
+  const record = expectRecord(input, path);
+
+  return {
+    property: expectString(record.property, `${path}.property`),
+    equals: parseScalarValue(record.equals, `${path}.equals`),
   };
 }
 
