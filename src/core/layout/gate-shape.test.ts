@@ -18,20 +18,45 @@ function unknownGate(inputKeys: string[], outputKeys: string[]): SwNetStatement 
 }
 
 describe("computeGateShape", () => {
-  it("places both sides from the top at a fixed 0.25 pitch", () => {
+  it("places both sides after 1.5 rows of top padding at a fixed 0.25 pitch", () => {
     const shape = computeGateShape(unknownGate(["a"], ["x", "y", "z"]), definitions);
 
-    expect(shape).toMatchObject({ width: 1, height: 1 });
-    expect(shape.inputs.map(({ position }) => position)).toEqual([{ x: 0, y: 0.25 }]);
+    expect(shape).toMatchObject({ width: 1, height: 1.25 });
+    expect(shape.inputs.map(({ position }) => position)).toEqual([{ x: 0, y: 0.375 }]);
     expect(shape.outputs.map(({ position }) => position)).toEqual([
-      { x: 1, y: 0.25 },
-      { x: 1, y: 0.5 },
-      { x: 1, y: 0.75 },
+      { x: 1, y: 0.375 },
+      { x: 1, y: 0.625 },
+      { x: 1, y: 0.875 },
     ]);
   });
 
-  it("keeps the minimum gate height and one row below the longest side", () => {
+  it("keeps half a unit of total padding around the longest side", () => {
     expect(computeGateShape(unknownGate([], []), definitions).height).toBe(0.5);
-    expect(computeGateShape(unknownGate(["a", "b"], []), definitions).height).toBe(0.75);
+    expect(computeGateShape(unknownGate(["a", "b"], []), definitions).height).toBe(1);
+  });
+
+  it("orders Composite Write inputs as composite, dynamic values, then external offset", () => {
+    const statement: SwNetStatement = {
+      kind: "inst",
+      typeId: "COMPOSITE_WRITE_NUMBER",
+      instanceId: "writer",
+      attributes: [
+        { key: "count", value: { kind: "number", value: 3 } },
+        { key: "offset", value: { kind: "number", value: -1 } },
+      ],
+      inputs: [],
+      outputs: [],
+    };
+
+    const shape = computeGateShape(statement, definitions);
+
+    expect(shape.height).toBe(1.75);
+    expect(shape.inputs.map(({ key, position }) => ({ key, y: position.y }))).toEqual([
+      { key: "inc", y: 0.375 },
+      { key: "in1", y: 0.625 },
+      { key: "in2", y: 0.875 },
+      { key: "in3", y: 1.125 },
+      { key: "offset_input", y: 1.375 },
+    ]);
   });
 });

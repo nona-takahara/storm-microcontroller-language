@@ -15,7 +15,7 @@ import {
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { indexNetProducers } from "../shared/producer-index.js";
 import { resolveStatementTypeName } from "../shared/module-net-graph.js";
-import { computeGateShape, GATE_WIDTH } from "./gate-shape.js";
+import { computeGateShape, GATE_FIRST_PORT_OFFSET, GATE_MIN_HEIGHT, GATE_PORT_ROW_HEIGHT, GATE_WIDTH } from "./gate-shape.js";
 
 export interface AutoLayoutExistingPositions {
   ports: Map<string, IrVector2>;
@@ -83,7 +83,7 @@ const DEFAULT_LAYER_SPACING = 0.25;
 const DEFAULT_GRID_SIZE = 0.25;
 // Default half-width of the fit target: roughly ±32 around the origin (see AutoLayoutOptions.maxExtent).
 const DEFAULT_MAX_EXTENT = 32;
-const PORT_NODE_SIZE = 0.25;
+const BOUNDARY_PORT_HEIGHT = GATE_PORT_ROW_HEIGHT + GATE_MIN_HEIGHT;
 
 const PORT_NODE_ID_PREFIX = "p$";
 const INSTANCE_NODE_ID_PREFIX = "n$";
@@ -226,7 +226,7 @@ export function computeModuleFootprint(
     const port = swMclPortByKey.get(slot.key);
 
     if (port) {
-      expand(port.position.x, port.position.y, PORT_NODE_SIZE, PORT_NODE_SIZE);
+      expand(port.position.x, port.position.y, GATE_WIDTH, BOUNDARY_PORT_HEIGHT);
     }
   }
 
@@ -317,11 +317,20 @@ export function buildElkGraphStructure(
 
   const children: ElkNode[] = portSlots.map((slot) => ({
     id: PORT_NODE_ID_PREFIX + slot.key,
-    width: PORT_NODE_SIZE,
-    height: PORT_NODE_SIZE,
+    width: GATE_WIDTH,
+    height: BOUNDARY_PORT_HEIGHT,
     layoutOptions: {
       "elk.layered.layering.layerConstraint": slot.direction === "in" ? "FIRST_SEPARATE" : "LAST_SEPARATE",
+      "elk.portConstraints": "FIXED_POS",
     },
+    ports: [{
+      id: boundaryPortId(slot),
+      x: slot.direction === "in" ? GATE_WIDTH : 0,
+      y: GATE_FIRST_PORT_OFFSET,
+      width: 0,
+      height: 0,
+      layoutOptions: { "elk.port.side": slot.direction === "in" ? "EAST" : "WEST" },
+    }],
   }));
 
   for (const statement of statements) {
@@ -406,7 +415,7 @@ export function buildElkGraphStructure(
         for (const slot of slots) {
           edges.push({
             id: nextEdgeId(),
-            sources: [PORT_NODE_ID_PREFIX + slot.key],
+            sources: [boundaryPortId(slot)],
             targets: [submoduleFootprints?.has(statement.instanceId)
               ? targetId
               : elkPortOrNodeId(targetId, targetShape.inputs, statement.instanceId, "input", input.key)],
@@ -435,7 +444,7 @@ export function buildElkGraphStructure(
           sources: [submoduleFootprints?.has(statement.instanceId)
             ? targetId
             : elkPortOrNodeId(targetId, targetShape.outputs, statement.instanceId, "output", output.key)],
-          targets: [PORT_NODE_ID_PREFIX + slot.key],
+          targets: [boundaryPortId(slot)],
           layoutOptions: { "elk.layered.priority.direction": "10" },
         });
       }
@@ -443,6 +452,10 @@ export function buildElkGraphStructure(
   }
 
   return { children, edges };
+}
+
+function boundaryPortId(slot: PortSlot): string {
+  return `${PORT_NODE_ID_PREFIX}${slot.key}$${slot.direction === "in" ? "output" : "input"}`;
 }
 
 function instancePortId(instanceId: string, direction: "input" | "output", key: string): string {

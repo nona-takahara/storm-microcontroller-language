@@ -44,7 +44,7 @@ describe("computeSwNetModuleLayout flow constraints", () => {
       ports: [{
         id: "n$producer$output$out",
         x: 1,
-        y: 0.25,
+        y: 0.375,
         layoutOptions: { "elk.port.side": "EAST" },
       }],
     });
@@ -52,6 +52,40 @@ describe("computeSwNetModuleLayout flow constraints", () => {
       sources: ["n$producer$output$out"],
       targets: ["n$consumer$input$in1"],
     });
+  });
+
+  it("models module boundary ports as gate-shaped nodes with a fixed connection point", () => {
+    const consumer: SwNetStatement = {
+      kind: "inst",
+      typeId: "UNKNOWN_GATE",
+      instanceId: "consumer",
+      attributes: [],
+      inputs: [{ key: "in", value: { kind: "string", value: "Source" } }],
+      outputs: [],
+    };
+    const structure = buildElkGraphStructure(
+      [{ key: "in:Source:1", name: "Source", direction: "in", occurrence: 1 }],
+      [consumer],
+      new Map(),
+      [],
+      undefined,
+      createBundledNodeDefinitions(),
+    );
+
+    expect(structure.children[0]).toMatchObject({
+      width: 1,
+      height: 0.75,
+      layoutOptions: {
+        "elk.layered.layering.layerConstraint": "FIRST_SEPARATE",
+        "elk.portConstraints": "FIXED_POS",
+      },
+      ports: [{
+        x: 1,
+        y: 0.375,
+        layoutOptions: { "elk.port.side": "EAST" },
+      }],
+    });
+    expect(structure.edges[0]?.sources).toEqual(["p$in:Source:1$output"]);
   });
 
   it("keeps an ordinary chain left to right and is deterministic", async () => {
