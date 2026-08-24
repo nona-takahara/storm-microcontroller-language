@@ -150,7 +150,8 @@
       "status": "todo",
       "relatedIssues": [
         3,
-        62
+        62,
+        87
       ],
       "notes": [
         {
@@ -166,7 +167,8 @@
       "status": "todo",
       "relatedIssues": [
         3,
-        62
+        62,
+        87
       ],
       "notes": [
         {
@@ -213,11 +215,16 @@
       "displayName": "Composite Write Boolean",
       "category": "composite-write",
       "status": "done",
-      "relatedIssues": [62],
+      "relatedIssues": [62, 87],
       "notes": [
         {
           "category": "ports",
           "text": "The `count` property determines how many dynamic boolean inputs exist: `in1` through `in<count>`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "ports",
+          "text": "`offset_input` is active only when `offset=-1`; any other `offset` value selects a fixed starting channel and supersedes that input.",
           "confidence": "verified"
         },
         {
@@ -231,11 +238,16 @@
       "displayName": "Composite Write Number",
       "category": "composite-write",
       "status": "done",
-      "relatedIssues": [62],
+      "relatedIssues": [62, 87],
       "notes": [
         {
           "category": "ports",
           "text": "The `count` property determines how many dynamic number inputs exist: `in1` through `in<count>`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "ports",
+          "text": "`offset_input` is active only when `offset=-1`; any other `offset` value selects a fixed starting channel and supersedes that input.",
           "confidence": "verified"
         },
         {
