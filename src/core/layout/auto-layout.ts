@@ -16,6 +16,7 @@ import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-ne
 import { indexNetProducers } from "../shared/producer-index.js";
 import { resolveStatementTypeName } from "../shared/module-net-graph.js";
 import { computeGateShape, GATE_FIRST_PORT_OFFSET, GATE_MIN_HEIGHT, GATE_WIDTH } from "./gate-shape.js";
+import { improveStraightWireLayout } from "./straight-wire-readability.js";
 
 export interface AutoLayoutExistingPositions {
   ports: Map<string, IrVector2>;
@@ -81,8 +82,8 @@ export interface NetProducer {
 const DEFAULT_NODE_SPACING = 0.25;
 const DEFAULT_LAYER_SPACING = 0.25;
 const DEFAULT_GRID_SIZE = 0.25;
-// Default half-width of the fit target: roughly ±32 around the origin (see AutoLayoutOptions.maxExtent).
-const DEFAULT_MAX_EXTENT = 32;
+// Default half-width of the fit target requested for the comfortably editable canvas area.
+const DEFAULT_MAX_EXTENT = 30;
 const BOUNDARY_PORT_HEIGHT = GATE_MIN_HEIGHT;
 
 const PORT_NODE_ID_PREFIX = "p$";
@@ -122,11 +123,9 @@ export async function computeSwNetModuleLayout(
   // frame here would detach newly-filled entries from the untouched existing ones instead of fitting
   // the module as a whole. Only safe to apply when there's no existing frame to clash with: a full
   // "force" regeneration, or a fill on a module that has no existing positions at all yet.
-  if (options.mode === "force" || !hasAnyExistingPositions(options.existing)) {
+  const canRepackComputedFrame = options.mode === "force" || !hasAnyExistingPositions(options.existing);
+  if (canRepackComputedFrame) {
     centerPositions(rawPositionById);
-    warnIfBoundingBoxExceedsExtent(rawPositionById, maxExtent, warnings);
-  } else {
-    warnIfBoundingBoxExceedsExtent(rawPositionById, maxExtent, warnings);
   }
 
   const gridSize = options.gridSize ?? DEFAULT_GRID_SIZE;
@@ -135,6 +134,48 @@ export async function computeSwNetModuleLayout(
   for (const [id, position] of rawPositionById) {
     positionById.set(id, snapVector(position, gridSize));
   }
+
+  // ELK may place weakly connected components in distant vertical bands even when every individual
+  // rank is short (a 93-node representative circuit reached 94.25 units high this way). Stormworks
+  // has no routed-edge lanes to preserve, so remove that empty cross-axis space while retaining the
+  // order within each rank. Frames may touch but their exact reserved rectangles never overlap.
+  if (canRepackComputedFrame) {
+    compactRanks(
+      positionById,
+      structure.children,
+      options.direction ?? "RIGHT",
+      gridSize,
+      options.nodeSpacing ?? DEFAULT_NODE_SPACING,
+      maxExtent,
+    );
+  }
+
+  // Improve the geometry Stormworks actually renders: straight lines between fixed port handles.
+  // Existing fill-mode positions are user-authored constraints and must remain untouched. Keeping
+  // x fixed during this pass also preserves ELK's ranks and its chosen forward/feedback direction.
+  if (canRepackComputedFrame && (options.direction ?? "RIGHT") === "RIGHT") {
+    const improved = improveStraightWireLayout(
+      module,
+      {
+        ports: new Map(portSlots.flatMap((slot) => {
+          const position = positionById.get(PORT_NODE_ID_PREFIX + slot.key);
+          return position ? [[slot.key, position] as const] : [];
+        })),
+        instances: new Map(module.statements.flatMap((statement) => {
+          const position = positionById.get(INSTANCE_NODE_ID_PREFIX + statement.instanceId);
+          return position ? [[statement.instanceId, position] as const] : [];
+        })),
+      },
+      definitions,
+      { gridSize },
+    );
+
+    for (const [instanceId, position] of improved.instances) {
+      positionById.set(INSTANCE_NODE_ID_PREFIX + instanceId, position);
+    }
+  }
+
+  warnIfBoundingBoxExceedsExtent(positionById, maxExtent, warnings);
 
   const ports: SwMclPortDocument[] = portSlots.map((slot) => {
     const computed = positionById.get(PORT_NODE_ID_PREFIX + slot.key) ?? { x: 0, y: 0 };
@@ -636,6 +677,65 @@ function centerPositions(positionById: Map<string, IrVector2>): void {
   }
 }
 
+// Pack nodes independently within each ELK rank along the cross axis. Rank/layer coordinates and
+// intra-rank order are invariant; only unused space is removed. Node sizes come from the same ELK
+// structure that reserved exact gate/submodule rectangles, rather than a second geometry model.
+function compactRanks(
+  positionById: Map<string, IrVector2>,
+  children: ElkNode[],
+  direction: "RIGHT" | "DOWN",
+  gridSize: number,
+  preferredSpacing: number,
+  maxExtent: number,
+): void {
+  const childById = new Map(children.map((child) => [child.id, child] as const));
+  const rankQuantum = gridSize > 0 ? gridSize : 1e-6;
+  const ranks = new Map<number, string[]>();
+
+  for (const [id, position] of positionById) {
+    const layerCoordinate = direction === "RIGHT" ? position.x : position.y;
+    const rank = Math.round(layerCoordinate / rankQuantum);
+    const ids = ranks.get(rank) ?? [];
+    ids.push(id);
+    ranks.set(rank, ids);
+  }
+
+  for (const ids of ranks.values()) {
+    ids.sort((leftId, rightId) => {
+      const left = positionById.get(leftId);
+      const right = positionById.get(rightId);
+      const crossDelta = direction === "RIGHT"
+        ? (left?.y ?? 0) - (right?.y ?? 0)
+        : (left?.x ?? 0) - (right?.x ?? 0);
+      return crossDelta || leftId.localeCompare(rightId);
+    });
+
+    const sizes = ids.map((id) => {
+      const child = childById.get(id);
+      return direction === "RIGHT" ? child?.height ?? 0 : child?.width ?? 0;
+    });
+    const contentSize = sizes.reduce((sum, size) => sum + size, 0);
+    const preferredTotalSize = contentSize + Math.max(0, ids.length - 1) * preferredSpacing;
+    // Preserve a grid cell of breathing room whenever it still fits the requested canvas. Only a
+    // genuinely crowded rank degrades to touching frames; exact overlap is never used. Because all
+    // dimensions originate in the ELK structure, this also applies to boundary-port nodes once the
+    // shared #92 geometry models their real frames.
+    const spacing = maxExtent > 0 && preferredTotalSize <= maxExtent * 2 ? preferredSpacing : 0;
+    const totalSize = contentSize + Math.max(0, ids.length - 1) * spacing;
+    let cursor = snapScalar(-totalSize / 2, gridSize);
+
+    ids.forEach((id, index) => {
+      const position = positionById.get(id);
+      if (!position) return;
+      positionById.set(id, direction === "RIGHT" ? { x: position.x, y: cursor } : { x: cursor, y: position.y });
+      cursor += (sizes[index] ?? 0) + spacing;
+    });
+  }
+
+  centerPositions(positionById);
+  for (const [id, position] of positionById) positionById.set(id, snapVector(position, gridSize));
+}
+
 // Snap one computed coordinate to the requested grid unit; a non-positive grid size disables snapping.
 function snapVector(vector: IrVector2, gridSize: number): IrVector2 {
   if (gridSize <= 0) {
@@ -646,4 +746,8 @@ function snapVector(vector: IrVector2, gridSize: number): IrVector2 {
     x: Math.round(vector.x / gridSize) * gridSize,
     y: Math.round(vector.y / gridSize) * gridSize,
   };
+}
+
+function snapScalar(value: number, gridSize: number): number {
+  return gridSize > 0 ? Math.round(value / gridSize) * gridSize : value;
 }

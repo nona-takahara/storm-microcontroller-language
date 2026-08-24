@@ -117,4 +117,20 @@ describe("computeSwNetModuleLayout flow constraints", () => {
 
     expect(x(result, "first")).toBeLessThan(x(result, "second"));
   });
+
+  it("packs weakly connected gates with spacing when they fit the target extent", async () => {
+    const statements = Array.from({ length: 24 }, (_, index) => gate(`gate_${index}`, [], `net_${index}`));
+    const result = await positions(statements);
+    const byX = new Map<number, Array<{ x: number; y: number }>>();
+    for (const position of Object.values(result)) {
+      const rank = byX.get(position.x) ?? [];
+      rank.push(position);
+      byX.set(position.x, rank);
+    }
+
+    const densestRank = [...byX.values()].sort((left, right) => right.length - left.length)[0] ?? [];
+    const sorted = densestRank.sort((left, right) => left.y - right.y);
+    expect(Math.max(...Object.values(result).map(({ y }) => y)) - Math.min(...Object.values(result).map(({ y }) => y))).toBeLessThanOrEqual(60);
+    expect(sorted.some((position, index) => index > 0 && position.y === (sorted[index - 1]?.y ?? 0) + 0.75)).toBe(true);
+  });
 });
