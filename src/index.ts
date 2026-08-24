@@ -24,6 +24,7 @@ export * from "./core/exporters/xml.js";
 export * from "./core/exporters/xml-tree.js";
 export * from "./core/module-net-view.js";
 export * from "./core/layout/gate-shape.js";
+export * from "./core/layout/straight-wire-readability.js";
 export * from "./core/compare/types.js";
 export * from "./core/compare/comparable-node.js";
 export * from "./core/compare/module-graph-comparator.js";
