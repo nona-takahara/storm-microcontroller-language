@@ -4,6 +4,8 @@
 import ElkConstructorDefault, { type ELK as ElkInstance, type ElkExtendedEdge, type ElkNode } from "elkjs";
 
 import { type IrVector2 } from "../ir.js";
+import { createBundledNodeDefinitions } from "../definitions/bundled.js";
+import { type NodeDefinitionRegistry } from "../definitions/loader.js";
 import { type SwNetModule, type SwNetStatement } from "../parsers/sw-net.js";
 import {
   type StormworksSwMclDocument,
@@ -13,6 +15,7 @@ import {
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { indexNetProducers } from "../shared/producer-index.js";
 import { resolveStatementTypeName } from "../shared/module-net-graph.js";
+import { computeGateShape, GATE_FIRST_PORT_OFFSET, GATE_MIN_HEIGHT, GATE_WIDTH } from "./gate-shape.js";
 
 export interface AutoLayoutExistingPositions {
   ports: Map<string, IrVector2>;
@@ -31,11 +34,12 @@ export interface AutoLayoutOptions {
   // within [-maxExtent, +maxExtent] on each axis). Stormworks' in-game microcontroller logic canvas
   // is only comfortably reachable/editable within roughly this range of its origin; ELK's layered
   // algorithm otherwise grows one axis unboundedly with graph size. See computeSwNetModuleLayout's
-  // post-layout fit step.
+  // post-layout wrapping/extent check.
   maxExtent?: number;
   // Real footprints for `use` statements whose target module already has its own layout, keyed
   // by this module's use-statement instanceId. See computeModuleFootprint.
   submoduleFootprints?: Map<string, ModuleFootprint>;
+  definitions?: NodeDefinitionRegistry;
 }
 
 export interface ModuleFootprint {
@@ -63,8 +67,9 @@ interface PortSlot {
   occurrence: number;
 }
 
-interface NetProducer {
+export interface NetProducer {
   instanceId: string;
+  outputKey: string;
 }
 
 // Scale constants calibrated against a real Stormworks project export (CHUSO1800_Traction.xml,
@@ -78,10 +83,7 @@ const DEFAULT_LAYER_SPACING = 0.25;
 const DEFAULT_GRID_SIZE = 0.25;
 // Default half-width of the fit target: roughly ±32 around the origin (see AutoLayoutOptions.maxExtent).
 const DEFAULT_MAX_EXTENT = 32;
-const PORT_NODE_SIZE = 0.25;
-const INSTANCE_NODE_WIDTH = 1.0;
-const INSTANCE_NODE_ROW_HEIGHT = 0.25;
-const INSTANCE_NODE_MIN_HEIGHT = 0.5;
+const BOUNDARY_PORT_HEIGHT = GATE_MIN_HEIGHT;
 
 const PORT_NODE_ID_PREFIX = "p$";
 const INSTANCE_NODE_ID_PREFIX = "n$";
@@ -97,9 +99,10 @@ export async function computeSwNetModuleLayout(
   options: AutoLayoutOptions,
 ): Promise<AutoLayoutResult> {
   const warnings: string[] = [];
+  const definitions = options.definitions ?? createBundledNodeDefinitions();
   const portSlots = buildPortSlots(module);
   const netProducers = buildNetProducerIndex(module.statements, warnings);
-  const structure = buildElkGraphStructure(portSlots, module.statements, netProducers, warnings, options.submoduleFootprints);
+  const structure = buildElkGraphStructure(portSlots, module.statements, netProducers, warnings, options.submoduleFootprints, definitions);
 
   const elk = new ElkConstructor();
   const maxExtent = options.maxExtent ?? DEFAULT_MAX_EXTENT;
@@ -115,12 +118,13 @@ export async function computeSwNetModuleLayout(
   }
 
   // Fill mode keeps every existing entry verbatim (see the ports/instances mapping below) and only
-  // writes computed positions for genuinely missing ones, so re-centering/scaling the *computed*
+  // writes computed positions for genuinely missing ones, so re-centering the *computed*
   // frame here would detach newly-filled entries from the untouched existing ones instead of fitting
   // the module as a whole. Only safe to apply when there's no existing frame to clash with: a full
   // "force" regeneration, or a fill on a module that has no existing positions at all yet.
   if (options.mode === "force" || !hasAnyExistingPositions(options.existing)) {
-    fitPositionsWithinExtent(rawPositionById, maxExtent, warnings);
+    centerPositions(rawPositionById);
+    warnIfBoundingBoxExceedsExtent(rawPositionById, maxExtent, warnings);
   } else {
     warnIfBoundingBoxExceedsExtent(rawPositionById, maxExtent, warnings);
   }
@@ -186,9 +190,8 @@ function buildPortSlots(module: SwNetModule): PortSlot[] {
 // Estimate an inst/use statement's node height in .sw-mcl grid units from its pin count, calibrated
 // against real Stormworks block measurements (see the scale-constants comment above): half a grid
 // cell minimum, growing by one row per pin beyond the block's built-in first row.
-function estimateInstanceHeight(statement: SwNetStatement): number {
-  const pinCount = Math.max(statement.inputs.length, statement.outputs.length);
-  return Math.max(INSTANCE_NODE_MIN_HEIGHT, (pinCount + 1) * INSTANCE_NODE_ROW_HEIGHT);
+function estimateInstanceHeight(statement: SwNetStatement, definitions: NodeDefinitionRegistry): number {
+  return computeGateShape(statement, definitions).height;
 }
 
 // Compute the bounding box of a module that already has a real .sw-mcl layout, so a `use`
@@ -200,6 +203,7 @@ export function computeModuleFootprint(
   module: SwNetModule,
   swMcl: StormworksSwMclDocument,
   nestedFootprints: Map<string, ModuleFootprint>,
+  definitions: NodeDefinitionRegistry = createBundledNodeDefinitions(),
 ): ModuleFootprint | undefined {
   const swMclPortByKey = new Map(
     swMcl.ports.map((port) => [formatPortOccurrenceKey(port.direction, port.name, port.occurrence), port] as const),
@@ -222,7 +226,7 @@ export function computeModuleFootprint(
     const port = swMclPortByKey.get(slot.key);
 
     if (port) {
-      expand(port.position.x, port.position.y, PORT_NODE_SIZE, PORT_NODE_SIZE);
+      expand(port.position.x, port.position.y, GATE_WIDTH, BOUNDARY_PORT_HEIGHT);
     }
   }
 
@@ -243,8 +247,8 @@ export function computeModuleFootprint(
     expand(
       instance.position.x + offsetX,
       instance.position.y + offsetY,
-      nested?.width ?? INSTANCE_NODE_WIDTH,
-      nested?.height ?? estimateInstanceHeight(statement),
+      nested?.width ?? GATE_WIDTH,
+      nested?.height ?? estimateInstanceHeight(statement, definitions),
     );
   }
 
@@ -261,7 +265,7 @@ function buildNetProducerIndex(statements: SwNetStatement[], warnings: string[])
   return indexNetProducers(
     statements,
     (statement) => statement,
-    (statement) => ({ instanceId: statement.instanceId }),
+    (statement, outputKey) => ({ instanceId: statement.instanceId, outputKey }),
     (netName) => {
       warnings.push(`Multiple instance outputs drive net ${netName}; using the first producer for layout.`);
     },
@@ -290,7 +294,7 @@ function groupPortSlotsByName(portSlots: PortSlot[], direction: "in" | "out"): M
   return map;
 }
 
-interface ElkGraphStructure {
+export interface ElkGraphStructure {
   children: ElkNode[];
   edges: ElkExtendedEdge[];
 }
@@ -298,32 +302,54 @@ interface ElkGraphStructure {
 // Build the ELK input graph's nodes/edges: port slots pinned to the first/last rank, instances as
 // ordinary layered nodes. Structure only — computeSwNetModuleLayout may lay this out twice (see
 // buildElkGraph below), and unknown-net/unknown-port warnings must only be emitted once regardless.
-function buildElkGraphStructure(
+export function buildElkGraphStructure(
   portSlots: PortSlot[],
   statements: SwNetStatement[],
   netProducers: Map<string, NetProducer>,
   warnings: string[],
   submoduleFootprints: Map<string, ModuleFootprint> | undefined,
+  definitions: NodeDefinitionRegistry,
 ): ElkGraphStructure {
   const inPortSlotsByName = groupPortSlotsByName(portSlots, "in");
   const outPortSlotsByName = groupPortSlotsByName(portSlots, "out");
+  const statementById = new Map(statements.map((statement) => [statement.instanceId, statement] as const));
+  const statementIndexById = new Map(statements.map((statement, index) => [statement.instanceId, index] as const));
 
   const children: ElkNode[] = portSlots.map((slot) => ({
     id: PORT_NODE_ID_PREFIX + slot.key,
-    width: PORT_NODE_SIZE,
-    height: PORT_NODE_SIZE,
+    width: GATE_WIDTH,
+    height: BOUNDARY_PORT_HEIGHT,
     layoutOptions: {
       "elk.layered.layering.layerConstraint": slot.direction === "in" ? "FIRST_SEPARATE" : "LAST_SEPARATE",
+      "elk.portConstraints": "FIXED_POS",
     },
+    ports: [{
+      id: boundaryPortId(slot),
+      x: slot.direction === "in" ? GATE_WIDTH : 0,
+      y: GATE_FIRST_PORT_OFFSET,
+      width: 0,
+      height: 0,
+      layoutOptions: { "elk.port.side": slot.direction === "in" ? "EAST" : "WEST" },
+    }],
   }));
 
   for (const statement of statements) {
     const footprint = submoduleFootprints?.get(statement.instanceId);
+    const shape = computeGateShape(statement, definitions);
 
     children.push({
       id: INSTANCE_NODE_ID_PREFIX + statement.instanceId,
-      width: footprint?.width ?? INSTANCE_NODE_WIDTH,
-      height: footprint?.height ?? estimateInstanceHeight(statement),
+      width: footprint?.width ?? shape.width,
+      height: footprint?.height ?? shape.height,
+      layoutOptions: footprint ? undefined : { "elk.portConstraints": "FIXED_POS" },
+      ports: footprint ? undefined : [...shape.inputs, ...shape.outputs].map((port) => ({
+        id: instancePortId(statement.instanceId, port.direction, port.key),
+        x: port.position.x,
+        y: port.position.y,
+        width: 0,
+        height: 0,
+        layoutOptions: { "elk.port.side": port.direction === "input" ? "WEST" : "EAST" },
+      })),
     });
   }
 
@@ -333,6 +359,7 @@ function buildElkGraphStructure(
 
   for (const statement of statements) {
     const targetId = INSTANCE_NODE_ID_PREFIX + statement.instanceId;
+    const targetShape = computeGateShape(statement, definitions);
 
     for (const input of statement.inputs) {
       if (input.value.kind === "identifier") {
@@ -345,10 +372,33 @@ function buildElkGraphStructure(
           continue;
         }
 
+        const producerStatement = statementById.get(producer.instanceId);
+        const producerNodeId = INSTANCE_NODE_ID_PREFIX + producer.instanceId;
+        const producerSource = producerStatement && !submoduleFootprints?.has(producer.instanceId)
+          ? elkPortOrNodeId(
+              producerNodeId,
+              computeGateShape(producerStatement, definitions).outputs,
+              producer.instanceId,
+              "output",
+              producer.outputKey,
+            )
+          : producerNodeId;
+
         edges.push({
           id: nextEdgeId(),
-          sources: [INSTANCE_NODE_ID_PREFIX + producer.instanceId],
-          targets: [targetId],
+          sources: [producerSource],
+          targets: [submoduleFootprints?.has(statement.instanceId)
+            ? targetId
+            : elkPortOrNodeId(targetId, targetShape.inputs, statement.instanceId, "input", input.key)],
+          layoutOptions: {
+            // In a cycle, preserve the DSL's forward model order as the main left-to-right flow and
+            // let the backward dependency become the feedback edge.
+            "elk.layered.priority.direction": String(
+              (statementIndexById.get(producer.instanceId) ?? 0) <= (statementIndexById.get(statement.instanceId) ?? 0)
+                ? 10
+                : 0,
+            ),
+          },
         });
         continue;
       }
@@ -365,8 +415,11 @@ function buildElkGraphStructure(
         for (const slot of slots) {
           edges.push({
             id: nextEdgeId(),
-            sources: [PORT_NODE_ID_PREFIX + slot.key],
-            targets: [targetId],
+            sources: [boundaryPortId(slot)],
+            targets: [submoduleFootprints?.has(statement.instanceId)
+              ? targetId
+              : elkPortOrNodeId(targetId, targetShape.inputs, statement.instanceId, "input", input.key)],
+            layoutOptions: { "elk.layered.priority.direction": "10" },
           });
         }
       }
@@ -388,14 +441,35 @@ function buildElkGraphStructure(
       for (const slot of slots) {
         edges.push({
           id: nextEdgeId(),
-          sources: [targetId],
-          targets: [PORT_NODE_ID_PREFIX + slot.key],
+          sources: [submoduleFootprints?.has(statement.instanceId)
+            ? targetId
+            : elkPortOrNodeId(targetId, targetShape.outputs, statement.instanceId, "output", output.key)],
+          targets: [boundaryPortId(slot)],
+          layoutOptions: { "elk.layered.priority.direction": "10" },
         });
       }
     }
   }
 
   return { children, edges };
+}
+
+function boundaryPortId(slot: PortSlot): string {
+  return `${PORT_NODE_ID_PREFIX}${slot.key}$${slot.direction === "in" ? "output" : "input"}`;
+}
+
+function instancePortId(instanceId: string, direction: "input" | "output", key: string): string {
+  return `${INSTANCE_NODE_ID_PREFIX}${instanceId}$${direction}$${key}`;
+}
+
+function elkPortOrNodeId(
+  nodeId: string,
+  ports: Array<{ key: string }>,
+  instanceId: string,
+  direction: "input" | "output",
+  key: string,
+): string {
+  return ports.some((port) => port.key === key) ? instancePortId(instanceId, direction, key) : nodeId;
 }
 
 // Wrap a graph structure with per-pass layout options. `wrapping` toggles the aspect-ratio/wrapping
@@ -432,6 +506,7 @@ function buildElkGraph(structure: ElkGraphStructure, options: AutoLayoutOptions,
     // edge in ELK's graph; this defaults to 10 like the other spacing options above and isn't
     // exercised by any of our test graphs, but pin it too rather than leave a gap in the audit.
     "elk.spacing.nodeSelfLoop": String(nodeSpacing),
+    "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
   };
 
   if (wrapping) {
@@ -456,7 +531,7 @@ function buildElkGraph(structure: ElkGraphStructure, options: AutoLayoutOptions,
 }
 
 // Whether any port/instance in this fill-mode layout already has a real, preserved position —
-// i.e. whether there's an established coordinate frame that a global re-center/rescale could
+// i.e. whether there's an established coordinate frame that a global re-center could
 // detach newly-computed positions from. See the guard in computeSwNetModuleLayout.
 function hasAnyExistingPositions(existing: AutoLayoutExistingPositions | undefined): boolean {
   return existing !== undefined && (existing.ports.size > 0 || existing.instances.size > 0);
@@ -508,7 +583,7 @@ function computeBoundingBox(
   return { minX, minY, maxX, maxY };
 }
 
-// A fill-mode layout with existing entries can't safely be re-centered/rescaled (see the guard in
+// A fill-mode layout with existing entries can't safely be re-centered (see the guard in
 // computeSwNetModuleLayout), but the module may still end up bigger than maxExtent once the
 // genuinely-missing entries this call computed are combined with the preserved existing ones. Warn
 // instead of silently leaving the module oversized.
@@ -530,55 +605,34 @@ function warnIfBoundingBoxExceedsExtent(
   if (width > targetSpan || height > targetSpan) {
     warnings.push(
       `Newly computed positions span ${width.toFixed(2)}x${height.toFixed(2)}, exceeding the ±${maxExtent} target ` +
-        `area; left unscaled because this module keeps existing hand-placed positions, and rescaling only the new ` +
-        `ones would detach them from the preserved layout. Re-run with --force/--regenerate to fully regenerate ` +
+        `area; left in the preserved coordinate frame because this module keeps existing hand-placed positions. ` +
+        `Re-run with --force/--regenerate to fully regenerate ` +
         `within ±${maxExtent}.`,
     );
   }
 }
 
-// Re-center a freshly computed layout on the origin and, if its bounding box still exceeds
-// [-maxExtent, +maxExtent] on either axis, scale that axis down (independently, since this is a
-// schematic grid layout rather than a proportionally-drawn diagram) so it fits. This is a
-// best-effort safety net on top of buildElkGraph's aspect-ratio wrapping: wrapping keeps a long
-// chain from widening (or a tall stack of layers from heightening) unboundedly by folding it toward
-// a square, but it only cuts along the layering axis — it can't help a graph that's wide because a
-// single layer has many parallel nodes, and even squared, a large enough graph can still exceed
-// maxExtent. Heavy compression from this fallback can visually overlap densely-packed nodes, hence
-// the warning below. Only safe to call when there's no existing frame to detach from — see the
-// guard in computeSwNetModuleLayout. Mutates `positionById` in place.
-function fitPositionsWithinExtent(positionById: Map<string, IrVector2>, maxExtent: number, warnings: string[]): void {
+// Re-center without scaling: gate dimensions and port offsets are fixed physical geometry.
+function centerPositions(positionById: Map<string, IrVector2>): void {
   const box = computeBoundingBox(positionById);
 
-  if (!box || maxExtent <= 0) {
+  if (!box) {
     return;
   }
 
   const { minX, minY, maxX, maxY } = box;
-  const width = maxX - minX;
-  const height = maxY - minY;
-  const targetSpan = maxExtent * 2;
-  const scaleX = width > targetSpan ? targetSpan / width : 1;
-  const scaleY = height > targetSpan ? targetSpan / height : 1;
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
 
-  if (scaleX === 1 && scaleY === 1 && centerX === 0 && centerY === 0) {
+  if (centerX === 0 && centerY === 0) {
     return;
   }
 
   for (const [id, position] of positionById) {
     positionById.set(id, {
-      x: (position.x - centerX) * scaleX,
-      y: (position.y - centerY) * scaleY,
+      x: position.x - centerX,
+      y: position.y - centerY,
     });
-  }
-
-  if (scaleX < 1 || scaleY < 1) {
-    warnings.push(
-      `Computed layout bounding box (${width.toFixed(2)}x${height.toFixed(2)}) exceeded the ±${maxExtent} target ` +
-        `area; scaled down (x${scaleX.toFixed(3)}, y${scaleY.toFixed(3)}) to fit, which may compress spacing.`,
-    );
   }
 }
 
