@@ -27,7 +27,10 @@ export function getSwNetInstanceName(node: IrNode): string {
 }
 
 
-export const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+// Mirrors the parser's Unicode ID_Start/ID_Continue-based identifier lexing (see
+// `isIdentifierStart`/`isIdentifierPart` in ../parsers/sw-net.ts) so a value that lexes as a bare
+// identifier is exactly the set of values this pattern matches.
+export const IDENTIFIER_PATTERN = /^[_\p{ID_Start}][_\p{ID_Continue}]*$/u;
 
 // Words that lex as boolean/null literal tokens rather than identifiers, even though they match
 // IDENTIFIER_PATTERN; a bare key or list-entry label spelled this way would fail to reparse.

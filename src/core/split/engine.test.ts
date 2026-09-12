@@ -90,6 +90,25 @@ describe("buildSplitModulePlan", () => {
     expect(result.value!.sourceEdits.some((edit) => edit.newText.includes("extracted_2"))).toBe(true);
   });
 
+  it("accepts a Unicode new module id, instance id, and import alias", () => {
+    const source = parseSwNetSourceDocument("module main\n  inst ABS a : a=1 -> out=r1\nend\n");
+    const result = buildSplitModulePlan({
+      definitions,
+      source,
+      moduleId: "main",
+      gateInstanceIds: ["a"],
+      newModuleId: "抽出モジュール",
+      newInstanceId: "抽出ゲート",
+      newImportAlias: "抽出",
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.value!.newModule.id).toBe("抽出モジュール");
+    expect(result.value!.movedInstanceIds).toEqual(["a"]);
+    const combinedEdits = result.value!.sourceEdits.map((edit) => edit.newText).join("\n");
+    expect(combinedEdits).toContain("抽出.抽出モジュール 抽出ゲート");
+  });
+
   it("splits local nets, module-port passthroughs, fan-out, and fully-internal nets correctly", () => {
     const text = [
       'import helper from "./helper.sw-net"',
