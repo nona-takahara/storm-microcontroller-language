@@ -45,7 +45,9 @@ describe("project flattening", () => {
 
     expect(statement.kind).toBe("inst");
     if (statement.kind === "inst") {
-      expect(statement.attributes.map(({ key, value }) => [key, value.value])).toEqual([
+      expect(
+        statement.attributes.map(({ key, value }) => [key, value.kind === "list" ? undefined : value.value]),
+      ).toEqual([
         ["min", -1],
         ["max", 1],
       ]);

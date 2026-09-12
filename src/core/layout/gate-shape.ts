@@ -115,7 +115,12 @@ function propertyValue(
   defaults: Record<string, string | number | boolean | null> | undefined,
 ): string | number | boolean | null | undefined {
   const attribute = attributes.find((candidate) => candidate.key === key);
-  return attribute ? attribute.value.value : defaults?.[key];
+
+  if (!attribute) {
+    return defaults?.[key];
+  }
+
+  return attribute.value.kind === "list" ? undefined : attribute.value.value;
 }
 
 function uniqueKeys(declared: string[], connected: SwNetAssignment[]): string[] {

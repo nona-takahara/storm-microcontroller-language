@@ -29,6 +29,15 @@ export function getSwNetInstanceName(node: IrNode): string {
 
 export const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+// Words that lex as boolean/null literal tokens rather than identifiers, even though they match
+// IDENTIFIER_PATTERN; a bare key or list-entry label spelled this way would fail to reparse.
+const RESERVED_LITERAL_KEYWORDS = new Set(["true", "false", "null"]);
+
+// Test whether text can be written as a bare (unquoted) sw-net identifier-shaped key.
+export function canFormatAsBareDslKey(value: string): boolean {
+  return IDENTIFIER_PATTERN.test(value) && !RESERVED_LITERAL_KEYWORDS.has(value);
+}
+
 // Sanitize arbitrary source text into a bare sw-net identifier.
 export function sanitizeSwNetIdentifier(value: string, emptyFallback = "node"): string {
   const sanitized = value.replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");

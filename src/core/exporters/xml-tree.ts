@@ -29,6 +29,7 @@ import {
 import { microprocessorIconToSymValues } from "../shared/microprocessor-icon.js";
 import { indexNetProducers } from "../shared/producer-index.js";
 import { resolveModuleInstancePositions } from "../shared/module-net-graph.js";
+import { encodeSwNetItemListEntries } from "../shared/scalar-coercion.js";
 
 export type StormworksXmlTreeScalar = string | number | boolean | null;
 export type StormworksXmlTreeValue = StormworksXmlTreeScalar | StormworksXmlTreeElement | StormworksXmlTreeValue[];
@@ -1034,7 +1035,30 @@ function applyInstanceAttributes(
     }
 
     // Non-script attributes either map through definitions or fall back to raw object attributes.
-    const scalarValue = expressionToScalarValue(attribute.value);
+    const propertyDefinition = resolveDslPropertyDefinition(instance.definition, attribute.key);
+
+    let scalarValue: IrScalarValue | undefined;
+
+    if (attribute.value.kind === "list") {
+      // A list literal is only meaningful for itemList-flagged properties (e.g. PROPERTY_DROPDOWN's
+      // items); anywhere else it's rejected exactly like any other non-scalar attribute value.
+      if (propertyDefinition?.source?.itemList !== true) {
+        pushExportWarning(
+          warnings,
+          `Attribute ${attribute.key} on ${instance.statement.instanceId} is not a scalar and was skipped.`,
+          undefined,
+          {
+            messageId: "export.attributeNonScalar",
+            messageArgs: { attributeKey: attribute.key, instanceId: instance.statement.instanceId },
+          },
+        );
+        continue;
+      }
+
+      scalarValue = encodeSwNetItemListEntries(attribute.value.entries);
+    } else {
+      scalarValue = expressionToScalarValue(attribute.value);
+    }
 
     if (scalarValue === undefined) {
       pushExportWarning(
@@ -1048,8 +1072,6 @@ function applyInstanceAttributes(
       );
       continue;
     }
-
-    const propertyDefinition = resolveDslPropertyDefinition(instance.definition, attribute.key);
 
     if (!propertyDefinition) {
       asTreeElement(componentElement.object)[`@_${attribute.key}`] = formatXmlScalarValue(scalarValue);

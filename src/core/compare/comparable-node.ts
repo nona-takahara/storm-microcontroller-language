@@ -8,6 +8,7 @@ import {
   type SwNetStatement,
 } from "../parsers/sw-net.js";
 import { formatPortNameKey } from "../serializers/sw-net-shared.js";
+import { encodeSwNetItemListEntries } from "../shared/scalar-coercion.js";
 import { type ComparableModuleGraph, type ComparableNode, type ComparablePortIdentity } from "./types.js";
 
 /** Resolve and enrich one module into the complete, position-independent shape used for comparison. */
@@ -76,5 +77,5 @@ function literalInputRecord(assignments: readonly SwNetAssignment[]): Record<str
 }
 
 function expressionToScalar(expression: SwNetExpression): IrScalarValue {
-  return expression.value;
+  return expression.kind === "list" ? encodeSwNetItemListEntries(expression.entries) : expression.value;
 }

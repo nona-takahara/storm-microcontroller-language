@@ -69,7 +69,8 @@ export type SwNetExpression =
   | SwNetStringExpression
   | SwNetNumberExpression
   | SwNetBooleanExpression
-  | SwNetNullExpression;
+  | SwNetNullExpression
+  | SwNetListExpression;
 
 export interface SwNetIdentifierExpression {
   kind: "identifier";
@@ -94,6 +95,14 @@ export interface SwNetBooleanExpression {
 export interface SwNetNullExpression {
   kind: "null";
   value: null;
+}
+
+// A bracketed `[label=value, ...]` list literal, reusing the same key=value grammar as attribute
+// lists (see PROPERTY_DROPDOWN's `items`). Deliberately has no `value` field so that any exhaustive
+// switch over SwNetExpression fails to compile until it handles this kind explicitly.
+export interface SwNetListExpression {
+  kind: "list";
+  entries: SwNetAssignment[];
 }
 
 /** Error type for syntax and namespace problems found while parsing sw-net source text. */
@@ -122,6 +131,8 @@ export type SwNetTokenKind =
   | "equal"
   | "lparen"
   | "rparen"
+  | "lbracket"
+  | "rbracket"
   | "arrow"
   | "eof";
 
@@ -391,7 +402,7 @@ class SwNetParser {
   }
 
   /** Parse a comma-separated assignment list until the requested terminator is reached. */
-  private parseAssignmentList(terminator: "rparen" | "arrow" | "statement"): SwNetAssignment[] {
+  private parseAssignmentList(terminator: "rparen" | "arrow" | "statement" | "rbracket"): SwNetAssignment[] {
     const assignments: SwNetAssignment[] = [];
 
     while (true) {
@@ -463,11 +474,29 @@ class SwNetParser {
       };
     }
 
+    if (this.isToken("lbracket")) {
+      return this.parseListExpression();
+    }
+
     const identifierToken = this.expect("identifier");
     return {
       kind: "identifier",
       value: identifierToken.text,
     };
+  }
+
+  /** Parse a bracketed `[label=value, ...]` list literal, reusing the same key=value grammar as attributes. */
+  private parseListExpression(): SwNetListExpression {
+    this.expect("lbracket");
+
+    if (this.isToken("rbracket")) {
+      this.expect("rbracket");
+      return { kind: "list", entries: [] };
+    }
+
+    const entries = this.parseAssignmentList("rbracket");
+    this.expect("rbracket");
+    return { kind: "list", entries };
   }
 
   /** Detect tokens that terminate the current statement without consuming them. */
@@ -608,6 +637,16 @@ class SwNetLexer {
     if (char === ")") {
       this.advance();
       return this.tokenAt("rparen", ")", startLine, startColumn, this.index - 1);
+    }
+
+    if (char === "[") {
+      this.advance();
+      return this.tokenAt("lbracket", "[", startLine, startColumn, this.index - 1);
+    }
+
+    if (char === "]") {
+      this.advance();
+      return this.tokenAt("rbracket", "]", startLine, startColumn, this.index - 1);
     }
 
     if (char === "-" && this.peekChar(1) === ">") {

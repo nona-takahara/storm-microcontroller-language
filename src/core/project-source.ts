@@ -723,10 +723,9 @@ function validateInstStatement(
     );
   }
 
-  const scriptRefValue = statement.attributes.find(
-    (attribute) => attribute.key === "script_ref" && attribute.value.kind === "string",
-  )?.value.value;
-  const scriptRef = typeof scriptRefValue === "string" ? scriptRefValue : undefined;
+  const scriptRefAttribute = statement.attributes.find((attribute) => attribute.key === "script_ref");
+  const scriptRef =
+    scriptRefAttribute?.value.kind === "string" ? scriptRefAttribute.value.value : undefined;
 
   if (scriptRef && sourceDocument.scripts[scriptRef] === undefined) {
     diagnostics.push(
