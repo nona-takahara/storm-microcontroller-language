@@ -969,14 +969,22 @@ function expectBooleanTokenValue(token: Token): boolean {
   throw new Error("Expected boolean token value");
 }
 
+// Unicode ID_Start/ID_Continue (UAX #31, the same properties ECMAScript's own identifier grammar
+// uses) let non-ASCII letters and digits appear in bare sw-net identifiers (module/instance ids,
+// net names) without disturbing the quoted-string syntax used elsewhere for port references.
+// `_` is added explicitly to ID_Start since connector punctuation is only part of ID_Continue.
+// This is checked one UTF-16 code unit at a time (see `advance`), so a character from outside the
+// Basic Multilingual Plane (most emoji, some rare CJK extension ideographs) will not extend an
+// identifier — a deliberate, documented scope boundary, not a bug.
+
 /** Test whether a character can start a bare identifier. */
 function isIdentifierStart(value: string | undefined): boolean {
-  return value !== undefined && /[A-Za-z_]/.test(value);
+  return value !== undefined && /[_\p{ID_Start}]/u.test(value);
 }
 
 /** Test whether a character can continue a bare identifier. */
 function isIdentifierPart(value: string | undefined): boolean {
-  return value !== undefined && /[A-Za-z0-9_]/.test(value);
+  return value !== undefined && /[_\p{ID_Continue}]/u.test(value);
 }
 
 /** Test whether a character is an ASCII decimal digit. */

@@ -193,6 +193,41 @@ describe("buildSynchronizationPlan", () => {
     expect(plan.applicable).toBe(true);
   });
 
+  it("preserves hand-authored Japanese instance ids and net names while updating a changed value", async () => {
+    const existingText = [
+      "module main\n",
+      "  inst SOURCE 電源 (value=1) : -> out=配線\n",
+      "  inst SINK 受信 : in=配線 ->\n",
+      "end\n",
+    ].join("");
+    const existing = project(existingText, "old", [
+      { id: "電源", type: "SOURCE", position: { x: 1, y: 1 } },
+      { id: "受信", type: "SINK", position: { x: 2, y: 1 } },
+    ]);
+    const resolved = await resolveProjectSource(existing);
+    expect(resolved.value).toBeDefined();
+
+    const incoming = project([
+      "module generated\n",
+      "  inst SOURCE x (value=2) : -> out=a\n",
+      "  inst SINK y : in=a ->\n",
+      "end\n",
+    ].join(""), "new", [
+      { id: "x", type: "SOURCE", position: { x: 1, y: 1 } },
+      { id: "y", type: "SINK", position: { x: 2, y: 1 } },
+    ], "generated");
+    const plan = buildSynchronizationPlan(resolved.value!, incoming);
+
+    expect(plan.conflicts).toEqual([]);
+    expect(plan.applicable).toBe(true);
+    expect(plan.summary).toMatchObject({ added: 0, removed: 0, updated: 1 });
+    const materialized = materializeSynchronizationSources(resolved.value!, plan)["main.sw-net"]!;
+    expect(materialized).toContain("inst SOURCE 電源 (value=2)");
+    expect(materialized).toContain("inst SINK 受信");
+    expect(materialized).toContain("out=配線");
+    expect(materialized).toContain("in=配線");
+  });
+
   it("uses the exact path for twelve independent property-distinguished nodes regardless of the partial budget", async () => {
     const size = 12;
     const statements = (prefix: string, reverse = false) => {

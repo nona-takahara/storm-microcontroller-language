@@ -9,7 +9,6 @@ import {
   compareSwNetIdentifier,
   getSwNetInstanceName,
   getSwNetInstanceTypeName,
-  IDENTIFIER_PATTERN,
   sanitizeSwNetIdentifier,
 } from "./sw-net-shared.js";
 
@@ -391,9 +390,10 @@ function createInternalNetName(instanceName: string, portKey: string): string {
   return `${instanceName}_${sanitizeSwNetIdentifier(portKey)}`;
 }
 
-// Keep generated identifiers valid and stable even when source names contain spaces.
+// Keep generated identifiers valid and stable even when source names don't fit the bare-identifier
+// character set (spaces, punctuation, reserved literal keywords).
 function formatBareIdentifier(value: string): string {
-  return IDENTIFIER_PATTERN.test(value) ? value : sanitizeSwNetIdentifier(value, "module");
+  return canFormatAsBareDslKey(value) ? value : sanitizeSwNetIdentifier(value, "module");
 }
 
 // Keep user-facing module-port names verbatim by always quoting them in DSL.
