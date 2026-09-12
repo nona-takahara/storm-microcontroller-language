@@ -6,6 +6,7 @@ import {
   type SwNetModule,
   type SwNetStatement,
 } from "../parsers/sw-net.js";
+import { canFormatAsBareDslKey } from "./sw-net-shared.js";
 
 export interface SerializeSwNetDocumentOptions {
   newlineAtEnd?: boolean;
@@ -104,9 +105,7 @@ function serializeAssignments(assignments: SwNetAssignment[]): string {
 // Keep conventional gate-pin keys compact, but quote module-port names that are not identifier
 // tokens. `true`, `false`, and `null` are lexer literals rather than identifiers as well.
 function formatAssignmentKey(key: string): string {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/u.test(key) && key !== "true" && key !== "false" && key !== "null"
-    ? key
-    : JSON.stringify(key);
+  return canFormatAsBareDslKey(key) ? key : JSON.stringify(key);
 }
 
 // Serialize one sw-net expression back to source text.
@@ -122,6 +121,8 @@ function serializeExpression(expression: SwNetExpression): string {
       return expression.value ? "true" : "false";
     case "null":
       return "null";
+    case "list":
+      return `[${serializeAssignments(expression.entries)}]`;
   }
 }
 

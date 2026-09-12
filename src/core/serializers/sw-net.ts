@@ -5,6 +5,7 @@ import { type IrLink, type IrNode, type IrProgram, type IrScalarValue, type IrSu
 import { resolvePinNames, resolvePortNodeName } from "../shared/pin-naming.js";
 import { coerceScalarValue } from "../shared/scalar-coercion.js";
 import {
+  canFormatAsBareDslKey,
   compareSwNetIdentifier,
   getSwNetInstanceName,
   getSwNetInstanceTypeName,
@@ -239,6 +240,13 @@ function collectAttributeAssignments(
       continue;
     }
 
+    if (propertyDefinition.source?.itemList === true && typeof dslValue === "string") {
+      const formattedItemList = formatDslItemList(dslValue);
+      assignments.push(`${dslKey}=${formattedItemList ?? formatDslScalar(dslValue)}`);
+      emittedDslKeys.add(dslKey);
+      continue;
+    }
+
     assignments.push(`${dslKey}=${formatDslScalar(dslValue)}`);
     emittedDslKeys.add(dslKey);
   }
@@ -408,6 +416,52 @@ function formatDslScalar(value: IrScalarValue | undefined): string {
   }
 
   return value ? "true" : "false";
+}
+
+// Render an itemList property's stored {l, value}[] JSON string (see extractItemListValue in
+// importers/xml.ts) as a `[label=value, ...]` list literal. Returns undefined (falls back to plain
+// quoted-string escaping) when the stored value isn't valid item-list JSON, so a malformed value
+// never crashes serialization.
+function formatDslItemList(value: string): string | undefined {
+  let items: unknown;
+
+  try {
+    items = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+
+  if (!Array.isArray(items)) {
+    return undefined;
+  }
+
+  const entries = items.map((item) => {
+    const record = (item ?? {}) as { l?: unknown; value?: unknown };
+    const label = typeof record.l === "string" ? record.l : String(record.l ?? "");
+    return `${formatDslItemListLabel(label)}=${formatDslItemListValue(record.value)}`;
+  });
+
+  return `[${entries.join(", ")}]`;
+}
+
+// Quote an item-list label only when it cannot be written as a bare sw-net identifier.
+function formatDslItemListLabel(label: string): string {
+  return canFormatAsBareDslKey(label) ? label : JSON.stringify(label);
+}
+
+// Render one item-list entry's value, preferring a bare number literal when the stored string
+// round-trips exactly through Number(...) so re-parsing can't silently change the stored value
+// (e.g. a leading-zero string like "007" stays quoted rather than becoming 7).
+function formatDslItemListValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "null";
+  }
+
+  if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value) && String(Number(value)) === value) {
+    return value;
+  }
+
+  return formatDslScalar(value as IrScalarValue);
 }
 
 // Coerce imported scalar values into the DSL type expected by a property definition.

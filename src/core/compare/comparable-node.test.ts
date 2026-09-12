@@ -32,6 +32,19 @@ describe("normalizeComparableModule", () => {
     );
   });
 
+  it("normalizes a list-literal items attribute to the same JSON string XML import produces", () => {
+    const source = `
+module main
+  inst PROPERTY_DROPDOWN gate (items=[None=0, "Single arm inner"=1]) : -> out=gate_out
+end
+`;
+    const module = parseSwNetDocument(source).modules[0];
+    expect(module).toBeDefined();
+
+    const gate = normalizeComparableModule(module!).value?.nodes.find((node) => node.node.id === "gate");
+    expect(gate?.attributes.items).toBe('[{"l":"None","value":"0"},{"l":"Single arm inner","value":"1"}]');
+  });
+
   it("gives duplicate ports signal-aware occurrence identities", () => {
     const source = `
 module duplicate_ports

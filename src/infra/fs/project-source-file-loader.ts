@@ -232,11 +232,9 @@ function collectScriptRefs(swNet: SwNetDocument): Set<string> {
 
 // Extract one string-valued script_ref from an inst statement when present.
 function getStatementScriptRef(statement: SwNetInstStatement): string | undefined {
-  const scriptRefValue = statement.attributes.find(
-    (attribute) => attribute.key === "script_ref" && attribute.value.kind === "string",
-  )?.value.value;
+  const scriptRefAttribute = statement.attributes.find((attribute) => attribute.key === "script_ref");
 
-  return typeof scriptRefValue === "string" ? scriptRefValue : undefined;
+  return scriptRefAttribute?.value.kind === "string" ? scriptRefAttribute.value.value : undefined;
 }
 
 // Replace a .sw-net extension with the matching companion-file extension.
