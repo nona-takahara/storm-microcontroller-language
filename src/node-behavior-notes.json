@@ -183,13 +183,14 @@
       "category": "composite",
       "status": "done",
       "relatedIssues": [
-        4
+        4,
+        101
       ],
       "notes": [
         {
           "category": "truth-table",
-          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
-          "confidence": "unconfirmed"
+          "text": "When `switch` is true, `out` is `a`; when `switch` is false, `out` is `b`.",
+          "confidence": "verified"
         },
         {
           "category": "edge-case",
@@ -273,9 +274,17 @@
     "CONST_BOOL": {
       "displayName": "Constant On",
       "category": "value",
-      "status": "todo",
-      "relatedIssues": [],
-      "notes": []
+      "status": "done",
+      "relatedIssues": [
+        102
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "text": "Outputs `true`.",
+          "confidence": "verified"
+        }
+      ]
     },
     "COUNTER": {
       "displayName": "Up/Down Counter",
@@ -545,7 +554,9 @@
       "displayName": "Numerical Switchbox",
       "category": "control",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [
+        101
+      ],
       "notes": [
         {
           "category": "edge-case",
@@ -554,8 +565,8 @@
         },
         {
           "category": "truth-table",
-          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded.",
-          "confidence": "unconfirmed"
+          "text": "When `switch` is true, `out` is `a`; when `switch` is false, `out` is `b`.",
+          "confidence": "verified"
         }
       ]
     },
@@ -726,9 +737,15 @@
       "category": "comparison",
       "status": "done",
       "relatedIssues": [
-        1
+        1,
+        102
       ],
       "notes": [
+        {
+          "category": "truth-table",
+          "text": "The range is inclusive: `out` is true when `min <= value <= max`.",
+          "confidence": "verified"
+        },
         {
           "category": "serialization",
           "text": "`min` and `max` follow storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
