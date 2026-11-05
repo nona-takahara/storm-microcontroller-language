@@ -69,29 +69,6 @@ pnpm cli spec SR_LATCH --json         # 機械可読な JSON 出力
 
 `spec` は、ソースコードを読まなくても人間・AI エージェント双方がゲートやツールの挙動を把握できるようにするためのコマンドです。ポート・プロパティの構造情報に加え、`src/node-behavior-notes.json` / `src/stormworks-system-notes.json` に記録された実機での既知の挙動（未確認の情報も確信度付きで隠さず表示）を返します。
 
-## MCP サーバー
-
-このパッケージは、エージェントクライアント向けの標準入出力 MCP サーバーも提供します。
-
-```bash
-pnpm mcp
-# インストールまたはビルド後:
-storm-mcl-mcp
-```
-
-利用できる MCP ツールは、主要な CLI ワークフローに対応しています。
-
-| ツール | 用途 |
-|---|---|
-| `xml_to_dsl` | Stormworks XML ファイルを `project.json`、`.sw-net`、`.sw-mcl` ファイルに変換します。 |
-| `dsl_to_xml` | DSL プロジェクトを Stormworks XML に戻します。必要に応じて指定パスへ書き込みます。 |
-| `check_dsl` | DSL 構文と import 解決を検証します。 |
-| `typecheck_dsl` | signal 型を検証し、ポート不整合を報告します。 |
-| `spec` | `storm-mcl spec` と同じゲート・ツール挙動リファレンスを返します。`list=true`、`gate_id`、`json=true` を指定できます。 |
-| `layout_dsl` | `storm-mcl layout-dsl` と同様に `.sw-mcl` の自動レイアウトを計算し(既定では書き込みます)。`module_id`/`document_path`、`all_submodules`、`force`、`dry_run`、`grid_size` に対応します。 |
-
-MCP ツールの説明文と応答文は、世界中の MCP クライアントで一貫して表示できるように英語で返します。
-
 ## DSL 形式
 
 ### .sw-net

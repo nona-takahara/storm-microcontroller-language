@@ -132,7 +132,7 @@ interface XmlIdAllocator {
 const DEFAULT_GROUP_DATA_TYPE = "-1104064832";
 
 // Export warnings are emitted as structured diagnostics at their source so callers do not need
-// adapter code that can drift between CLI, MCP, and library entry points.
+// adapter code that can drift between CLI and library entry points.
 function pushExportWarning(
   warnings: Diagnostic[],
   message: string,
@@ -578,7 +578,7 @@ function resolveInstancePosition(
       // elsewhere in this file, so tooling can tell "renamed instance" apart from any other
       // export-time warning (see also src/core/module-net-view.ts's INSTANCE_LAYOUT_ID_MISMATCH,
       // which is the more reliably reachable consumer of this code -- see CLAUDE.md/PR notes on why
-      // dsl2xml/dsl_to_xml rarely surface this one in practice).
+      // dsl2xml rarely surfaces this one in practice).
       warnings.push(
         createWarningDiagnostic(
           "INSTANCE_LAYOUT_ID_MISMATCH",
@@ -1465,7 +1465,7 @@ function buildBridgeObjectElement(
   };
   const slot = portSlotsByProjectNodeId.get(projectNode.document.id);
   // Bridge-canvas position now lives entirely in .sw-mcl's port slots (project.json no longer
-  // carries its own copy); computeProjectLayoutOverrides (CLI/MCP) keeps that data filled in.
+  // carries its own copy); computeProjectLayoutOverrides keeps that data filled in.
   const position = slot?.position;
 
   if (position) {

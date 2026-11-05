@@ -6,7 +6,7 @@ import {
   type Translator,
 } from "./i18n/index.js";
 
-// Shared diagnostic helpers keep CLI, MCP, and library code on one public shape.
+// Shared diagnostic helpers keep CLI and library code on one public shape.
 export type StormworksDiagnosticSeverity = "error" | "warning" | "info";
 export type StormworksDiagnosticSource = string;
 
@@ -141,7 +141,7 @@ export async function runAsyncToDiagnostics<T>(
   }
 }
 
-// Format diagnostics consistently for human-facing CLI/MCP output; include location only when present.
+// Format diagnostics consistently for human-facing CLI output; include location only when present.
 export function formatDiagnostic(diagnostic: Diagnostic, translator: Translator = englishTranslator): string {
   const location = [diagnostic.documentId, diagnostic.path].filter((value): value is string => !!value).join(":");
   const suffix = location.length > 0 ? ` (${location})` : "";

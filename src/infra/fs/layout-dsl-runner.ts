@@ -1,5 +1,4 @@
-// Shared layout-dsl execution core used by both the CLI (`storm-mcl layout-dsl`) and the MCP
-// `layout_dsl` tool, so the two front ends stay behaviorally identical.
+// Layout execution core used by the CLI (`storm-mcl layout-dsl`) and Node.js library callers.
 import { computeSwNetModuleLayout, type AutoLayoutExistingPositions } from "../../core/layout/auto-layout.js";
 import { type IrVector2 } from "../../core/ir.js";
 import { type LocalizedMessage } from "../../core/i18n/index.js";
@@ -242,12 +241,12 @@ export interface ComputeProjectLayoutOverridesResult {
 }
 
 // Compute (but never write) ELK auto-layout for any module reachable from the project whose .sw-mcl
-// is missing or incomplete, so dsl2xml/dsl2xml-tree (CLI) and dsl_to_xml (MCP) can feed computed
+// is missing or incomplete, so dsl2xml/dsl2xml-tree and library callers can feed computed
 // positions into the exporter purely in memory instead of falling through to the exporter's cruder
 // shared-anchor/omitted-<pos> degradation (see src/core/exporters/xml-tree.ts's
 // resolveInstancePosition) -- without mutating the user's project directory as a side effect of what
 // is otherwise a read-only conversion. Persisting a computed layout to disk still requires an
-// explicit `layout-dsl`/`layout_dsl` call; this function is deliberately side-effect-free. Best-effort:
+// explicit `layout-dsl` call; this function is deliberately side-effect-free. Best-effort:
 // .sw-mcl has always been an optional input (CLAUDE.md), so failures here are reported as messages but
 // never thrown — the caller's normal load/export flow still runs afterward and will surface any real,
 // blocking problem.

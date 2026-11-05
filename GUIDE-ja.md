@@ -57,46 +57,26 @@ pnpm build
 
 完了すると `dist` というフォルダが作成されます。
 
-### ステップ3：AIツールにMCPサーバーを登録する
+### ステップ3：CLIの起動を確認する
 
-AIツール（Claude Code、Cursor、Windsurfなど）の設定ファイルに以下を追加します。
+展開したフォルダで次のコマンドを実行し、ゲートの一覧が表示されることを確認してください。
 
-**Claude Code（CLIまたはIDE拡張）の場合：**
-
-`%USERPROFILE%\.claude\settings.json`（Windowsの場合）を開き、以下を追加します：
-
-```json
-{
-  "mcpServers": {
-    "storm-mcl": {
-      "command": "node",
-      "args": ["C:\\Tools\\storm-mcl\\dist\\mcp\\server.js"]
-    }
-  }
-}
+```bash
+pnpm cli spec --list
 ```
 
-> `C:\\Tools\\storm-mcl\\` の部分は、実際にツールを展開したフォルダのパスに変えてください。  
-> パスの区切り文字は `\\`（バックスラッシュ2つ）にする必要があります。
-
-**Claude Desktop（デスクトップアプリ）の場合：**
-
-`%APPDATA%\Claude\claude_desktop_config.json` を開き、同じ内容を追加します。
-
-**Cursorの場合：**
-
-`設定 → MCP → + Add Server` から同様の設定を追加できます。
+AIと一緒に作業する場合は、ローカルファイルの編集とコマンド実行に対応したAIツールで、このフォルダを開いてください。
 
 ---
 
 ## 使い方
 
-登録が完了したら、AIに話しかけるだけで使えます。
+コマンドは、ツールを展開したフォルダで実行してください。AIに依頼する場合は、CLIを使うことと入力・出力のパスを伝えてください。
 
 ### XMLをDSLに変換する（編集の準備）
 
 ```
-このXMLファイルをDSL形式に変換してください。
+pnpm cli xml2dsl を使って、このXMLファイルをDSL形式に変換してください。
 入力：C:\Users\あなた\Documents\mycontroller.xml
 出力先：C:\Users\あなた\Documents\mycontroller-dsl\
 ```
@@ -110,7 +90,7 @@ AIツール（Claude Code、Cursor、Windsurfなど）の設定ファイルに�
 ### DSLをXMLに戻す（Stormworksへの読み込み準備）
 
 ```
-DSLファイルをXMLに変換してください。
+pnpm cli dsl2xml を使って、DSLファイルをXMLに変換してください。
 project.json：C:\Users\あなた\Documents\mycontroller-dsl\project.json
 出力：C:\Users\あなた\Documents\mycontroller-edited.xml
 ```
@@ -118,14 +98,14 @@ project.json：C:\Users\あなた\Documents\mycontroller-dsl\project.json
 ### エラーチェック
 
 ```
-このDSLファイルにエラーがないか確認してください。
+pnpm cli check-dsl を使って、このDSLファイルにエラーがないか確認してください。
 C:\Users\あなた\Documents\mycontroller-dsl\project.json
 ```
 
 ### 型チェック（信号の種類が合っているか確認）
 
 ```
-信号の型が正しく接続されているか確認してください。
+pnpm cli typecheck-dsl を使って、信号の型が正しく接続されているか確認してください。
 C:\Users\あなた\Documents\mycontroller-dsl\project.json
 ```
 
@@ -142,8 +122,9 @@ C:\Users\あなた\Documents\mycontroller-dsl\project.json
 **Q. ビルド後にdistフォルダが見当たらない**  
 → `pnpm build` の出力にエラーメッセージが出ていないか確認してください。
 
-**Q. AIがstorm-mclツールを認識しない**  
-→ AIツールを再起動してください。設定ファイルの変更はツール再起動後に反映されます。パスに日本語や空白が含まれる場合は、ツールを `C:\storm-mcl\` のような英数字のみのパスに移動してみてください。
+**Q. AIがstorm-mclの使い方を知らない**
+
+→ AIにこのフォルダの `README-ja.md` を読むよう依頼してください。コマンドを実行できないAIツールでは、提案されたコマンドを自分でコマンドプロンプトから実行してください。
 
 **Q. 変換したXMLをStormworksに読み込むには？**  
 → Stormworks内のマイコン編集画面で「Load」ボタンから変換後のXMLを選択します。

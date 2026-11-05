@@ -50,6 +50,8 @@ pnpm cli dsl2xml <project.json> --out <output.xml>
 
 ### Other commands
 
+`compare-dsl` uses port-key-strict matching. As an intentional v1 limitation, re-serializing a commutative gate with its inputs swapped (for example AND, OR, or ADD) is reported as different even though the circuit is semantically equivalent.
+
 ```bash
 # Check DSL structure, such as unresolved references.
 pnpm cli check-dsl <project.json>
@@ -68,32 +70,6 @@ pnpm cli spec SR_LATCH --json         # Print machine-readable JSON
 ```
 
 The `spec` command helps both humans and AI agents understand gate and tool behavior without reading the source code. It combines port/property structure with known in-game behavior from `src/node-behavior-notes.json` and `src/stormworks-system-notes.json`, including confidence levels for unverified notes.
-
-## MCP server
-
-The package also exposes a stdio MCP server for agent clients.
-
-```bash
-pnpm mcp
-# after installation/build:
-storm-mcl-mcp
-```
-
-Available MCP tools mirror the core CLI workflows.
-
-| Tool | Purpose |
-|---|---|
-| `xml_to_dsl` | Convert a Stormworks XML file into `project.json`, `.sw-net`, and `.sw-mcl` files. |
-| `dsl_to_xml` | Convert a DSL project back into Stormworks XML, optionally writing it to a path. |
-| `check_dsl` | Validate DSL syntax and import resolution. |
-| `typecheck_dsl` | Validate signal types and report port mismatches. |
-| `compare_dsl` | Compare two `project.json` or `.sw-net` inputs for structural equivalence; supports paired `module_id_a`/`module_id_b` selectors and JSON output. |
-| `spec` | Read the same gate/tool behavior reference as `storm-mcl spec`; use `list=true`, `gate_id`, and/or `json=true`. |
-| `layout_dsl` | Compute (and by default write) `.sw-mcl` auto-layout, same as `storm-mcl layout-dsl`; supports `module_id`/`document_path`, `all_submodules`, `force`, `dry_run`, and `grid_size`. |
-
-All MCP tool descriptions and responses are written in English so global MCP clients can display them consistently.
-
-`compare-dsl`/`compare_dsl` uses port-key-strict matching. As an intentional v1 limitation, re-serializing a commutative gate with its inputs swapped (for example AND, OR, or ADD) is reported as different even though the circuit is semantically equivalent.
 
 ## DSL format
 

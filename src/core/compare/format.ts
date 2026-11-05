@@ -7,7 +7,7 @@ import {
   type ProjectComparisonResult,
 } from "./types.js";
 
-/** Format a comparison result for human-facing CLI and MCP text output. */
+/** Format a comparison result for human-facing CLI text output. */
 export function formatNetworkComparison(
   result: NetworkComparisonResult,
   translator: Translator = englishTranslator,
