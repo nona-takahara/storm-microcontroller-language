@@ -2,6 +2,7 @@
 export * from "./core/diagnostics.js";
 export * from "./core/i18n/index.js";
 export * from "./core/ir.js";
+export * from "./core/shared/output-file-name.js";
 export * from "./core/project-source.js";
 export * from "./core/definitions/bundled.js";
 export * from "./core/definitions/schema.js";

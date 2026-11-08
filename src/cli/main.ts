@@ -21,6 +21,7 @@ import {
   formatSpecOverviewText,
   formatSynchronizationReport,
   importStormworksXmlToProjectSource,
+  inspectOutputFileName,
   listGateSpecSummaries,
   loadBundledNodeBehaviorNotes,
   loadBundledNodeDefinitions,
@@ -99,6 +100,22 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
+// Announce a written file, and warn (without failing) when its file name has a hyphen or non-ASCII character.
+function reportWrittenFile(filePath: string): void {
+  console.error(cliTranslator.format("cli.wroteFile", { path: filePath }));
+
+  const { fileName, discouragedCharacters } = inspectOutputFileName(filePath);
+
+  if (discouragedCharacters.length > 0) {
+    console.error(
+      `[${cliTranslator.format("diagnostic.severity.warning")}] ${cliTranslator.format("cli.discouragedFileName", {
+        name: fileName,
+        characters: discouragedCharacters.map((character) => JSON.stringify(character)).join(", "),
+      })}`,
+    );
+  }
+}
+
 // Convert XML into the standard project.json + sw-net + sw-mcl file set.
 async function runXml2DslCommand(args: string[]): Promise<number> {
   const parsedArgs = parseXml2DslArgs(args);
@@ -136,13 +153,13 @@ async function runXml2DslCommand(args: string[]): Promise<number> {
     await writeProjectSourceToDirectory(result.value, parsedArgs.outputDirectory);
     const entryRelativePath = resolveEntryDocumentRelativePath(result.value);
     const entrySwMclRelativePath = replaceSwNetExtensionForDisplay(entryRelativePath, ".sw-mcl");
-    console.error(cliTranslator.format("cli.wroteFile", { path: `${parsedArgs.outputDirectory}/project.json` }));
-    console.error(cliTranslator.format("cli.wroteFile", { path: `${parsedArgs.outputDirectory}/${entryRelativePath}` }));
-    console.error(cliTranslator.format("cli.wroteFile", { path: `${parsedArgs.outputDirectory}/${entrySwMclRelativePath}` }));
+    reportWrittenFile(`${parsedArgs.outputDirectory}/project.json`);
+    reportWrittenFile(`${parsedArgs.outputDirectory}/${entryRelativePath}`);
+    reportWrittenFile(`${parsedArgs.outputDirectory}/${entrySwMclRelativePath}`);
 
     for (const relativeScriptPath of Object.keys(result.value.entryDocument.scripts).sort()) {
       const scriptOutputPath = joinRelativeDisplayPath(entryRelativePath, relativeScriptPath);
-      console.error(cliTranslator.format("cli.wroteFile", { path: `${parsedArgs.outputDirectory}/${scriptOutputPath}` }));
+      reportWrittenFile(`${parsedArgs.outputDirectory}/${scriptOutputPath}`);
     }
 
     return hasErrors ? 1 : 0;
@@ -246,7 +263,7 @@ async function runDsl2XmlCommand(args: string[]): Promise<number> {
 
   if (parsedArgs.outputPath) {
     await writeUtf8TextFile(parsedArgs.outputPath, buildResult.value.xml);
-    console.error(cliTranslator.format("cli.wroteFile", { path: parsedArgs.outputPath }));
+    reportWrittenFile(parsedArgs.outputPath);
     return loadHasErrors || buildHasErrors ? 1 : 0;
   }
 
@@ -489,8 +506,8 @@ async function runSplitModuleCommand(args: string[]): Promise<number> {
   }
 
   await writeSplitModuleFiles(plan);
-  console.error(cliTranslator.format("cli.wroteFile", { path: plan.sourceSwNetPath }));
-  console.error(cliTranslator.format("cli.wroteFile", { path: plan.newSwNetPath }));
+  reportWrittenFile(plan.sourceSwNetPath);
+  reportWrittenFile(plan.newSwNetPath);
   console.log(cliTranslator.format("split.result.written"));
   return hasErrors ? 1 : 0;
 }
@@ -576,7 +593,7 @@ async function layoutOneTarget(target: LayoutTarget, args: LayoutDslArgs): Promi
     return false;
   }
 
-  console.error(cliTranslator.format("cli.wroteFile", { path: target.swMclPath }));
+  reportWrittenFile(target.swMclPath);
   return false;
 }
 

@@ -7,6 +7,7 @@ export const enMessages = {
   "cli.missingLanguage": "Missing value for --lang. Expected auto, en, or ja.",
   "cli.duplicateLanguage": "The --lang option may only be specified once.",
   "cli.wroteFile": "Wrote {path}",
+  "cli.discouragedFileName": "File name \"{name}\" contains characters that are discouraged in file names: {characters}. The file was written anyway.",
   "cli.typecheckPassed": "DSL typecheck passed.",
   "cli.resolved": "Resolved {documents, plural, one {# document} other {# documents}}, {modules, plural, one {# module} other {# modules}}, and {uses, plural, one {# use statement} other {# use statements}}.",
   "cli.autoLayout": "auto-layout",
@@ -164,6 +165,7 @@ export interface MessageArgsById {
   "cli.missingLanguage": NoMessageArguments;
   "cli.duplicateLanguage": NoMessageArguments;
   "cli.wroteFile": { path: string };
+  "cli.discouragedFileName": { name: string; characters: string };
   "cli.typecheckPassed": NoMessageArguments;
   "cli.resolved": { documents: number; modules: number; uses: number };
   "cli.autoLayout": NoMessageArguments;
@@ -318,6 +320,7 @@ export const jaMessages: Record<MessageId, string> = {
   "cli.missingLanguage": "--langの値がありません。auto、en、jaのいずれかを指定してください。",
   "cli.duplicateLanguage": "--langオプションは1回だけ指定できます。",
   "cli.wroteFile": "書き込みました: {path}",
+  "cli.discouragedFileName": "ファイル名 \"{name}\" に、ファイル名として推奨されない文字が含まれています: {characters}。ファイルはそのまま書き込みました。",
   "cli.typecheckPassed": "DSLの型チェックに成功しました。",
   "cli.resolved": "{documents}個のドキュメント、{modules}個のモジュール、{uses}個のuse文を解決しました。",
   "cli.autoLayout": "自動レイアウト",
