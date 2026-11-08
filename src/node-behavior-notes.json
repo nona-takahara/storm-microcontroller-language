@@ -555,7 +555,8 @@
       "category": "control",
       "status": "done",
       "relatedIssues": [
-        101
+        101,
+        103
       ],
       "notes": [
         {
@@ -566,6 +567,11 @@
         {
           "category": "truth-table",
           "text": "When `switch` is true, `out` is `a`; when `switch` is false, `out` is `b`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "When `switch` selects an unconnected `a` or `b`, `out` is 0. It does not hold the previous value.",
           "confidence": "verified"
         }
       ]
@@ -814,7 +820,9 @@
       "displayName": "Toggle",
       "category": "logic-bool",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [
+        103
+      ],
       "notes": [
         {
           "category": "other",
@@ -823,8 +831,23 @@
         },
         {
           "category": "timing",
-          "text": "Toggling is tied to the rising edge of `a`: each false-to-true transition flips `out`.",
-          "confidence": "unconfirmed"
+          "text": "Toggling is tied to the rising edge of `a`: each false-to-true transition flips `out`, and a true-to-false transition leaves it unchanged.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "`out` is false after the vehicle spawns, as long as `a` has no rising edge.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "When another component drives `a` with a constant true (e.g. CONST_BOOL), `out` becomes true after spawn. `a` reads false on the first tick, because inputs carry the previous tick's outputs, and the true arriving on the next tick is an ordinary rising edge.",
+          "confidence": "inferred"
+        },
+        {
+          "category": "edge-case",
+          "text": "`out` keeps its value across a game save and reload. Returning the vehicle to the workbench resets it to false.",
+          "confidence": "verified"
         }
       ]
     },
