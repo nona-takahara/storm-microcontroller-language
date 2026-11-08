@@ -40,6 +40,10 @@
   ],
   "author": "Nona Takahara",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nona-takahara/storm-microcontroller-language.git"
+  },
   "packageManager": "pnpm@10.28.2",
   "dependencies": {
     "elkjs": "^0.11.1",

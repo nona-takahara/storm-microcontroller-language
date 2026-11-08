@@ -3,6 +3,8 @@ name: Release full test
 on:
   release:
     types: [created]
+  # publish.ymlが公開前の検証として呼び出す
+  workflow_call:
 
 permissions:
   contents: read
