@@ -1,0 +1,59 @@
+name: Publish
+
+# npmのTrusted Publishing(OIDC)でnpmへ公開する。長期トークンは使わない。
+# vX.Y.Z形式のタグをpushすると、検証を通った場合にだけ公開する。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify
+    uses: ./.github/workflows/release-full-test.yml
+
+  publish:
+    name: Publish to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # npmjs.comのTrusted Publisherに登録する環境名と一致させる
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write # OIDCトークンの発行に必須。公開ジョブだけに付ける
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - name: Check tag matches package version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::タグ ${GITHUB_REF_NAME} が package.json の version (v${version}) と一致しません"
+            exit 1
+          fi
+
+      # Trusted Publishingにはnpm 11.5.1以上が必要
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - run: pnpm install --frozen-lockfile
+
+      # provenanceはTrusted Publishingで自動的に付く。prepackでビルドされる
+      - name: Publish
+        run: npm publish
