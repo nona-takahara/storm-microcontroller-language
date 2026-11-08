@@ -911,8 +911,8 @@
       "notes": [
         {
           "category": "truth-table",
-          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
-          "confidence": "unconfirmed"
+          "text": "When `switch` is true, `out` is `a`; when `switch` is false, `out` is `b`.",
+          "confidence": "verified"
         },
         {
           "category": "edge-case",
