@@ -45,4 +45,9 @@ export const TOOL_CONVENTIONS: ToolConventionNote[] = [
     text:
       "Import paths must be relative (start with ./ or ../) and end in .sw-net. Duplicate module IDs/aliases and `use` cycles are hard errors, not warnings — check-dsl/typecheck-dsl will refuse to proceed past them.",
   },
+  {
+    topic: "file names of written files: avoid hyphens and non-ASCII characters",
+    text:
+      'Choose output file names (dsl2xml --out, xml2dsl --out-dir, split-module --out, and the .sw-mcl that layout-dsl writes) without hyphens and without non-ASCII characters; letters, digits, and underscores are the recommended set. This is a recommendation, not a prohibition: storm-mcl still writes the file as requested and prints a "[warning] File name ..." line to stderr, and the command\'s exit code is unaffected. Only the file name is checked, not the directories above it. Stormworks itself loads microcontroller XML with such names.',
+  },
 ];
