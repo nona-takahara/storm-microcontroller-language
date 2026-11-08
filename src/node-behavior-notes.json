@@ -749,7 +749,7 @@
       "notes": [
         {
           "category": "truth-table",
-          "text": "The range is inclusive: `out` is true when `min <= value <= max`.",
+          "text": "The range is inclusive and does not depend on the order of `min` and `max`: `out` is true when `value` lies between them, bounds included. `min=1, max=0` behaves like `min=0, max=1`.",
           "confidence": "verified"
         },
         {
@@ -765,6 +765,11 @@
         {
           "category": "edge-case",
           "text": "With `min=0, max=0`, both +0 and -0 make `out` true: -0 compares equal to 0.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "A NaN `value` makes `out` false, whichever of `min` and `max` is larger.",
           "confidence": "verified"
         }
       ]
