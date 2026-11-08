@@ -761,6 +761,11 @@
           "category": "other",
           "text": "Setting `min` equal to `max` makes THRESHOLD behave like an exact-equality check (EQUAL without an epsilon tolerance).",
           "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "With `min=0, max=0`, both +0 and -0 make `out` true: -0 compares equal to 0.",
+          "confidence": "verified"
         }
       ]
     },
