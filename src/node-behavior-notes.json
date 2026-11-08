@@ -183,13 +183,14 @@
       "category": "composite",
       "status": "done",
       "relatedIssues": [
-        4
+        4,
+        101
       ],
       "notes": [
         {
           "category": "truth-table",
-          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
-          "confidence": "unconfirmed"
+          "text": "When `switch` is true, `out` is `a`; when `switch` is false, `out` is `b`.",
+          "confidence": "verified"
         },
         {
           "category": "edge-case",
@@ -273,9 +274,17 @@
     "CONST_BOOL": {
       "displayName": "Constant On",
       "category": "value",
-      "status": "todo",
-      "relatedIssues": [],
-      "notes": []
+      "status": "done",
+      "relatedIssues": [
+        102
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "text": "Outputs `true`.",
+          "confidence": "verified"
+        }
+      ]
     },
     "COUNTER": {
       "displayName": "Up/Down Counter",
@@ -545,7 +554,10 @@
       "displayName": "Numerical Switchbox",
       "category": "control",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [
+        101,
+        103
+      ],
       "notes": [
         {
           "category": "edge-case",
@@ -554,8 +566,13 @@
         },
         {
           "category": "truth-table",
-          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded.",
-          "confidence": "unconfirmed"
+          "text": "When `switch` is true, `out` is `a`; when `switch` is false, `out` is `b`.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "When `switch` selects an unconnected `a` or `b`, `out` is 0. It does not hold the previous value.",
+          "confidence": "verified"
         }
       ]
     },
@@ -726,9 +743,15 @@
       "category": "comparison",
       "status": "done",
       "relatedIssues": [
-        1
+        1,
+        102
       ],
       "notes": [
+        {
+          "category": "truth-table",
+          "text": "The range is inclusive and does not depend on the order of `min` and `max`: `out` is true when `value` lies between them, bounds included. `min=1, max=0` behaves like `min=0, max=1`.",
+          "confidence": "verified"
+        },
         {
           "category": "serialization",
           "text": "`min` and `max` follow storm-mcl's paired numeric `@text`/`@value` convention: import uses `@text` as authoritative, and export regenerates both attributes from the parsed DSL value.",
@@ -737,6 +760,16 @@
         {
           "category": "other",
           "text": "Setting `min` equal to `max` makes THRESHOLD behave like an exact-equality check (EQUAL without an epsilon tolerance).",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "With `min=0, max=0`, both +0 and -0 make `out` true: -0 compares equal to 0.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "A NaN `value` makes `out` false, whichever of `min` and `max` is larger.",
           "confidence": "verified"
         }
       ]
@@ -797,7 +830,9 @@
       "displayName": "Toggle",
       "category": "logic-bool",
       "status": "done",
-      "relatedIssues": [],
+      "relatedIssues": [
+        103
+      ],
       "notes": [
         {
           "category": "other",
@@ -806,8 +841,23 @@
         },
         {
           "category": "timing",
-          "text": "Toggling is tied to the rising edge of `a`: each false-to-true transition flips `out`.",
-          "confidence": "unconfirmed"
+          "text": "Toggling is tied to the rising edge of `a`: each false-to-true transition flips `out`, and a true-to-false transition leaves it unchanged.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "`out` is false after the vehicle spawns, as long as `a` has no rising edge.",
+          "confidence": "verified"
+        },
+        {
+          "category": "edge-case",
+          "text": "When another component drives `a` with a constant true (e.g. CONST_BOOL), `out` becomes true after spawn. `a` reads false on the first tick, because inputs carry the previous tick's outputs, and the true arriving on the next tick is an ordinary rising edge.",
+          "confidence": "inferred"
+        },
+        {
+          "category": "edge-case",
+          "text": "`out` keeps its value across a game save and reload. Returning the vehicle to the workbench resets it to false.",
+          "confidence": "verified"
         }
       ]
     },
@@ -871,8 +921,8 @@
       "notes": [
         {
           "category": "truth-table",
-          "text": "Do not assume a specific `switch` value maps to `a` (e.g. that `false` selects `a`): that mapping is unrecorded for this gate.",
-          "confidence": "unconfirmed"
+          "text": "When `switch` is true, `out` is `a`; when `switch` is false, `out` is `b`.",
+          "confidence": "verified"
         },
         {
           "category": "edge-case",
