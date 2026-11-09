@@ -1,0 +1,10 @@
+module main
+  port in "left" : number
+  port out "result" : number
+  inst NEGATE n : value="left" -> out=a
+  inst ADD p1 : a=a, b=1 -> out=b
+  inst ABS q1 : value=b -> out=c
+  inst ADD p2 : a=c, b=1 -> out=d
+  inst ABS q2 : value=d -> out=e
+  inst ABS z : value=e -> out="result"
+end
