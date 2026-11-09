@@ -1,20 +1,12 @@
 import {
   createErrorDiagnostic,
+  createWarningDiagnostic,
   type Diagnostic,
   type StormworksLibraryResult,
 } from "../diagnostics.js";
-import {
-  type SwNetAssignment,
-  type SwNetExpression,
-  type SwNetModule,
-  type SwNetPort,
-  type SwNetStatement,
-} from "../parsers/sw-net.js";
-import {
-  type SwNetResolutionResult,
-  type SwNetResolvedModule,
-  type SwNetResolvedModuleKey,
-} from "../resolvers/sw-net.js";
+import { walkFlattenedModule } from "../flatten/walk.js";
+import { type SwNetAssignment, type SwNetModule, type SwNetStatement } from "../parsers/sw-net.js";
+import { type SwNetResolutionResult, type SwNetResolvedModule } from "../resolvers/sw-net.js";
 import { type ProvenancePath } from "./types.js";
 
 export interface FlattenSwNetProjectOptions {
@@ -30,6 +22,7 @@ export interface FlattenedSwNetProject {
 /**
  * Inline the selected entry module's complete `use` tree into one ordinary sw-net module.
  * This is the comparison authority: its shape matches the circuit after module boundaries vanish.
+ * The `use` lowering itself lives in src/core/flatten/walk.ts and is shared with dsl2xml.
  */
 export function flattenSwNetProject(
   resolution: SwNetResolutionResult,
@@ -41,25 +34,56 @@ export function flattenSwNetProject(
     return { diagnostics };
   }
 
-  const moduleByKey = new Map(
-    resolution.modules.map((resolved) => [formatModuleKey(resolved.key), resolved] as const),
-  );
   const statements: SwNetStatement[] = [];
   const provenanceByInstanceId: Record<string, ProvenancePath> = {};
   const documentPathByInstanceId: Record<string, string> = {};
-  const rootBindings = new Map(
-    entry.module.ports.map((port) => [portBindingKey(port), stringExpression(port.name)] as const),
-  );
 
-  flattenModule(
-    entry,
-    [],
-    rootBindings,
-    moduleByKey,
-    statements,
-    provenanceByInstanceId,
-    documentPathByInstanceId,
-  );
+  try {
+    walkFlattenedModule<void>(resolution.modules, entry.key, {
+      naming: {
+        instanceId: formatInstanceId,
+        netName: (scopePath, name) => formatInstanceId([...scopePath, `$${name}`]),
+      },
+      rootScope: undefined,
+      enterUse: () => undefined,
+      onUnresolvedPort: ({ flattenedId, portName }) => {
+        diagnostics.push(
+          createWarningDiagnostic(
+            "COMPARE_UNRESOLVED_MODULE_PORT",
+            `Instance ${flattenedId} references module port "${portName}" that has no usable binding; the reference was dropped.`,
+            "compare",
+            undefined,
+            flattenedId,
+            { messageId: "compare.diagnostic.unresolvedPort", messageArgs: { instanceId: flattenedId, portName } },
+          ),
+        );
+      },
+      onInstance: ({ moduleKey, statement, instancePath, flattenedId, inputs, outputs }) => {
+        statements.push({
+          ...statement,
+          instanceId: flattenedId,
+          attributes: cloneAssignments(statement.attributes),
+          inputs,
+          outputs,
+        });
+        provenanceByInstanceId[flattenedId] = { moduleId: moduleKey.moduleId, instanceIds: instancePath };
+        documentPathByInstanceId[flattenedId] = moduleKey.documentPath;
+      },
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    diagnostics.push(
+      createErrorDiagnostic(
+        "COMPARE_FLATTEN_FAILED",
+        `Could not inline the module tree: ${reason}`,
+        "compare",
+        resolution.entryDocumentPath,
+        undefined,
+        { messageId: "compare.diagnostic.flattenFailed", messageArgs: { reason } },
+      ),
+    );
+    return { diagnostics };
+  }
 
   return {
     value: {
@@ -73,160 +97,6 @@ export function flattenSwNetProject(
     },
     diagnostics,
   };
-}
-
-function flattenModule(
-  resolved: SwNetResolvedModule,
-  instancePath: string[],
-  portBindings: Map<string, SwNetExpression>,
-  moduleByKey: Map<string, SwNetResolvedModule>,
-  statements: SwNetStatement[],
-  provenanceByInstanceId: Record<string, ProvenancePath>,
-  documentPathByInstanceId: Record<string, string>,
-): void {
-  const useByInstanceId = new Map(
-    resolved.uses.map((use) => [use.statement.instanceId, use] as const),
-  );
-
-  for (const statement of resolved.module.statements) {
-    if (statement.kind === "inst") {
-      const flattenedId = formatInstanceId([...instancePath, statement.instanceId]);
-      statements.push({
-        ...statement,
-        instanceId: flattenedId,
-        attributes: cloneAssignments(statement.attributes),
-        inputs: rewriteAssignments(statement.inputs, resolved.module.ports, portBindings, instancePath, false),
-        outputs: rewriteAssignments(statement.outputs, resolved.module.ports, portBindings, instancePath, true),
-      });
-      provenanceByInstanceId[flattenedId] = {
-        moduleId: resolved.module.id,
-        instanceIds: [...instancePath, statement.instanceId],
-      };
-      documentPathByInstanceId[flattenedId] = resolved.key.documentPath;
-      continue;
-    }
-
-    const use = useByInstanceId.get(statement.instanceId);
-    const target = use ? moduleByKey.get(formatModuleKey(use.target)) : undefined;
-    if (!target) {
-      throw new Error(
-        `Resolved use target for ${resolved.module.id}.${statement.instanceId} was not found.`,
-      );
-    }
-
-    const childPath = [...instancePath, statement.instanceId];
-    const childBindings = buildChildPortBindings(
-      target.module.ports,
-      statement.inputs,
-      statement.outputs,
-      resolved.module.ports,
-      portBindings,
-      instancePath,
-      childPath,
-    );
-    flattenModule(
-      target,
-      childPath,
-      childBindings,
-      moduleByKey,
-      statements,
-      provenanceByInstanceId,
-      documentPathByInstanceId,
-    );
-  }
-}
-
-function buildChildPortBindings(
-  childPorts: SwNetPort[],
-  inputs: SwNetAssignment[],
-  outputs: SwNetAssignment[],
-  parentPorts: SwNetPort[],
-  parentBindings: Map<string, SwNetExpression>,
-  parentPath: string[],
-  childPath: string[],
-): Map<string, SwNetExpression> {
-  const inputsByKey = new Map(inputs.map((assignment) => [assignment.key, assignment.value] as const));
-  const outputsByKey = new Map(outputs.map((assignment) => [assignment.key, assignment.value] as const));
-  const result = new Map<string, SwNetExpression>();
-
-  for (const port of childPorts) {
-    const assigned = (port.direction === "in" ? inputsByKey : outputsByKey).get(port.name);
-    if (assigned) {
-      result.set(
-        portBindingKey(port),
-        rewriteExpression(assigned, parentPorts, parentBindings, parentPath),
-      );
-    } else if (port.direction === "out") {
-      result.set(portBindingKey(port), stringExpression(formatLocalNet(childPath, `port:${port.name}`)));
-    }
-  }
-
-  return result;
-}
-
-function rewriteAssignments(
-  assignments: SwNetAssignment[],
-  ports: SwNetPort[],
-  portBindings: Map<string, SwNetExpression>,
-  instancePath: string[],
-  keepUnboundPort: boolean,
-): SwNetAssignment[] {
-  return assignments.flatMap((assignment): SwNetAssignment[] => {
-    const rewritten = rewriteExpressionOrUndefined(
-      assignment.value,
-      ports,
-      portBindings,
-      instancePath,
-      keepUnboundPort,
-    );
-    return rewritten ? [{ key: assignment.key, value: rewritten }] : [];
-  });
-}
-
-function rewriteExpression(
-  expression: SwNetExpression,
-  ports: SwNetPort[],
-  portBindings: Map<string, SwNetExpression>,
-  instancePath: string[],
-): SwNetExpression {
-  return (
-    rewriteExpressionOrUndefined(expression, ports, portBindings, instancePath, true) ??
-    expression
-  );
-}
-
-function rewriteExpressionOrUndefined(
-  expression: SwNetExpression,
-  ports: SwNetPort[],
-  portBindings: Map<string, SwNetExpression>,
-  instancePath: string[],
-  keepUnboundPort: boolean,
-): SwNetExpression | undefined {
-  if (expression.kind === "identifier") {
-    return {
-      kind: "identifier",
-      value: formatLocalNet(instancePath, expression.value),
-    };
-  }
-
-  if (expression.kind !== "string") {
-    return { ...expression };
-  }
-
-  const matchingPorts = ports.filter((port) => port.name === expression.value);
-  if (matchingPorts.length > 0) {
-    for (const port of matchingPorts) {
-      const binding = portBindings.get(portBindingKey(port));
-      if (binding) {
-        return { ...binding };
-      }
-    }
-    return keepUnboundPort
-      ? stringExpression(formatLocalNet(instancePath, `unbound:${expression.value}`))
-      : undefined;
-  }
-
-  return stringExpression(formatLocalNet(instancePath, expression.value));
 }
 
 function selectEntryModule(
@@ -278,30 +148,10 @@ function selectEntryModule(
   return candidates[0];
 }
 
-function rewriteAssignment(assignment: SwNetAssignment): SwNetAssignment {
-  return { key: assignment.key, value: { ...assignment.value } };
-}
-
 function cloneAssignments(assignments: SwNetAssignment[]): SwNetAssignment[] {
-  return assignments.map(rewriteAssignment);
-}
-
-function portBindingKey(port: SwNetPort): string {
-  return `${port.direction}:${port.name}`;
-}
-
-function formatModuleKey(key: SwNetResolvedModuleKey): string {
-  return JSON.stringify([key.documentPath, key.moduleId]);
+  return assignments.map((assignment) => ({ key: assignment.key, value: { ...assignment.value } }));
 }
 
 function formatInstanceId(path: string[]): string {
   return path.map(encodeURIComponent).join("/");
-}
-
-function formatLocalNet(path: string[], netName: string): string {
-  return formatInstanceId([...path, `$${netName}`]);
-}
-
-function stringExpression(value: string): SwNetExpression {
-  return { kind: "string", value };
 }

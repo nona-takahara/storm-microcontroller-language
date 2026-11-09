@@ -97,6 +97,8 @@ export const enMessages = {
   "compare.diagnostic.moduleAmbiguous": "Module {moduleId} is ambiguous in comparison target {side}; it is defined in multiple documents.",
   "compare.diagnostic.entryNotFound": "Entry document does not define module {moduleId}.",
   "compare.diagnostic.entryAmbiguous": "Select an entry module explicitly when the entry document does not have a unique module or a module named main.",
+  "compare.diagnostic.unresolvedPort": "Instance {instanceId} references module port {portName} that has no usable binding; the reference was dropped.",
+  "compare.diagnostic.flattenFailed": "Could not inline the module tree: {reason}",
   "compare.node.port": "{id} (port {direction} {name}, {signal}, occurrence {occurrence})",
   "compare.node.gate": "{id} ({definitionId})",
   "layout.error": "error",
@@ -257,6 +259,8 @@ export interface MessageArgsById {
   "compare.diagnostic.moduleAmbiguous": { moduleId: string; side: string };
   "compare.diagnostic.entryNotFound": { moduleId: string };
   "compare.diagnostic.entryAmbiguous": NoMessageArguments;
+  "compare.diagnostic.unresolvedPort": { instanceId: string; portName: string };
+  "compare.diagnostic.flattenFailed": { reason: string };
   "compare.node.port": { id: string; direction: string; name: string; signal: string; occurrence: number };
   "compare.node.gate": { id: string; definitionId: string };
   "layout.error": NoMessageArguments;
@@ -410,6 +414,8 @@ export const jaMessages: Record<MessageId, string> = {
   "compare.diagnostic.moduleAmbiguous": "比較対象{side}のモジュール {moduleId} は複数のドキュメントで定義されているため一意に決まりません。",
   "compare.diagnostic.entryNotFound": "エントリードキュメントにモジュール {moduleId} が定義されていません。",
   "compare.diagnostic.entryAmbiguous": "エントリードキュメントに一意のモジュールまたはmainモジュールがない場合は、エントリーモジュールを明示的に選択してください。",
+  "compare.diagnostic.unresolvedPort": "インスタンス {instanceId} が参照するモジュールポート {portName} に使える接続がないため、この参照を除外しました。",
+  "compare.diagnostic.flattenFailed": "モジュールツリーを展開できませんでした: {reason}",
   "compare.node.port": "{id}（ポート {direction} {name}、{signal}、出現番号 {occurrence}）",
   "compare.node.gate": "{id}（{definitionId}）",
   "layout.error": "エラー",
