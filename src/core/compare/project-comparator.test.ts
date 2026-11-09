@@ -8,7 +8,7 @@ import {
   type SwNetDocumentResolver,
   type SwNetResolutionResult,
 } from "../resolvers/sw-net.js";
-import { compareSwNetProjects } from "./project-comparator.js";
+import { compareSwNetEntryModules, compareSwNetProjects } from "./project-comparator.js";
 
 const fixtureDirectory = join(dirname(fileURLToPath(import.meta.url)), "__fixtures__");
 
@@ -69,6 +69,42 @@ describe("project comparison", () => {
       valueB: 1,
     });
     expect(result.moduleResults.some((entry) => entry.result.verdict === "different")).toBe(true);
+  });
+
+  it("expands multi-level use trees with colliding internal net names on both comparison paths", async () => {
+    const nested = await resolveFixture("project-nested-a");
+    const inline = await resolveFixture("project-nested-b");
+
+    const project = compareSwNetProjects(nested, inline);
+    expect(project.value?.verdict).toBe("equivalent");
+    expect(project.value?.matchedPairs).toHaveLength(8);
+
+    const entry = compareSwNetEntryModules(
+      { resolution: nested, key: { documentPath: nested.entryDocumentPath, moduleId: "main" } },
+      { resolution: inline, key: { documentPath: inline.entryDocumentPath, moduleId: "main" } },
+    );
+    expect(entry.diagnostics).toEqual([]);
+    expect(entry.value?.verdict).toBe("equivalent");
+    expect(entry.value?.matchedPairs).toHaveLength(8);
+  });
+
+  it("compares a non-entry module of a multi-level project by its inlined circuit", async () => {
+    const nested = await resolveFixture("project-nested-a");
+    const mid = { documentPath: nested.entryDocumentPath, moduleId: "mid" };
+    const leaf = { documentPath: nested.entryDocumentPath, moduleId: "leaf" };
+
+    const same = compareSwNetEntryModules(
+      { resolution: nested, key: mid },
+      { resolution: nested, key: mid },
+    );
+    expect(same.value?.verdict).toBe("equivalent");
+    expect(same.value?.matchedPairs).toHaveLength(7);
+
+    const different = compareSwNetEntryModules(
+      { resolution: nested, key: mid },
+      { resolution: nested, key: leaf },
+    );
+    expect(different.value?.verdict).toBe("different");
   });
 
   it("reports an ambiguous entry document as diagnostics", async () => {

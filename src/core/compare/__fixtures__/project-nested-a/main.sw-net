@@ -1,0 +1,21 @@
+module leaf
+  port in "x" : number
+  port out "y" : number
+  inst ADD inner : a="x", b=1 -> out=temp
+  inst ABS post : value=temp -> out="y"
+end
+
+module mid
+  port in "x" : number
+  port out "y" : number
+  inst NEGATE neg : value="x" -> out=temp
+  use leaf l1 : x=temp -> y=temp2
+  use leaf l2 : x=temp2 -> y="y"
+end
+
+module main
+  port in "left" : number
+  port out "result" : number
+  use mid m : x="left" -> y=temp
+  inst ABS final : value=temp -> out="result"
+end

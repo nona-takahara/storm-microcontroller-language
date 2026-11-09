@@ -61,6 +61,33 @@ export function compareSwNetProjects(
   };
 }
 
+/**
+ * Compare two specific modules by their fully inlined circuits, ignoring which document is the project entry.
+ * Unlike compareSwNetModules, nested `use` statements are expanded instead of treated as opaque nodes.
+ */
+export function compareSwNetEntryModules(
+  a: { resolution: SwNetResolutionResult; key: SwNetResolvedModuleKey },
+  b: { resolution: SwNetResolutionResult; key: SwNetResolvedModuleKey },
+  options: NetworkComparisonOptions = {},
+): StormworksLibraryResult<NetworkComparisonResult> {
+  const flattenedA = flattenSwNetProject(
+    { ...a.resolution, entryDocumentPath: a.key.documentPath },
+    { entryModuleId: a.key.moduleId },
+  );
+  const flattenedB = flattenSwNetProject(
+    { ...b.resolution, entryDocumentPath: b.key.documentPath },
+    { entryModuleId: b.key.moduleId },
+  );
+  const diagnostics = [...flattenedA.diagnostics, ...flattenedB.diagnostics];
+
+  if (!flattenedA.value || !flattenedB.value) {
+    return { diagnostics };
+  }
+
+  const flatResult = compareFlattenedProjects(flattenedA.value, flattenedB.value, options);
+  return { value: flatResult.value, diagnostics: [...diagnostics, ...flatResult.diagnostics] };
+}
+
 function compareFlattenedProjects(
   a: FlattenedSwNetProject,
   b: FlattenedSwNetProject,
