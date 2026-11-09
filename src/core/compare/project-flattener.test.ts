@@ -90,6 +90,43 @@ describe("project flattening", () => {
   });
 });
 
+describe("project flattening edge cases (shared with dsl2xml)", () => {
+  it("drops an unresolvable port reference with a warning instead of inventing a net", async () => {
+    const document = parseSwNetDocument(`
+      module helper
+        port in "x" : number
+        port out "y" : number
+        inst ADD a : a="x", b="nope" -> out="y"
+      end
+      module main
+        port in "left" : number
+        port out "result" : number
+        use helper h : x="left" -> y="result"
+      end
+    `);
+    const result = flattenSwNetProject(await resolveDocument(document));
+    const statement = result.value!.module.statements[0]!;
+
+    expect(statement.inputs.map(({ key }) => key)).toEqual(["a"]);
+    expect(result.diagnostics.map(({ code }) => code)).toEqual(["COMPARE_UNRESOLVED_MODULE_PORT"]);
+  });
+
+  it("reports duplicate instance ids as a diagnostic instead of throwing", async () => {
+    const document = parseSwNetDocument(`
+      module main
+        port in "left" : number
+        port out "result" : number
+        inst ABS same : value="left" -> out=t
+        inst ABS same : value=t -> out="result"
+      end
+    `);
+    const result = flattenSwNetProject(await resolveDocument(document));
+
+    expect(result.value).toBeUndefined();
+    expect(result.diagnostics[0]?.code).toBe("COMPARE_FLATTEN_FAILED");
+  });
+});
+
 describe("module parameter substitution", () => {
   const attributeValues = (statement: { kind: string; attributes?: { key: string; value: unknown }[] }) =>
     statement.kind === "inst"

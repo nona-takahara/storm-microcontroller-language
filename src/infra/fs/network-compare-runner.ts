@@ -1,7 +1,7 @@
 import { extname } from "node:path";
 
 import {
-  compareSwNetModules,
+  compareSwNetEntryModules,
   compareSwNetProjects,
   createErrorDiagnostic,
   resolveProjectSource,
@@ -90,7 +90,10 @@ export async function runCompareDsl(
       return { kind: "network", loadDiagnostics, diagnostics: [] };
     }
 
-    const result = compareSwNetModules(moduleA.module, moduleB.module);
+    const result = compareSwNetEntryModules(
+      { resolution: loadedA.resolution, key: moduleA.key },
+      { resolution: loadedB.resolution, key: moduleB.key },
+    );
     return {
       kind: "network",
       comparison: result.value,

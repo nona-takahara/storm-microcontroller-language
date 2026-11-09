@@ -14,7 +14,6 @@ import {
 } from "../definitions/schema.js";
 import { createWarningDiagnostic, type Diagnostic } from "../diagnostics.js";
 import { type LocalizedMessage } from "../i18n/index.js";
-import { buildChildParamEnv, buildEntryParamEnv, type ModuleParamEnv, substituteAttributeParams } from "../module-params.js";
 import { type IrSignalKind, type IrScalarValue, type IrVector2 } from "../ir.js";
 import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement, type SwNetModule } from "../parsers/sw-net.js";
 import { type ProjectJsonDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
@@ -22,11 +21,7 @@ import { addVector } from "../serializers/submodule-layout.js";
 import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
 import { formatPortNameKey, formatPortOccurrenceKey } from "../serializers/sw-net-shared.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule, type SwNetResolvedModuleKey } from "../resolvers/sw-net.js";
-import {
-  buildModulePortNameSets,
-  resolveStringPortDirection,
-  type ModulePortNameSets,
-} from "../shared/module-port-directions.js";
+import { walkFlattenedModule, formatResolvedModuleKey, type FlattenVisitor } from "../flatten/walk.js";
 import { microprocessorIconToSymValues } from "../shared/microprocessor-icon.js";
 import { indexNetProducers } from "../shared/producer-index.js";
 import { resolveModuleInstancePositions } from "../shared/module-net-graph.js";
@@ -176,22 +171,14 @@ export function buildStormworksXmlTree(
     submoduleCanvasOrigin,
     swMclModule ? undefined : entryAnchorFallback,
   );
-  const moduleByKey = buildModuleByKeyIndex(input.swNet.modules);
   const flattenedInstances: FlattenedInstance[] = [];
 
   // `use` statements have no XML counterpart, so every reachable module is inlined into one flat
   // instance list here before any XML-shaped structures are built.
-  flattenModule(
+  walkFlattenedModule(
+    input.swNet.modules,
     entryModule.key,
-    "",
-    new Map(),
-    buildEntryParamEnv(entryModule.module, entryModule.key.documentPath),
-    entryLayout,
-    true,
-    moduleByKey,
-    input.swMclByDocumentPath,
-    flattenedInstances,
-    warnings,
+    createXmlFlattenVisitor(entryLayout, input.swMclByDocumentPath, flattenedInstances, warnings),
   );
 
   const allocator = createXmlIdAllocator([]);
@@ -511,29 +498,6 @@ function buildLogicInstanceContexts(
   });
 }
 
-// Build a lookup from every resolved module's key to itself for O(1) access during flattening.
-function buildModuleByKeyIndex(modules: SwNetResolvedModule[]): Map<string, SwNetResolvedModule> {
-  return new Map(modules.map((module) => [formatModuleKey(module.key), module] as const));
-}
-
-// Reject a module body that declares two inst/use statements under the same instance id. The flatten
-// pass' namespacing scheme (`${namespace}$${instanceId}`) only stays collision-free if every module's
-// own statements already have unique instance ids; two `use` instances sharing an id would otherwise
-// silently alias their inlined nets onto each other.
-function assertUniqueStatementInstanceIds(module: SwNetModule, moduleKey: SwNetResolvedModuleKey): void {
-  const seen = new Set<string>();
-
-  for (const statement of module.statements) {
-    if (seen.has(statement.instanceId)) {
-      throw new Error(
-        `Duplicate instance id ${statement.instanceId} in module ${formatModuleKey(moduleKey)}; every inst/use statement needs a unique instance id.`,
-      );
-    }
-
-    seen.add(statement.instanceId);
-  }
-}
-
 // Build the position lookup for one module's own instances, or the degraded single-anchor fallback
 // used when that module's sw-mcl could not be resolved (e.g. a same-document helper module that isn't
 // the file's paired layout module -- see known limitation tracked in issue #7).
@@ -614,272 +578,73 @@ function tryResolveModuleSwMcl(
   return candidate && candidate.moduleId === moduleKey.moduleId ? candidate : null;
 }
 
-// Resolve one sw-net expression from the module currently being flattened into a global, entry-scope
-// expression: identifiers always get namespaced into module-local net names — per this tool's
-// documented convention (src/core/spec/tool-conventions.ts), a bare identifier is always an internal
-// net local to the module, even if its text happens to match a declared port name; only a quoted
-// string references the module's own declared port. String port references get substituted with
-// whatever the caller already bound that port to, looked up by the port's own declared direction
-// rather than the local usage site's. This is deliberately asymmetric, by design: an output port
-// behaves like an ordinary net as well as a port — it has exactly one producer inside the module, so
-// the module is free to also read that same value back internally (direction "in") any number of
-// times, in addition to the caller reading it from outside. An input port is a port only — its one
-// and only producer is the caller's binding, so the module body may never target it as a write
-// (direction "out"); doing so would create a second, conflicting producer for a single-source signal.
-// At the entry module, strings still name real project.json ports and pass through unchanged.
-function resolveFlattenExpr(
-  expr: SwNetExpression,
-  direction: "in" | "out",
-  namespace: string,
-  portBindings: Map<string, SwNetExpression>,
-  isEntryModule: boolean,
-  modulePorts: ModulePortNameSets,
-  contextLabel: string,
-  warnings: Diagnostic[],
-): SwNetExpression | undefined {
-  if (expr.kind === "identifier") {
-    return {
-      kind: "identifier",
-      value: namespace ? `${namespace}$${expr.value}` : expr.value,
-    };
-  }
-
-  if (expr.kind === "string") {
-    if (isEntryModule) {
-      return expr;
-    }
-
-    const portDirection = resolveStringPortDirection(expr.value, direction, modulePorts);
-
-    if (portDirection === undefined) {
-      const message =
-        direction === "out" && modulePorts.in.has(expr.value)
-          ? `${contextLabel} tries to drive its own input port "${expr.value}"; an input port has exactly one producer (the caller's binding), so a module cannot also drive it internally.`
-          : `${contextLabel} references undeclared module port "${expr.value}".`;
-      pushExportWarning(
-        warnings,
-        message,
-        undefined,
-        {
-          messageId: "export.undeclaredModulePort",
-          messageArgs: { context: contextLabel, portName: JSON.stringify(expr.value) },
-        },
-      );
-      return undefined;
-    }
-
-    const resolved = portBindings.get(formatPortBindingKey(portDirection, expr.value));
-
-    if (!resolved) {
-      pushExportWarning(
-        warnings,
-        `${contextLabel} references undeclared module port "${expr.value}".`,
-        undefined,
-        {
-          messageId: "export.undeclaredModulePort",
-          messageArgs: { context: contextLabel, portName: JSON.stringify(expr.value) },
-        },
-      );
-      return undefined;
-    }
-
-    return resolved;
-  }
-
-  return expr;
-}
-
-// Resolve a whole inst/use pin-assignment list through resolveFlattenExpr, dropping assignments that
-// could not be resolved (resolveFlattenExpr already warned for those).
-function resolveAssignmentList(
-  assignments: SwNetAssignment[],
-  direction: "in" | "out",
-  namespace: string,
-  portBindings: Map<string, SwNetExpression>,
-  isEntryModule: boolean,
-  modulePorts: ModulePortNameSets,
-  contextLabel: string,
-  warnings: Diagnostic[],
-): SwNetAssignment[] {
-  const resolved: SwNetAssignment[] = [];
-
-  for (const assignment of assignments) {
-    const value = resolveFlattenExpr(
-      assignment.value,
-      direction,
-      namespace,
-      portBindings,
-      isEntryModule,
-      modulePorts,
-      contextLabel,
-      warnings,
-    );
-
-    if (value !== undefined) {
-      resolved.push({ key: assignment.key, value });
-    }
-  }
-
-  return resolved;
-}
-
-// Build the `in:<port>`/`out:<port>` binding-map key shared by resolveFlattenExpr and use-statement lowering.
-function formatPortBindingKey(direction: "in" | "out", portName: string): string {
-  return `${direction}:${portName}`;
-}
-
-// Recursively inline one module's statements into `out`, expanding every `use` statement into its
-// target module's own (further-flattened) instances. Stormworks XML has no module concept, so this is
-// the only place composite `use` semantics get lowered to something the rest of the exporter understands.
-function flattenModule(
-  moduleKey: SwNetResolvedModuleKey,
-  namespace: string,
-  portBindings: Map<string, SwNetExpression>,
-  paramEnv: ModuleParamEnv,
-  layout: FlattenLayoutContext,
-  isEntryModule: boolean,
-  moduleByKey: Map<string, SwNetResolvedModule>,
+// dsl2xml's side of the shared flatten walk (src/core/flatten/walk.ts): instances are named
+// `parent$child`, and each flattened instance carries its absolute canvas position from the owning
+// module's sw-mcl plus the module it was authored in.
+function createXmlFlattenVisitor(
+  entryLayout: FlattenLayoutContext,
   swMclByDocumentPath: Map<string, StormworksSwMclDocument | null>,
   out: FlattenedInstance[],
   warnings: Diagnostic[],
-): void {
-  const resolvedModule = moduleByKey.get(formatModuleKey(moduleKey));
-
-  if (!resolvedModule) {
-    throw new Error(`Resolved module ${formatModuleKey(moduleKey)} was not indexed.`);
-  }
-
-  assertUniqueStatementInstanceIds(resolvedModule.module, moduleKey);
-
-  const modulePorts = buildModulePortNameSets(resolvedModule.module.ports);
-
-  for (const statement of resolvedModule.module.statements) {
-    const namespacedInstanceId = namespace ? `${namespace}$${statement.instanceId}` : statement.instanceId;
-    const contextLabel = `Instance ${namespacedInstanceId}`;
-
-    if (statement.kind === "inst") {
+): FlattenVisitor<FlattenLayoutContext> {
+  return {
+    naming: {
+      instanceId: (path) => path.join("$"),
+      netName: (scopePath, name) => (scopePath.length > 0 ? `${scopePath.join("$")}$${name}` : name),
+    },
+    rootScope: entryLayout,
+    onUnresolvedPort: ({ flattenedId, portName, reason }) => {
+      const contextLabel = `Instance ${flattenedId}`;
+      const message =
+        reason === "drives-input"
+          ? `${contextLabel} tries to drive its own input port "${portName}"; an input port has exactly one producer (the caller's binding), so a module cannot also drive it internally.`
+          : `${contextLabel} references undeclared module port "${portName}".`;
+      pushExportWarning(warnings, message, undefined, {
+        messageId: "export.undeclaredModulePort",
+        messageArgs: { context: contextLabel, portName: JSON.stringify(portName) },
+      });
+    },
+    onInstance: ({ scope, moduleKey, statement, flattenedId, attributes, inputs, outputs }) => {
       out.push({
         statement: {
           kind: "inst",
           typeId: statement.typeId,
-          instanceId: namespacedInstanceId,
-          attributes: substituteAttributeParams(statement.attributes, paramEnv),
-          inputs: resolveAssignmentList(
-            statement.inputs,
-            "in",
-            namespace,
-            portBindings,
-            isEntryModule,
-            modulePorts,
-            contextLabel,
-            warnings,
-          ),
-          outputs: resolveAssignmentList(
-            statement.outputs,
-            "out",
-            namespace,
-            portBindings,
-            isEntryModule,
-            modulePorts,
-            contextLabel,
-            warnings,
-          ),
+          instanceId: flattenedId,
+          attributes,
+          inputs,
+          outputs,
         },
         sourceModuleKey: moduleKey,
-        position: resolveInstancePosition(layout, statement.instanceId, namespacedInstanceId, warnings),
+        position: resolveInstancePosition(scope, statement.instanceId, flattenedId, warnings),
       });
-      continue;
-    }
+    },
+    enterUse: ({ parentScope, statement, targetModule, flattenedId }) => {
+      const useAnchor = resolveInstancePosition(parentScope, statement.instanceId, flattenedId, warnings);
+      const targetSwMclModule = tryResolveModuleSwMcl(swMclByDocumentPath, targetModule.key);
 
-    // `use` statement: resolve its own bindings in the current scope, then recurse into the target
-    // module with those as the child's port bindings.
-    const childPortBindings = new Map<string, SwNetExpression>();
-
-    for (const assignment of statement.inputs) {
-      const value = resolveFlattenExpr(
-        assignment.value,
-        "in",
-        namespace,
-        portBindings,
-        isEntryModule,
-        modulePorts,
-        contextLabel,
-        warnings,
-      );
-
-      if (value !== undefined) {
-        childPortBindings.set(formatPortBindingKey("in", assignment.key), value);
-      }
-    }
-
-    for (const assignment of statement.outputs) {
-      const value = resolveFlattenExpr(
-        assignment.value,
-        "out",
-        namespace,
-        portBindings,
-        isEntryModule,
-        modulePorts,
-        contextLabel,
-        warnings,
-      );
-
-      if (value !== undefined) {
-        childPortBindings.set(formatPortBindingKey("out", assignment.key), value);
-      }
-    }
-
-    const useEdge = resolvedModule.uses.find((candidate) => candidate.statement === statement);
-
-    if (!useEdge) {
-      throw new Error(`Use statement ${namespacedInstanceId} in ${formatModuleKey(moduleKey)} was not resolved.`);
-    }
-
-    const useAnchor = resolveInstancePosition(layout, statement.instanceId, namespacedInstanceId, warnings);
-    const targetSwMclModule = tryResolveModuleSwMcl(swMclByDocumentPath, useEdge.target);
-
-    if (!targetSwMclModule) {
-      pushExportWarning(
-        warnings,
-        `sw-mcl for module ${formatModuleKey(useEdge.target)} was not found; instances embedded via "${namespacedInstanceId}" will share its anchor position.`,
-        undefined,
-        {
-          messageId: "export.moduleLayoutMissing",
-          messageArgs: {
-            moduleKey: formatModuleKey(useEdge.target),
-            instanceId: JSON.stringify(namespacedInstanceId),
+      if (!targetSwMclModule) {
+        pushExportWarning(
+          warnings,
+          `sw-mcl for module ${formatResolvedModuleKey(targetModule.key)} was not found; instances embedded via "${flattenedId}" will share its anchor position.`,
+          undefined,
+          {
+            messageId: "export.moduleLayoutMissing",
+            messageArgs: {
+              moduleKey: formatResolvedModuleKey(targetModule.key),
+              instanceId: JSON.stringify(flattenedId),
+            },
           },
-        },
+        );
+      }
+
+      return buildFlattenLayoutContext(
+        targetModule.module,
+        targetSwMclModule,
+        useAnchor ?? null,
+        targetSwMclModule ? undefined : useAnchor,
       );
-    }
-
-    const targetSwNetModule = moduleByKey.get(formatModuleKey(useEdge.target))?.module ?? null;
-    const childLayout = buildFlattenLayoutContext(
-      targetSwNetModule,
-      targetSwMclModule,
-      useAnchor ?? null,
-      targetSwMclModule ? undefined : useAnchor,
-    );
-
-    flattenModule(
-      useEdge.target,
-      namespacedInstanceId,
-      childPortBindings,
-      targetSwNetModule
-        ? buildChildParamEnv(targetSwNetModule, statement.args, paramEnv, {
-            documentPath: moduleKey.documentPath,
-            moduleId: moduleKey.moduleId,
-            instanceId: statement.instanceId,
-          })
-        : new Map(),
-      childLayout,
-      false,
-      moduleByKey,
-      swMclByDocumentPath,
-      out,
-      warnings,
-    );
-  }
+    },
+  };
 }
 
 // Index which logic instance produces each internal net name referenced by XML inputs.
@@ -1789,11 +1554,6 @@ function expressionToScalarValue(expression: SwNetExpression): IrScalarValue | u
     default:
       return undefined;
   }
-}
-
-// Build a stable lookup key for one resolved sw-net module.
-function formatModuleKey(key: SwNetResolvedModuleKey): string {
-  return `${key.documentPath}#${key.moduleId}`;
 }
 
 // Format a scalar value using the XML spellings Stormworks expects.

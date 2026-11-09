@@ -7,7 +7,6 @@ import {
 import { normalizeComparableModule } from "./comparable-node.js";
 import {
   compareComparableModuleGraphs,
-  compareSwNetModules,
   type NetworkComparisonOptions,
 } from "./module-graph-comparator.js";
 import {
@@ -61,6 +60,33 @@ export function compareSwNetProjects(
   };
 }
 
+/**
+ * Compare two specific modules by their fully inlined circuits, ignoring which document is the project entry.
+ * Unlike compareSwNetModules, nested `use` statements are expanded instead of treated as opaque nodes.
+ */
+export function compareSwNetEntryModules(
+  a: { resolution: SwNetResolutionResult; key: SwNetResolvedModuleKey },
+  b: { resolution: SwNetResolutionResult; key: SwNetResolvedModuleKey },
+  options: NetworkComparisonOptions = {},
+): StormworksLibraryResult<NetworkComparisonResult> {
+  const flattenedA = flattenSwNetProject(
+    { ...a.resolution, entryDocumentPath: a.key.documentPath },
+    { entryModuleId: a.key.moduleId },
+  );
+  const flattenedB = flattenSwNetProject(
+    { ...b.resolution, entryDocumentPath: b.key.documentPath },
+    { entryModuleId: b.key.moduleId },
+  );
+  const diagnostics = [...flattenedA.diagnostics, ...flattenedB.diagnostics];
+
+  if (!flattenedA.value || !flattenedB.value) {
+    return { diagnostics };
+  }
+
+  const flatResult = compareFlattenedProjects(flattenedA.value, flattenedB.value, options);
+  return { value: flatResult.value, diagnostics: [...diagnostics, ...flatResult.diagnostics] };
+}
+
 function compareFlattenedProjects(
   a: FlattenedSwNetProject,
   b: FlattenedSwNetProject,
@@ -102,14 +128,21 @@ function compareModuleStructures(
   b: SwNetResolutionResult,
   options: NetworkComparisonOptions,
 ): ModuleGrouping {
+  // Each module is flattened once, so a module paired with many candidates is not re-expanded per pair.
+  const flattenedA = flattenEachModule(a);
+  const flattenedB = flattenEachModule(b);
   const candidates = a.modules.flatMap((moduleA) =>
     b.modules
       .filter((moduleB) => portSignature(moduleA) === portSignature(moduleB))
-      .map((moduleB) => ({
-        moduleA,
-        moduleB,
-        result: compareSwNetModules(moduleA.module, moduleB.module, options).value,
-      }))
+      .map((moduleB) => {
+        const left = flattenedA.get(moduleKey(moduleA.key));
+        const right = flattenedB.get(moduleKey(moduleB.key));
+        return {
+          moduleA,
+          moduleB,
+          result: left && right ? compareFlattenedProjects(left, right, options).value : undefined,
+        };
+      })
       .filter(
         (
           candidate,
@@ -147,6 +180,20 @@ function compareModuleStructures(
     unmatchedA: a.modules.map((module) => moduleKey(module.key)).filter((key) => !usedA.has(key)),
     unmatchedB: b.modules.map((module) => moduleKey(module.key)).filter((key) => !usedB.has(key)),
   };
+}
+
+function flattenEachModule(resolution: SwNetResolutionResult): Map<string, FlattenedSwNetProject> {
+  const result = new Map<string, FlattenedSwNetProject>();
+  for (const module of resolution.modules) {
+    const flattened = flattenSwNetProject(
+      { ...resolution, entryDocumentPath: module.key.documentPath },
+      { entryModuleId: module.key.moduleId },
+    );
+    if (flattened.value) {
+      result.set(moduleKey(module.key), flattened.value);
+    }
+  }
+  return result;
 }
 
 function groupingRank(result: NetworkComparisonResult): number {
