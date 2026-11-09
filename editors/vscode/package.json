@@ -1,0 +1,32 @@
+{
+  "name": "storm-sw-net",
+  "displayName": "Stormworks sw-net",
+  "description": "Syntax highlighting for the Stormworks microcontroller DSL (.sw-net)",
+  "version": "0.1.0",
+  "publisher": "nona-takahara",
+  "license": "MIT",
+  "engines": { "vscode": "^1.60.0" },
+  "categories": ["Programming Languages"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nona-takahara/storm-microcontroller-language.git",
+    "directory": "editors/vscode"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "sw-net",
+        "aliases": ["Stormworks sw-net", "sw-net"],
+        "extensions": [".sw-net"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "sw-net",
+        "scopeName": "source.sw-net",
+        "path": "./syntaxes/sw-net.tmLanguage.json"
+      }
+    ]
+  }
+}

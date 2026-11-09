@@ -1,0 +1,124 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Stormworks sw-net",
+  "scopeName": "source.sw-net",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#import" },
+    { "include": "#module" },
+    { "include": "#port" },
+    { "include": "#inst" },
+    { "include": "#use" },
+    { "include": "#expression" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.sw-net",
+      "match": "#.*$"
+    },
+    "import": {
+      "match": "\\b(import)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)\\s+(from)\\b",
+      "captures": {
+        "1": { "name": "keyword.control.import.sw-net" },
+        "2": { "name": "entity.name.namespace.sw-net" },
+        "3": { "name": "keyword.control.import.sw-net" }
+      }
+    },
+    "module": {
+      "patterns": [
+        {
+          "match": "\\b(module)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.module.sw-net" },
+            "2": { "name": "entity.name.type.module.sw-net" }
+          }
+        },
+        {
+          "match": "\\bend\\b",
+          "name": "keyword.declaration.module.sw-net"
+        }
+      ]
+    },
+    "port": {
+      "match": "\\b(port)\\s+(in|out)\\b(?:\\s+(\"(?:[^\"\\\\]|\\\\.)*\"|[\\p{L}_][\\p{L}\\p{N}_]*))?(?:\\s*(:)\\s*(number|boolean|composite|video|audio|execute|unknown)\\b)?",
+      "captures": {
+        "1": { "name": "keyword.declaration.port.sw-net" },
+        "2": { "name": "storage.modifier.direction.sw-net" },
+        "3": {
+          "patterns": [
+            { "include": "#string" },
+            { "match": ".+", "name": "variable.other.port.sw-net" }
+          ]
+        },
+        "4": { "name": "punctuation.separator.colon.sw-net" },
+        "5": { "name": "support.type.signal.sw-net" }
+      }
+    },
+    "inst": {
+      "match": "\\b(inst)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "captures": {
+        "1": { "name": "keyword.other.inst.sw-net" },
+        "2": { "name": "entity.name.type.gate.sw-net" },
+        "3": { "name": "entity.name.function.instance.sw-net" }
+      }
+    },
+    "use": {
+      "match": "\\b(use)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)(?:(\\.)([\\p{L}_][\\p{L}\\p{N}_]*))?\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "captures": {
+        "1": { "name": "keyword.other.use.sw-net" },
+        "2": { "name": "entity.name.type.module.sw-net" },
+        "3": { "name": "punctuation.accessor.dot.sw-net" },
+        "4": { "name": "entity.name.type.module.sw-net" },
+        "5": { "name": "entity.name.function.instance.sw-net" }
+      }
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#key" },
+        { "include": "#string" },
+        { "include": "#number" },
+        { "include": "#constant" },
+        { "match": "->", "name": "keyword.operator.arrow.sw-net" },
+        { "match": ":", "name": "punctuation.separator.colon.sw-net" },
+        { "match": "=", "name": "keyword.operator.assignment.sw-net" },
+        { "match": ",", "name": "punctuation.separator.comma.sw-net" },
+        { "match": "[()\\[\\]]", "name": "punctuation.bracket.sw-net" },
+        { "match": "[\\p{L}_][\\p{L}\\p{N}_]*", "name": "variable.other.net.sw-net" }
+      ]
+    },
+    "key": {
+      "match": "(\"(?:[^\"\\\\]|\\\\.)*\"|[\\p{L}_][\\p{L}\\p{N}_]*)(?=\\s*=)",
+      "captures": {
+        "1": {
+          "patterns": [
+            { "include": "#string" },
+            { "match": ".+", "name": "variable.parameter.pin.sw-net" }
+          ]
+        }
+      }
+    },
+    "string": {
+      "name": "string.quoted.double.sw-net",
+      "begin": "\"",
+      "end": "\"|$",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.sw-net" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.sw-net" } },
+      "patterns": [
+        {
+          "match": "\\\\(?:[\"\\\\/bfnrt]|u[0-9A-Fa-f]{4})",
+          "name": "constant.character.escape.sw-net"
+        },
+        { "match": "\\\\.", "name": "invalid.illegal.escape.sw-net" }
+      ]
+    },
+    "number": {
+      "match": "(?<![\\p{L}\\p{N}_])[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?",
+      "name": "constant.numeric.sw-net"
+    },
+    "constant": {
+      "match": "\\b(?:true|false|null)\\b",
+      "name": "constant.language.sw-net"
+    }
+  }
+}
