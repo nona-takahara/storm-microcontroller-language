@@ -78,6 +78,9 @@ describe("project comparison", () => {
     const project = compareSwNetProjects(nested, inline);
     expect(project.value?.verdict).toBe("equivalent");
     expect(project.value?.matchedPairs).toHaveLength(8);
+    const mainEntry = project.value?.moduleResults.find((entry) => entry.moduleKeyA.endsWith("#main"));
+    expect(mainEntry?.moduleKeyB.endsWith("#main")).toBe(true);
+    expect(mainEntry?.result.verdict).toBe("equivalent");
 
     const entry = compareSwNetEntryModules(
       { resolution: nested, key: { documentPath: nested.entryDocumentPath, moduleId: "main" } },
