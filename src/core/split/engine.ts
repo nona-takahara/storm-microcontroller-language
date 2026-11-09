@@ -12,6 +12,7 @@
 // `identifier(name)` to `string(name)`: the moved side now reads/writes its own declared port, and the
 // statements left behind keep referencing the same bare name, now forwarded through the new `use`.
 import { findCompatibleComponentDefinition, type NodeDefinitionRegistry } from "../definitions/loader.js";
+import { collectParamRefNames } from "../module-params.js";
 import { createErrorDiagnostic, type Diagnostic, type StormworksLibraryResult } from "../diagnostics.js";
 import { type IrSignalKind } from "../ir.js";
 import {
@@ -140,6 +141,29 @@ export function buildSplitModulePlan(options: BuildSplitModulePlanOptions): Stor
   }
 
   if (missingIds.length > 0) {
+    return { diagnostics };
+  }
+
+  // The new module declares no parameters, so a moved statement that reads `@name` would dangle.
+  for (const id of gateInstanceIds) {
+    const statement = statementById.get(id)!;
+    const assignments = statement.kind === "inst" ? statement.attributes : statement.args;
+
+    if (assignments.some((assignment) => collectParamRefNames(assignment.value).length > 0)) {
+      diagnostics.push(
+        createErrorDiagnostic(
+          "SPLIT_PARAM_REFERENCE",
+          `Instance ${id} reads a module parameter of ${options.moduleId} and cannot be moved.`,
+          "split",
+          undefined,
+          id,
+          { messageId: "split.paramReference", messageArgs: { instanceId: id, moduleId: options.moduleId } },
+        ),
+      );
+    }
+  }
+
+  if (diagnostics.length > 0) {
     return { diagnostics };
   }
 

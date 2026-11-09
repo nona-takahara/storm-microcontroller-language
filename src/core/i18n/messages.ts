@@ -141,6 +141,7 @@ export const enMessages = {
   "sync.warning.layout-projection": "layout not applied",
   "sync.conflict.module-boundary": "module boundary",
   "sync.conflict.shared-module-divergence": "shared module divergence",
+  "sync.conflict.module-parameter": "module parameter",
   "sync.conflict.ambiguous-correspondence": "ambiguous correspondence",
   "sync.conflict.ambiguous-placement": "ambiguous placement",
   "sync.conflict.layout-projection": "layout projection",
@@ -154,6 +155,7 @@ export const enMessages = {
   "split.emptySelection": "No gate instance ids were provided to split.",
   "split.gateNotFound": "Instance {instanceId} was not found in module {moduleId}.",
   "split.instanceIdConflict": "Instance id {instanceId} is already used in module {moduleId}.",
+  "split.paramReference": "Instance {instanceId} reads a module parameter (@name) of {moduleId}, so it cannot be moved into a new module.",
   "split.result.written": "Split applied. Files were written.",
   "split.result.dryRun": "Dry run completed. No files were written.",
   "split.summary": "Moved {count, plural, one {# instance} other {# instances}} into module {moduleId} ({path}).",
@@ -307,6 +309,7 @@ export interface MessageArgsById {
   "sync.warning.layout-projection": NoMessageArguments;
   "sync.conflict.module-boundary": NoMessageArguments;
   "sync.conflict.shared-module-divergence": NoMessageArguments;
+  "sync.conflict.module-parameter": NoMessageArguments;
   "sync.conflict.ambiguous-correspondence": NoMessageArguments;
   "sync.conflict.ambiguous-placement": NoMessageArguments;
   "sync.conflict.layout-projection": NoMessageArguments;
@@ -320,6 +323,7 @@ export interface MessageArgsById {
   "split.emptySelection": NoMessageArguments;
   "split.gateNotFound": { instanceId: string; moduleId: string };
   "split.instanceIdConflict": { instanceId: string; moduleId: string };
+  "split.paramReference": { instanceId: string; moduleId: string };
   "split.result.written": NoMessageArguments;
   "split.result.dryRun": NoMessageArguments;
   "split.summary": { count: number; moduleId: string; path: string };
@@ -466,6 +470,7 @@ export const jaMessages: Record<MessageId, string> = {
   "sync.warning.layout-projection": "レイアウト未反映",
   "sync.conflict.module-boundary": "module境界",
   "sync.conflict.shared-module-divergence": "共有moduleの利用箇所間差異",
+  "sync.conflict.module-parameter": "moduleパラメータ",
   "sync.conflict.ambiguous-correspondence": "対応の曖昧性",
   "sync.conflict.ambiguous-placement": "配置先の曖昧性",
   "sync.conflict.layout-projection": "レイアウト投影",
@@ -479,6 +484,7 @@ export const jaMessages: Record<MessageId, string> = {
   "split.emptySelection": "分割対象のinstance idが指定されていません。",
   "split.gateNotFound": "instance {instanceId} はモジュール {moduleId} に見つかりません。",
   "split.instanceIdConflict": "instance id {instanceId} はモジュール {moduleId} で既に使われています。",
+  "split.paramReference": "instance {instanceId} は {moduleId} のモジュールパラメータ（@名前）を参照しているため、新しいモジュールへ移せません。",
   "split.result.written": "分割を適用し、ファイルを書き込みました。",
   "split.result.dryRun": "dry-runが完了しました。ファイルは変更していません。",
   "split.summary": "{count}個のインスタンスをモジュール {moduleId}（{path}）へ移動しました。",

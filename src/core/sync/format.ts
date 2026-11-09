@@ -125,6 +125,7 @@ function formatConflictKind(kind: SynchronizationConflictKind, translator: Trans
   switch (kind) {
     case "module-boundary": return translator.format("sync.conflict.module-boundary");
     case "shared-module-divergence": return translator.format("sync.conflict.shared-module-divergence");
+    case "module-parameter": return translator.format("sync.conflict.module-parameter");
     case "ambiguous-correspondence": return translator.format("sync.conflict.ambiguous-correspondence");
     case "ambiguous-placement": return translator.format("sync.conflict.ambiguous-placement");
     case "layout-projection": return translator.format("sync.conflict.layout-projection");

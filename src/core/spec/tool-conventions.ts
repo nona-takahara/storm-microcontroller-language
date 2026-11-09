@@ -46,6 +46,11 @@ export const TOOL_CONVENTIONS: ToolConventionNote[] = [
       "Import paths must be relative (start with ./ or ../) and end in .sw-net. Duplicate module IDs/aliases and `use` cycles are hard errors, not warnings — check-dsl/typecheck-dsl will refuse to proceed past them.",
   },
   {
+    topic: "module parameters: module m(name=default), @name, use m id (name=value)",
+    text:
+      'A module may declare parameters with a REQUIRED scalar default (`module sub(edge="rise", start=0)`). Inside it, `inst PULSE p (mode=@edge)` reads one; a `use` overrides it (`use sub s1 (edge="fall") : ...`) and may forward its own parameter (`use leaf l (x=@start)`). `@name` is only valid as an inst property value or a use argument — never in pin wiring, and it is not a net. Parameters are expanded away on export (XML has no modules), so each `use` yields gates with concrete values. An undeclared `@name`, an unknown argument, or an argument whose type differs from the default (null matches anything) is an error. Sync (XML -> DSL) writes a changed parameter-controlled property back to the `use` argument only when every gate sharing that argument agrees; otherwise it reports a "module parameter" conflict. split-module refuses to move a gate that reads `@name`.',
+  },
+  {
     topic: "file names of written files: avoid hyphens and non-ASCII characters",
     text:
       'Choose output file names (dsl2xml --out, xml2dsl --out-dir, split-module --out, and the .sw-mcl that layout-dsl writes) without hyphens and without non-ASCII characters; letters, digits, and underscores are the recommended set. This is a recommendation, not a prohibition: storm-mcl still writes the file as requested and prints a "[warning] File name ..." line to stderr, and the command\'s exit code is unaffected. Only the file name is checked, not the directories above it. Stormworks itself loads microcontroller XML with such names.',

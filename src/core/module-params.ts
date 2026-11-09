@@ -4,12 +4,46 @@
 // before anything downstream (XML export, comparison) sees the attributes.
 import { type SwNetAssignment, type SwNetExpression, type SwNetModule } from "./parsers/sw-net.js";
 
-/** Resolved parameter values for one module instance, keyed by parameter name. Values never hold `paramRef`. */
-export type ModuleParamEnv = ReadonlyMap<string, SwNetExpression>;
+/**
+ * Where a parameter's value is controlled, so sync can write a changed value back to the source.
+ * - `use-arg`: the `name=value` argument of one `use` statement (added when the use relies on the default).
+ * - `entry-default`: the entry module's own header default; nothing passes arguments to it.
+ */
+export type ParamOrigin =
+  | { kind: "use-arg"; documentPath: string; moduleId: string; useInstanceId: string; argName: string }
+  | { kind: "entry-default"; documentPath: string; moduleId: string; paramName: string };
+
+/** One parameter's resolved value (never a `paramRef`) and the place that controls it. */
+export interface ParamBinding {
+  value: SwNetExpression;
+  origin: ParamOrigin;
+}
+
+/** Resolved parameters for one module instance, keyed by parameter name. */
+export type ModuleParamEnv = ReadonlyMap<string, ParamBinding>;
+
+/** The `use` statement that instantiates a module, identifying where its arguments live. */
+export interface ParamUseSite {
+  documentPath: string;
+  moduleId: string;
+  instanceId: string;
+}
 
 /** Environment of the entry module (nothing passes arguments to it, so every parameter keeps its default). */
-export function buildEntryParamEnv(module: SwNetModule): ModuleParamEnv {
-  return buildChildParamEnv(module, [], new Map());
+export function buildEntryParamEnv(module: SwNetModule, documentPath: string): ModuleParamEnv {
+  const env = new Map<string, ParamBinding>();
+
+  for (const param of module.params) {
+    const value = substituteParamRefs(param.value, new Map());
+    if (value) {
+      env.set(param.key, {
+        value,
+        origin: { kind: "entry-default", documentPath, moduleId: module.id, paramName: param.key },
+      });
+    }
+  }
+
+  return env;
 }
 
 /**
@@ -21,13 +55,21 @@ export function buildChildParamEnv(
   child: SwNetModule,
   args: readonly SwNetAssignment[],
   parentEnv: ModuleParamEnv,
+  site: ParamUseSite,
 ): ModuleParamEnv {
-  const env = new Map<string, SwNetExpression>();
+  const env = new Map<string, ParamBinding>();
 
   for (const param of child.params) {
-    const resolved = substituteParamRefs(param.value, new Map());
-    if (resolved) {
-      env.set(param.key, resolved);
+    const origin: ParamOrigin = {
+      kind: "use-arg",
+      documentPath: site.documentPath,
+      moduleId: site.moduleId,
+      useInstanceId: site.instanceId,
+      argName: param.key,
+    };
+    const value = substituteParamRefs(param.value, new Map());
+    if (value) {
+      env.set(param.key, { value, origin });
     }
   }
 
@@ -36,9 +78,18 @@ export function buildChildParamEnv(
       continue;
     }
 
-    const resolved = substituteParamRefs(arg.value, parentEnv);
-    if (resolved) {
-      env.set(arg.key, resolved);
+    // A forwarded `@parent` stays controlled by the parent's origin; a literal is controlled by this argument.
+    if (arg.value.kind === "paramRef") {
+      const forwarded = parentEnv.get(arg.value.name);
+      if (forwarded) {
+        env.set(arg.key, { value: cloneExpression(forwarded.value), origin: forwarded.origin });
+      }
+      continue;
+    }
+
+    const value = substituteParamRefs(arg.value, parentEnv);
+    if (value) {
+      env.set(arg.key, { value, origin: env.get(arg.key)!.origin });
     }
   }
 
@@ -60,14 +111,38 @@ export function substituteAttributeParams(
   });
 }
 
+/**
+ * For attributes written as a bare `@name`, the origin that controls the value. A `@name` nested inside a
+ * list literal has no single owner, so it is reported as `undefined` to let callers refuse to write it back.
+ */
+export function resolveAttributeParamOrigins(
+  attributes: readonly SwNetAssignment[],
+  env: ModuleParamEnv,
+): Record<string, ParamOrigin | undefined> {
+  const origins: Record<string, ParamOrigin | undefined> = {};
+
+  for (const attribute of attributes) {
+    if (attribute.value.kind === "paramRef") {
+      const binding = env.get(attribute.value.name);
+      if (binding) {
+        origins[attribute.key] = binding.origin;
+      }
+    } else if (collectParamRefNames(attribute.value).length > 0) {
+      origins[attribute.key] = undefined;
+    }
+  }
+
+  return origins;
+}
+
 /** Resolve `@name` inside one expression (recursing into list entries); `undefined` when unresolvable. */
 export function substituteParamRefs(
   expression: SwNetExpression,
   env: ModuleParamEnv,
 ): SwNetExpression | undefined {
   if (expression.kind === "paramRef") {
-    const value = env.get(expression.name);
-    return value ? cloneExpression(value) : undefined;
+    const binding = env.get(expression.name);
+    return binding ? cloneExpression(binding.value) : undefined;
   }
 
   if (expression.kind === "list") {

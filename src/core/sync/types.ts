@@ -26,6 +26,7 @@ export interface SynchronizationChange {
 export type SynchronizationConflictKind =
   | "module-boundary"
   | "shared-module-divergence"
+  | "module-parameter"
   | "ambiguous-correspondence"
   | "ambiguous-placement"
   | "layout-projection";

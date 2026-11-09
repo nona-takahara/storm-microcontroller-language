@@ -15,7 +15,14 @@ import {
   type SwNetResolvedModule,
   type SwNetResolvedModuleKey,
 } from "../resolvers/sw-net.js";
-import { buildChildParamEnv, buildEntryParamEnv, type ModuleParamEnv, substituteAttributeParams } from "../module-params.js";
+import {
+  buildChildParamEnv,
+  buildEntryParamEnv,
+  type ModuleParamEnv,
+  type ParamOrigin,
+  resolveAttributeParamOrigins,
+  substituteAttributeParams,
+} from "../module-params.js";
 import { type ProvenancePath } from "./types.js";
 
 export interface FlattenSwNetProjectOptions {
@@ -26,6 +33,8 @@ export interface FlattenedSwNetProject {
   module: SwNetModule;
   provenanceByInstanceId: Record<string, ProvenancePath>;
   documentPathByInstanceId: Record<string, string>;
+  /** Per flattened instance, which attributes were written as `@param` and where each one is controlled. `undefined` marks a reference that cannot be written back (inside a list literal). */
+  paramOriginsByInstanceId: Record<string, Record<string, ParamOrigin | undefined>>;
 }
 
 /**
@@ -48,6 +57,7 @@ export function flattenSwNetProject(
   const statements: SwNetStatement[] = [];
   const provenanceByInstanceId: Record<string, ProvenancePath> = {};
   const documentPathByInstanceId: Record<string, string> = {};
+  const paramOriginsByInstanceId: Record<string, Record<string, ParamOrigin | undefined>> = {};
   const rootBindings = new Map(
     entry.module.ports.map((port) => [portBindingKey(port), stringExpression(port.name)] as const),
   );
@@ -56,11 +66,12 @@ export function flattenSwNetProject(
     entry,
     [],
     rootBindings,
-    buildEntryParamEnv(entry.module),
+    buildEntryParamEnv(entry.module, entry.key.documentPath),
     moduleByKey,
     statements,
     provenanceByInstanceId,
     documentPathByInstanceId,
+    paramOriginsByInstanceId,
   );
 
   return {
@@ -73,6 +84,7 @@ export function flattenSwNetProject(
       },
       provenanceByInstanceId,
       documentPathByInstanceId,
+      paramOriginsByInstanceId,
     },
     diagnostics,
   };
@@ -87,6 +99,7 @@ function flattenModule(
   statements: SwNetStatement[],
   provenanceByInstanceId: Record<string, ProvenancePath>,
   documentPathByInstanceId: Record<string, string>,
+  paramOriginsByInstanceId: Record<string, Record<string, ParamOrigin | undefined>>,
 ): void {
   const useByInstanceId = new Map(
     resolved.uses.map((use) => [use.statement.instanceId, use] as const),
@@ -107,6 +120,10 @@ function flattenModule(
         instanceIds: [...instancePath, statement.instanceId],
       };
       documentPathByInstanceId[flattenedId] = resolved.key.documentPath;
+      const origins = resolveAttributeParamOrigins(statement.attributes, paramEnv);
+      if (Object.keys(origins).length > 0) {
+        paramOriginsByInstanceId[flattenedId] = origins;
+      }
       continue;
     }
 
@@ -132,11 +149,16 @@ function flattenModule(
       target,
       childPath,
       childBindings,
-      buildChildParamEnv(target.module, statement.args, paramEnv),
+      buildChildParamEnv(target.module, statement.args, paramEnv, {
+        documentPath: resolved.key.documentPath,
+        moduleId: resolved.module.id,
+        instanceId: statement.instanceId,
+      }),
       moduleByKey,
       statements,
       provenanceByInstanceId,
       documentPathByInstanceId,
+      paramOriginsByInstanceId,
     );
   }
 }

@@ -185,7 +185,7 @@ export function buildStormworksXmlTree(
     entryModule.key,
     "",
     new Map(),
-    buildEntryParamEnv(entryModule.module),
+    buildEntryParamEnv(entryModule.module, entryModule.key.documentPath),
     entryLayout,
     true,
     moduleByKey,
@@ -865,7 +865,13 @@ function flattenModule(
       useEdge.target,
       namespacedInstanceId,
       childPortBindings,
-      targetSwNetModule ? buildChildParamEnv(targetSwNetModule, statement.args, paramEnv) : new Map(),
+      targetSwNetModule
+        ? buildChildParamEnv(targetSwNetModule, statement.args, paramEnv, {
+            documentPath: moduleKey.documentPath,
+            moduleId: moduleKey.moduleId,
+            instanceId: statement.instanceId,
+          })
+        : new Map(),
       childLayout,
       false,
       moduleByKey,
