@@ -25,7 +25,7 @@ function layout(entries: Array<[string, number, number]>): StraightWireLayout {
 
 describe("straight-wire readability", () => {
   it("reconstructs exact gate-port segments and penalizes crossings", () => {
-    const module: SwNetModule = { id: "main", ports: [], statements: [source("a", "a"), source("b", "b"), sink("c", "b"), sink("d", "a")] };
+    const module: SwNetModule = { id: "main", params: [], ports: [], statements: [source("a", "a"), source("b", "b"), sink("c", "b"), sink("d", "a")] };
     const result = evaluateStraightWireReadability(module, layout([["a", 0, 0], ["b", 0, 1], ["c", 3, 0], ["d", 3, 1]]), definitions);
 
     expect(result.wires).toContainEqual({ source: { x: 1, y: 0.375 }, target: { x: 3, y: 1.375 }, sourceOwner: "a", targetOwner: "d" });
@@ -37,6 +37,7 @@ describe("straight-wire readability", () => {
     const producer: SwNetStatement = { kind: "inst", typeId: "UNKNOWN", instanceId: "producer", attributes: [], inputs: [], outputs: [{ key: "out", value: { kind: "string", value: "output" } }] };
     const module: SwNetModule = {
       id: "main",
+      params: [],
       ports: [
         { direction: "in", name: "input", signal: "number" },
         { direction: "out", name: "output", signal: "number" },
@@ -63,7 +64,7 @@ describe("straight-wire readability", () => {
   });
 
   it("distinguishes a shallow crossing when crossing counts are equal", () => {
-    const module: SwNetModule = { id: "main", ports: [], statements: [source("a", "a"), source("b", "b"), sink("c", "b"), sink("d", "a")] };
+    const module: SwNetModule = { id: "main", params: [], ports: [], statements: [source("a", "a"), source("b", "b"), sink("c", "b"), sink("d", "a")] };
     const shallow = evaluateStraightWireReadability(module, layout([["a", 0, 0], ["b", 0, 0.5], ["c", 5, 0], ["d", 5, 0.5]]), definitions);
     const clear = evaluateStraightWireReadability(module, layout([["a", 0, 0], ["b", 0, 2], ["c", 3, 0], ["d", 3, 2]]), definitions);
 
@@ -73,7 +74,7 @@ describe("straight-wire readability", () => {
   });
 
   it("penalizes a wire crossing an unrelated gate", () => {
-    const module: SwNetModule = { id: "main", ports: [], statements: [source("a", "net"), sink("b", "net"), source("blocker", "unused")] };
+    const module: SwNetModule = { id: "main", params: [], ports: [], statements: [source("a", "net"), sink("b", "net"), source("blocker", "unused")] };
     const blocked = evaluateStraightWireReadability(module, layout([["a", 0, 0], ["blocker", 2, 0], ["b", 4, 0]]), definitions);
     const clear = evaluateStraightWireReadability(module, layout([["a", 0, 0], ["blocker", 2, 1], ["b", 4, 0]]), definitions);
 
@@ -83,7 +84,7 @@ describe("straight-wire readability", () => {
   });
 
   it("swaps adjacent gates within a rank to remove a crossing", () => {
-    const module: SwNetModule = { id: "main", ports: [], statements: [source("a", "a"), source("b", "b"), sink("c", "b"), sink("d", "a")] };
+    const module: SwNetModule = { id: "main", params: [], ports: [], statements: [source("a", "a"), source("b", "b"), sink("c", "b"), sink("d", "a")] };
     const initial = layout([["a", 0, 0], ["b", 0, 1], ["c", 3, 0], ["d", 3, 1]]);
     const improved = improveStraightWireLayout(module, initial, definitions, { gridSize: 0.25 });
 
@@ -94,7 +95,7 @@ describe("straight-wire readability", () => {
   });
 
   it("is deterministic and obeys the candidate-evaluation bound", () => {
-    const module: SwNetModule = { id: "main", ports: [], statements: [source("a", "a"), source("b", "b"), sink("c", "b"), sink("d", "a")] };
+    const module: SwNetModule = { id: "main", params: [], ports: [], statements: [source("a", "a"), source("b", "b"), sink("c", "b"), sink("d", "a")] };
     const initial = layout([["a", 0, 0], ["b", 0, 1], ["c", 3, 0], ["d", 3, 1]]);
     const bounded = improveStraightWireLayout(module, initial, definitions, { gridSize: 0.25, maxCandidateEvaluations: 0 });
     const first = improveStraightWireLayout(module, initial, definitions, { gridSize: 0.25 });
@@ -107,7 +108,7 @@ describe("straight-wire readability", () => {
   it("keeps the main left-to-right order in a feedback loop", () => {
     const first: SwNetStatement = { kind: "inst", typeId: "UNKNOWN", instanceId: "first", attributes: [], inputs: [{ key: "in", value: { kind: "identifier", value: "feedback" } }], outputs: [{ key: "out", value: { kind: "identifier", value: "forward" } }] };
     const second: SwNetStatement = { kind: "inst", typeId: "UNKNOWN", instanceId: "second", attributes: [], inputs: [{ key: "in", value: { kind: "identifier", value: "forward" } }], outputs: [{ key: "out", value: { kind: "identifier", value: "feedback" } }] };
-    const module: SwNetModule = { id: "main", ports: [], statements: [first, second] };
+    const module: SwNetModule = { id: "main", params: [], ports: [], statements: [first, second] };
     const improved = improveStraightWireLayout(module, layout([["first", 0, 0], ["second", 2, 0]]), definitions, { gridSize: 0.25 });
 
     expect(improved.instances.get("first")?.x).toBeLessThan(improved.instances.get("second")?.x ?? 0);

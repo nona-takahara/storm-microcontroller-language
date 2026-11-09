@@ -120,7 +120,7 @@ function propertyValue(
     return defaults?.[key];
   }
 
-  return attribute.value.kind === "list" ? undefined : attribute.value.value;
+  return attribute.value.kind === "list" || attribute.value.kind === "paramRef" ? undefined : attribute.value.value;
 }
 
 function uniqueKeys(declared: string[], connected: SwNetAssignment[]): string[] {

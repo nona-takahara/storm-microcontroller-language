@@ -15,6 +15,7 @@ import {
   type SwNetResolvedModule,
   type SwNetResolvedModuleKey,
 } from "../resolvers/sw-net.js";
+import { buildChildParamEnv, buildEntryParamEnv, type ModuleParamEnv, substituteAttributeParams } from "../module-params.js";
 import { type ProvenancePath } from "./types.js";
 
 export interface FlattenSwNetProjectOptions {
@@ -55,6 +56,7 @@ export function flattenSwNetProject(
     entry,
     [],
     rootBindings,
+    buildEntryParamEnv(entry.module),
     moduleByKey,
     statements,
     provenanceByInstanceId,
@@ -65,6 +67,7 @@ export function flattenSwNetProject(
     value: {
       module: {
         id: entry.module.id,
+        params: entry.module.params,
         ports: entry.module.ports,
         statements,
       },
@@ -79,6 +82,7 @@ function flattenModule(
   resolved: SwNetResolvedModule,
   instancePath: string[],
   portBindings: Map<string, SwNetExpression>,
+  paramEnv: ModuleParamEnv,
   moduleByKey: Map<string, SwNetResolvedModule>,
   statements: SwNetStatement[],
   provenanceByInstanceId: Record<string, ProvenancePath>,
@@ -94,7 +98,7 @@ function flattenModule(
       statements.push({
         ...statement,
         instanceId: flattenedId,
-        attributes: cloneAssignments(statement.attributes),
+        attributes: substituteAttributeParams(statement.attributes, paramEnv),
         inputs: rewriteAssignments(statement.inputs, resolved.module.ports, portBindings, instancePath, false),
         outputs: rewriteAssignments(statement.outputs, resolved.module.ports, portBindings, instancePath, true),
       });
@@ -128,6 +132,7 @@ function flattenModule(
       target,
       childPath,
       childBindings,
+      buildChildParamEnv(target.module, statement.args, paramEnv),
       moduleByKey,
       statements,
       provenanceByInstanceId,
@@ -276,14 +281,6 @@ function selectEntryModule(
   }
 
   return candidates[0];
-}
-
-function rewriteAssignment(assignment: SwNetAssignment): SwNetAssignment {
-  return { key: assignment.key, value: { ...assignment.value } };
-}
-
-function cloneAssignments(assignments: SwNetAssignment[]): SwNetAssignment[] {
-  return assignments.map(rewriteAssignment);
 }
 
 function portBindingKey(port: SwNetPort): string {

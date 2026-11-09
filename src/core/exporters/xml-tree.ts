@@ -14,6 +14,7 @@ import {
 } from "../definitions/schema.js";
 import { createWarningDiagnostic, type Diagnostic } from "../diagnostics.js";
 import { type LocalizedMessage } from "../i18n/index.js";
+import { buildChildParamEnv, buildEntryParamEnv, type ModuleParamEnv, substituteAttributeParams } from "../module-params.js";
 import { type IrSignalKind, type IrScalarValue, type IrVector2 } from "../ir.js";
 import { type SwNetAssignment, type SwNetExpression, type SwNetInstStatement, type SwNetModule } from "../parsers/sw-net.js";
 import { type ProjectJsonDocument, type ProjectJsonNodeDocument } from "../serializers/project-json.js";
@@ -184,6 +185,7 @@ export function buildStormworksXmlTree(
     entryModule.key,
     "",
     new Map(),
+    buildEntryParamEnv(entryModule.module),
     entryLayout,
     true,
     moduleByKey,
@@ -733,6 +735,7 @@ function flattenModule(
   moduleKey: SwNetResolvedModuleKey,
   namespace: string,
   portBindings: Map<string, SwNetExpression>,
+  paramEnv: ModuleParamEnv,
   layout: FlattenLayoutContext,
   isEntryModule: boolean,
   moduleByKey: Map<string, SwNetResolvedModule>,
@@ -760,7 +763,7 @@ function flattenModule(
           kind: "inst",
           typeId: statement.typeId,
           instanceId: namespacedInstanceId,
-          attributes: statement.attributes,
+          attributes: substituteAttributeParams(statement.attributes, paramEnv),
           inputs: resolveAssignmentList(
             statement.inputs,
             "in",
@@ -862,6 +865,7 @@ function flattenModule(
       useEdge.target,
       namespacedInstanceId,
       childPortBindings,
+      targetSwNetModule ? buildChildParamEnv(targetSwNetModule, statement.args, paramEnv) : new Map(),
       childLayout,
       false,
       moduleByKey,

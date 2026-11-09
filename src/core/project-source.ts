@@ -17,6 +17,7 @@ import {
   type BuildStormworksXmlTreeResult,
 } from "./exporters/xml-tree.js";
 import { importStormworksXml } from "./importers/xml.js";
+import { validateModuleParams } from "./module-param-diagnostics.js";
 import {
   createErrorDiagnostic,
   createWarningDiagnostic,
@@ -501,6 +502,7 @@ async function collectProjectSourceDiagnostics(
   }
 
   validateUseStatements(resolvedGraph.value, diagnostics);
+  validateModuleParams(resolvedGraph.value, diagnostics);
   validateNetSignalConsistency(resolvedGraph.value, definitions, diagnostics);
 
   return {

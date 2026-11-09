@@ -1,13 +1,14 @@
 // Shared types for the module-split engine (issue #64): mechanically extracting a chosen set of
 // inst/use statements out of one sw-net module into a brand-new module, rewriting only the
 // boundary-crossing wiring so every untouched statement's text is left byte-for-byte alone.
-import { type SwNetPort, type SwNetStatement } from "../parsers/sw-net.js";
+import { type SwNetAssignment, type SwNetPort, type SwNetStatement } from "../parsers/sw-net.js";
 import { type SwNetTextEdit } from "../parsers/sw-net-source.js";
 
 // The extracted module's full declaration, ready to serialize into a brand-new document alongside
 // whatever imports its own moved `use` statements still need.
 export interface SplitModuleNewModule {
   id: string;
+  params: SwNetAssignment[];
   ports: SwNetPort[];
   statements: SwNetStatement[];
 }

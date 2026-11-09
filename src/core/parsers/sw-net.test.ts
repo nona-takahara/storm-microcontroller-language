@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { serializeSwNetDocument } from "../serializers/sw-net-document.js";
 import { parseSwNetDocument, tokenizeSwNetDocument } from "./sw-net.js";
 
 describe("sw-net list literals", () => {
@@ -91,5 +92,53 @@ describe("sw-net Unicode identifiers", () => {
     expect(() => parseSwNetDocument("module main\n  inst ABS \u{1F600} : -> out=net1\nend\n")).toThrow(
       /Unexpected character/,
     );
+  });
+});
+
+describe("sw-net module parameters", () => {
+  const source = [
+    'module sub(arg1=0, arg2="rise")',
+    '  port out "y" : number',
+    "",
+    "  inst PULSE edge (mode=@arg2) : -> out=y",
+    "end",
+    "",
+    "module main",
+    '  use sub s1 (arg1=3, arg2="fall") : -> y=out',
+    "  use sub s2 : -> y=out2",
+    "end",
+    "",
+  ].join("\n");
+
+  it("tokenizes @ as its own token", () => {
+    expect(tokenizeSwNetDocument("@arg").map((token) => token.kind)).toEqual(["at", "identifier", "eof"]);
+  });
+
+  it("parses module parameters, @references, and use arguments", () => {
+    const [sub, main] = parseSwNetDocument(source).modules;
+
+    expect(sub?.params).toEqual([
+      { key: "arg1", value: { kind: "number", value: 0 } },
+      { key: "arg2", value: { kind: "string", value: "rise" } },
+    ]);
+    const inst = sub?.statements[0];
+    expect(inst?.kind === "inst" && inst.attributes).toEqual([
+      { key: "mode", value: { kind: "paramRef", name: "arg2" } },
+    ]);
+    const [withArgs, withoutArgs] = main?.statements ?? [];
+    expect(withArgs?.kind === "use" && withArgs.args).toEqual([
+      { key: "arg1", value: { kind: "number", value: 3 } },
+      { key: "arg2", value: { kind: "string", value: "fall" } },
+    ]);
+    expect(withoutArgs?.kind === "use" && withoutArgs.args).toEqual([]);
+    expect(main?.params).toEqual([]);
+  });
+
+  it("round-trips through the serializer", () => {
+    expect(serializeSwNetDocument(parseSwNetDocument(source))).toBe(source);
+  });
+
+  it("rejects a bare @ without a name", () => {
+    expect(() => parseSwNetDocument("module main\n  inst ABS g (a=@) : -> out=x\nend\n")).toThrow(/identifier/);
   });
 });

@@ -265,6 +265,7 @@ export function buildSplitModulePlan(options: BuildSplitModulePlanOptions): Stor
     kind: "use",
     moduleRef: { kind: "imported", alias: options.newImportAlias, moduleId: options.newModuleId },
     instanceId: newInstanceId,
+    args: [],
     inputs: useInputs,
     outputs: useOutputs,
   };
@@ -273,6 +274,7 @@ export function buildSplitModulePlan(options: BuildSplitModulePlanOptions): Stor
 
   const newModule: SplitModuleNewModule = {
     id: options.newModuleId,
+    params: [],
     ports: newPorts,
     statements: newStatements,
   };

@@ -46,7 +46,7 @@ describe("project flattening", () => {
     expect(statement.kind).toBe("inst");
     if (statement.kind === "inst") {
       expect(
-        statement.attributes.map(({ key, value }) => [key, value.kind === "list" ? undefined : value.value]),
+        statement.attributes.map(({ key, value }) => [key, value.kind === "list" || value.kind === "paramRef" ? undefined : value.value]),
       ).toEqual([
         ["min", -1],
         ["max", 1],
@@ -87,6 +87,40 @@ describe("project flattening", () => {
     expect(new Set(internalNetValues)).toEqual(
       new Set(["nested1/%24temp", "nested2/%24temp"]),
     );
+  });
+});
+
+describe("module parameter substitution", () => {
+  const attributeValues = (statement: { kind: string; attributes?: { key: string; value: unknown }[] }) =>
+    statement.kind === "inst"
+      ? Object.fromEntries(statement.attributes!.map(({ key, value }) => [key, (value as { value?: unknown }).value]))
+      : {};
+
+  it("applies defaults, use-site overrides, and forwards parent parameters", async () => {
+    const document = parseSwNetDocument(`
+      module leaf(lo=-1, hi=1)
+        port out "y" : number
+        inst CLAMP gate (min=@lo, max=@hi) : value=0 -> out="y"
+      end
+      module mid(top=10)
+        port out "y" : number
+        use leaf inner (hi=@top) : -> y="y"
+      end
+      module main
+        port out "a" : number
+        port out "b" : number
+        port out "c" : number
+        use leaf defaults : -> y="a"
+        use leaf custom (lo=-5, hi=5) : -> y="b"
+        use mid forwarded (top=42) : -> y="c"
+      end
+    `);
+    const flattened = flattenSwNetProject(await resolveDocument(document)).value!;
+    const byId = Object.fromEntries(flattened.module.statements.map((s) => [s.instanceId, attributeValues(s)]));
+
+    expect(byId["defaults/gate"]).toEqual({ min: -1, max: 1 });
+    expect(byId["custom/gate"]).toEqual({ min: -5, max: 5 });
+    expect(byId["forwarded/inner/gate"]).toEqual({ min: -1, max: 42 });
   });
 });
 
