@@ -53,7 +53,7 @@ export interface SynchronizationConflict {
 }
 
 export interface SynchronizationWarning {
-  kind: "layout-overwrite" | "layout-projection";
+  kind: "layout-overwrite" | "layout-projection" | "submodule-rewrite";
   reason: string;
   impacts: SynchronizationImpact[];
   selectedPosition?: IrVector2;

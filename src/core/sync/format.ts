@@ -5,6 +5,7 @@ import {
   type SynchronizationImpact,
   type SynchronizationManualSuggestion,
   type SynchronizationPlan,
+  type SynchronizationWarning,
 } from "./types.js";
 
 export type SynchronizationReportOutcome = "written" | "dry-run" | "blocked";
@@ -51,7 +52,7 @@ export function formatSynchronizationReport(
         ? ` => (${warning.selectedPosition.x}, ${warning.selectedPosition.y})`
         : "";
       lines.push(translator.format("sync.warning", {
-        kind: translator.format(warning.kind === "layout-overwrite" ? "sync.warning.layout-overwrite" : "sync.warning.layout-projection"),
+        kind: translator.format(formatWarningKey(warning.kind)),
         impacts: `${warning.impacts.map(formatImpact).join(", ")}${position}`,
       }));
       if (warning.reason) lines.push(translator.format("sync.reason", { reason: warning.reason }));
@@ -110,6 +111,14 @@ function formatNode(node: SynchronizationPlan["changes"][number]["incoming"]): s
 function formatImpact(impact: SynchronizationImpact): string {
   return [impact.documentPath, impact.moduleId, ...(impact.usePath ?? []), impact.instanceId]
     .filter((item): item is string => Boolean(item)).join("::") || "?";
+}
+
+function formatWarningKey(kind: SynchronizationWarning["kind"]) {
+  switch (kind) {
+    case "layout-overwrite": return "sync.warning.layout-overwrite";
+    case "layout-projection": return "sync.warning.layout-projection";
+    case "submodule-rewrite": return "sync.warning.submodule-rewrite";
+  }
 }
 
 function formatChangeKind(kind: SynchronizationChangeKind, translator: Translator): string {

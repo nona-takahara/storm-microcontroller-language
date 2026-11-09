@@ -640,6 +640,29 @@ describe("buildSynchronizationPlan with module parameters", () => {
     expect(materializeSynchronizationSources(resolved.value!, plan)["main.sw-net"]).toContain('use leaf one (lo=-3) : -> y="a"');
   });
 
+  it("warns when a non-parameter property is rewritten inside a submodule, and not for parameter writes", async () => {
+    const existing = project(existingText('  use leaf one : -> y="a"\n  use leaf two (lo=-5, hi=5) : -> y="b"\n'), "old", empty);
+    const resolved = await resolveProjectSource(existing);
+    const literal = [
+      "module leaf2\n",
+      '  port out "y" : number\n',
+      '  inst CLAMP gate (min=0, max=1) : value=0 -> out="y"\n',
+      "end\n\n",
+      'module main\n  port out "a" : number\n  use leaf2 only : -> y="a"\nend\n',
+    ].join("");
+    const literalResolved = await resolveProjectSource(project(literal, "old", empty));
+    const incoming = project('module main\n  port out "a" : number\n  inst CLAMP g (min=0, max=7) : value=0 -> out="a"\nend\n', "new", empty);
+    const plan = buildSynchronizationPlan(literalResolved.value!, incoming);
+
+    expect(plan.applicable).toBe(true);
+    expect(plan.warnings.filter((warning) => warning.kind === "submodule-rewrite")).toHaveLength(1);
+    expect(plan.warnings.find((warning) => warning.kind === "submodule-rewrite")?.reason).toContain("max: 1 -> 7");
+    expect(materializeSynchronizationSources(literalResolved.value!, plan)["main.sw-net"]).toContain("max=7");
+
+    const paramPlan = buildSynchronizationPlan(resolved.value!, project(incomingText(-1, -7), "new", empty));
+    expect(paramPlan.warnings.some((warning) => warning.kind === "submodule-rewrite")).toBe(false);
+  });
+
   it("reports a conflict when gates sharing one parameter no longer agree", async () => {
     const twoGates = [
       "module pair(lo=0)\n",

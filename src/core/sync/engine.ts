@@ -153,6 +153,7 @@ export function buildSynchronizationPlan(
   let layouts: SynchronizationLayoutUpdate[] = [];
 
   if (conflicts.length === 0) {
+    warnings.push(...warnSubmoduleRewrites(localChanges, oldGraph.nodes));
     sourceEdits = buildSourceEdits(existing, luaProjection.module, newGraph, correspondencePairs, localChanges, placements, paramPlan.writebacks);
     layouts = buildLayoutUpdates(existing.documents, correspondencePairs, placements, projectedLayout);
   }
@@ -610,6 +611,30 @@ function detectSharedModuleDivergence(
       });
     }
   }
+}
+
+// A property that is not controlled by a module parameter is rewritten inside the shared module itself,
+// so every `use` of that module sees the new value. Say so, and point at the parameter alternative.
+function warnSubmoduleRewrites(changes: SynchronizationChange[], existingNodes: ComparableNode[]): SynchronizationWarning[] {
+  const seen = new Set<string>();
+  const warnings: SynchronizationWarning[] = [];
+  for (const change of changes) {
+    const ref = change.existing;
+    if (change.kind !== "updated" || !change.propertyChanges || !ref?.usePath?.length) continue;
+    const key = `${ref.documentPath}\0${ref.moduleId}\0${ref.instanceId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const uses = existingNodes.filter((node) =>
+      node.node.source?.path === ref.documentPath && node.provenance?.moduleId === ref.moduleId && node.provenance?.instanceIds.at(-1) === ref.instanceId).length;
+    const properties = Object.entries(change.propertyChanges)
+      .map(([name, value]) => `${name}: ${JSON.stringify(value.before)} -> ${JSON.stringify(value.after)}`).join(", ");
+    warnings.push({
+      kind: "submodule-rewrite",
+      reason: `Rewrote ${properties} on ${ref.instanceId} inside module ${ref.moduleId} in place. The change applies to all ${uses} expansion(s) of this module. To give each use its own value, turn the property into a module parameter (@name).`,
+      impacts: [{ documentPath: ref.documentPath, moduleId: ref.moduleId, instanceId: ref.instanceId, usePath: ref.usePath }],
+    });
+  }
+  return warnings;
 }
 
 function formatImpactDetail(impact: SynchronizationImpact): string {

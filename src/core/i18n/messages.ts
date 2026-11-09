@@ -139,6 +139,7 @@ export const enMessages = {
   "sync.kind.rewired": "rewired",
   "sync.warning.layout-overwrite": "layout overwrite",
   "sync.warning.layout-projection": "layout not applied",
+  "sync.warning.submodule-rewrite": "submodule property rewritten",
   "sync.conflict.module-boundary": "module boundary",
   "sync.conflict.shared-module-divergence": "shared module divergence",
   "sync.conflict.module-parameter": "module parameter",
@@ -307,6 +308,7 @@ export interface MessageArgsById {
   "sync.kind.rewired": NoMessageArguments;
   "sync.warning.layout-overwrite": NoMessageArguments;
   "sync.warning.layout-projection": NoMessageArguments;
+  "sync.warning.submodule-rewrite": NoMessageArguments;
   "sync.conflict.module-boundary": NoMessageArguments;
   "sync.conflict.shared-module-divergence": NoMessageArguments;
   "sync.conflict.module-parameter": NoMessageArguments;
@@ -468,6 +470,7 @@ export const jaMessages: Record<MessageId, string> = {
   "sync.kind.rewired": "配線変更",
   "sync.warning.layout-overwrite": "レイアウト上書き",
   "sync.warning.layout-projection": "レイアウト未反映",
+  "sync.warning.submodule-rewrite": "submodule内のプロパティを書き換え",
   "sync.conflict.module-boundary": "module境界",
   "sync.conflict.shared-module-divergence": "共有moduleの利用箇所間差異",
   "sync.conflict.module-parameter": "moduleパラメータ",
