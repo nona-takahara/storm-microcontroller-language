@@ -16,7 +16,7 @@ function gate(id: string, inputNets: string[], outputNet: string): SwNetStatemen
 }
 
 async function positions(statements: SwNetStatement[]) {
-  const module: SwNetModule = { id: "main", ports: [], statements };
+  const module: SwNetModule = { id: "main", params: [], ports: [], statements };
   const result = await computeSwNetModuleLayout(module, { mode: "force" });
   return Object.fromEntries(result.instances.map(({ id, position }) => [id, position]));
 }

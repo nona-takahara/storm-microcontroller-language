@@ -5,6 +5,7 @@ import {
   type SynchronizationImpact,
   type SynchronizationManualSuggestion,
   type SynchronizationPlan,
+  type SynchronizationWarning,
 } from "./types.js";
 
 export type SynchronizationReportOutcome = "written" | "dry-run" | "blocked";
@@ -51,7 +52,7 @@ export function formatSynchronizationReport(
         ? ` => (${warning.selectedPosition.x}, ${warning.selectedPosition.y})`
         : "";
       lines.push(translator.format("sync.warning", {
-        kind: translator.format(warning.kind === "layout-overwrite" ? "sync.warning.layout-overwrite" : "sync.warning.layout-projection"),
+        kind: translator.format(formatWarningKey(warning.kind)),
         impacts: `${warning.impacts.map(formatImpact).join(", ")}${position}`,
       }));
       if (warning.reason) lines.push(translator.format("sync.reason", { reason: warning.reason }));
@@ -112,6 +113,14 @@ function formatImpact(impact: SynchronizationImpact): string {
     .filter((item): item is string => Boolean(item)).join("::") || "?";
 }
 
+function formatWarningKey(kind: SynchronizationWarning["kind"]) {
+  switch (kind) {
+    case "layout-overwrite": return "sync.warning.layout-overwrite";
+    case "layout-projection": return "sync.warning.layout-projection";
+    case "submodule-rewrite": return "sync.warning.submodule-rewrite";
+  }
+}
+
 function formatChangeKind(kind: SynchronizationChangeKind, translator: Translator): string {
   switch (kind) {
     case "added": return translator.format("sync.kind.added");
@@ -125,6 +134,7 @@ function formatConflictKind(kind: SynchronizationConflictKind, translator: Trans
   switch (kind) {
     case "module-boundary": return translator.format("sync.conflict.module-boundary");
     case "shared-module-divergence": return translator.format("sync.conflict.shared-module-divergence");
+    case "module-parameter": return translator.format("sync.conflict.module-parameter");
     case "ambiguous-correspondence": return translator.format("sync.conflict.ambiguous-correspondence");
     case "ambiguous-placement": return translator.format("sync.conflict.ambiguous-placement");
     case "layout-projection": return translator.format("sync.conflict.layout-projection");

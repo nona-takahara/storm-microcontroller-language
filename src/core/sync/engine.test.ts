@@ -599,6 +599,97 @@ describe("buildSynchronizationPlan", () => {
   });
 });
 
+describe("buildSynchronizationPlan with module parameters", () => {
+  const leaf = [
+    "module leaf(lo=-1, hi=1)\n",
+    '  port out "y" : number\n',
+    '  inst CLAMP gate (min=@lo, max=@hi) : value=0 -> out="y"\n',
+    "end\n",
+  ].join("");
+  const existingText = (uses: string) => `${leaf}\nmodule main\n  port out "a" : number\n  port out "b" : number\n${uses}end\n`;
+  const incomingText = (min1: number, min2: number, max2 = 5) => [
+    "module main\n",
+    '  port out "a" : number\n',
+    '  port out "b" : number\n',
+    `  inst CLAMP g1 (min=${min1}, max=1) : value=0 -> out="a"\n`,
+    `  inst CLAMP g2 (min=${min2}, max=${max2}) : value=0 -> out="b"\n`,
+    "end\n",
+  ].join("");
+  const empty: Array<{ id: string; type: string; position: { x: number; y: number } }> = [];
+
+  it("writes a changed parameter-controlled property back to the use argument and keeps @param", async () => {
+    const existing = project(existingText('  use leaf one : -> y="a"\n  use leaf two (lo=-5, hi=5) : -> y="b"\n'), "old", empty);
+    const resolved = await resolveProjectSource(existing);
+    const plan = buildSynchronizationPlan(resolved.value!, project(incomingText(-1, -7), "new", empty));
+
+    expect(plan.conflicts).toEqual([]);
+    expect(plan.applicable).toBe(true);
+    expect(plan.changes.some((change) => change.kind === "updated")).toBe(true);
+    const materialized = materializeSynchronizationSources(resolved.value!, plan)["main.sw-net"]!;
+    expect(materialized).toContain('use leaf two (lo=-7, hi=5) : -> y="b"');
+    expect(materialized).toContain('use leaf one : -> y="a"');
+    expect(materialized).toContain("inst CLAMP gate (min=@lo, max=@hi)");
+  });
+
+  it("adds the argument when the use relied on the default", async () => {
+    const existing = project(existingText('  use leaf one : -> y="a"\n  use leaf two (lo=-5, hi=5) : -> y="b"\n'), "old", empty);
+    const resolved = await resolveProjectSource(existing);
+    const plan = buildSynchronizationPlan(resolved.value!, project(incomingText(-3, -5), "new", empty));
+
+    expect(plan.conflicts).toEqual([]);
+    expect(materializeSynchronizationSources(resolved.value!, plan)["main.sw-net"]).toContain('use leaf one (lo=-3) : -> y="a"');
+  });
+
+  it("warns when a non-parameter property is rewritten inside a submodule, and not for parameter writes", async () => {
+    const existing = project(existingText('  use leaf one : -> y="a"\n  use leaf two (lo=-5, hi=5) : -> y="b"\n'), "old", empty);
+    const resolved = await resolveProjectSource(existing);
+    const literal = [
+      "module leaf2\n",
+      '  port out "y" : number\n',
+      '  inst CLAMP gate (min=0, max=1) : value=0 -> out="y"\n',
+      "end\n\n",
+      'module main\n  port out "a" : number\n  use leaf2 only : -> y="a"\nend\n',
+    ].join("");
+    const literalResolved = await resolveProjectSource(project(literal, "old", empty));
+    const incoming = project('module main\n  port out "a" : number\n  inst CLAMP g (min=0, max=7) : value=0 -> out="a"\nend\n', "new", empty);
+    const plan = buildSynchronizationPlan(literalResolved.value!, incoming);
+
+    expect(plan.applicable).toBe(true);
+    expect(plan.warnings.filter((warning) => warning.kind === "submodule-rewrite")).toHaveLength(1);
+    expect(plan.warnings.find((warning) => warning.kind === "submodule-rewrite")?.reason).toContain("max: 1 -> 7");
+    expect(materializeSynchronizationSources(literalResolved.value!, plan)["main.sw-net"]).toContain("max=7");
+
+    const paramPlan = buildSynchronizationPlan(resolved.value!, project(incomingText(-1, -7), "new", empty));
+    expect(paramPlan.warnings.some((warning) => warning.kind === "submodule-rewrite")).toBe(false);
+  });
+
+  it("reports a conflict when gates sharing one parameter no longer agree", async () => {
+    const twoGates = [
+      "module pair(lo=0)\n",
+      '  port out "p" : number\n',
+      '  port out "q" : number\n',
+      '  inst CLAMP first (min=@lo, max=9) : value=0 -> out="p"\n',
+      '  inst CLAMP second (min=@lo, max=8) : value=0 -> out="q"\n',
+      "end\n\n",
+      'module main\n  port out "a" : number\n  port out "b" : number\n  use pair inner : -> p="a", q="b"\nend\n',
+    ].join("");
+    const incoming = [
+      "module main\n",
+      '  port out "a" : number\n',
+      '  port out "b" : number\n',
+      '  inst CLAMP g1 (min=1, max=9) : value=0 -> out="a"\n',
+      '  inst CLAMP g2 (min=2, max=8) : value=0 -> out="b"\n',
+      "end\n",
+    ].join("");
+    const resolved = await resolveProjectSource(project(twoGates, "old", empty));
+    const plan = buildSynchronizationPlan(resolved.value!, project(incoming, "new", empty));
+
+    expect(plan.applicable).toBe(false);
+    expect(plan.conflicts.map((conflict) => conflict.kind)).toContain("module-parameter");
+    expect(plan.sourceEdits).toEqual([]);
+  });
+});
+
 function project(
   swNetText: string,
   name: string,

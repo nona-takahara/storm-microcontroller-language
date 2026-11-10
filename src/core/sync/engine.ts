@@ -23,6 +23,7 @@ import {
 } from "../parsers/sw-net.js";
 import { serializeSwNetStatement } from "../serializers/sw-net-document.js";
 import { type StormworksSwMclDocument } from "../serializers/sw-mcl.js";
+import { type ParamArgumentWriteback, planParamWritebacks, withoutParamDerivedChanges } from "./param-writeback.js";
 import { findPartialNodeCorrespondence, type PartialCorrespondenceOptions } from "./partial-matcher.js";
 import {
   type SynchronizationChange,
@@ -127,7 +128,17 @@ export function buildSynchronizationPlan(
   const placements = planAddedPlacements(oldGraph.nodes, occupiedLuaNames, newGraph, unmatchedIncoming, pairByIncomingId, conflicts);
   applyAddedPlacementRefs(changes, placements, newGraph, correspondencePairs);
   detectPortBoundaryChanges(existing, changes, conflicts);
-  detectSharedModuleDivergence(oldGraph.nodes, newGraph, changes, correspondencePairs, conflicts);
+  // Properties controlled by `@param` are written back to the `use` argument, not to the gate statement.
+  const paramPlan = planParamWritebacks(
+    oldGraph.nodes,
+    correspondencePairs,
+    flattened.value.paramOriginsByInstanceId,
+    incomingModule,
+    impactFromNode,
+  );
+  conflicts.push(...paramPlan.conflicts);
+  const localChanges = withoutParamDerivedChanges(changes, paramPlan.derivedKeys);
+  detectSharedModuleDivergence(oldGraph.nodes, newGraph, localChanges, correspondencePairs, conflicts, paramPlan.derivedKeys);
   const projectedLayout = projectLayoutToExistingModules(existing, incoming, correspondencePairs, placements, warnings);
 
   const project = {
@@ -142,7 +153,8 @@ export function buildSynchronizationPlan(
   let layouts: SynchronizationLayoutUpdate[] = [];
 
   if (conflicts.length === 0) {
-    sourceEdits = buildSourceEdits(existing, luaProjection.module, newGraph, correspondencePairs, changes, placements);
+    warnings.push(...warnSubmoduleRewrites(localChanges, oldGraph.nodes));
+    sourceEdits = buildSourceEdits(existing, luaProjection.module, newGraph, correspondencePairs, localChanges, placements, paramPlan.writebacks);
     layouts = buildLayoutUpdates(existing.documents, correspondencePairs, placements, projectedLayout);
   }
 
@@ -551,6 +563,7 @@ function detectSharedModuleDivergence(
   changes: SynchronizationChange[],
   pairs: MatchedNodePair[],
   conflicts: SynchronizationConflict[],
+  paramDerivedKeys: ReadonlyMap<string, ReadonlySet<string>>,
 ): void {
   const occurrences = new Map<string, ComparableNode[]>();
   for (const node of existingNodes) {
@@ -570,7 +583,7 @@ function detectSharedModuleDivergence(
       if (nodeChanges.some((change) => change.kind === "removed")) return "removed";
       const pair = pairs.find((item) => item.a.node.id === node.node.id);
       return pair
-        ? `${pair.b.node.definitionId}\0${JSON.stringify(pair.b.attributes)}\0${nodeChanges.map((item) => item.kind).sort().join(",")}\0${structuralIncidentSignature(incoming, pair.b)}`
+        ? `${pair.b.node.definitionId}\0${JSON.stringify(withoutKeys(pair.b.attributes, paramDerivedKeys.get(node.node.id)))}\0${nodeChanges.map((item) => item.kind).sort().join(",")}\0${structuralIncidentSignature(incoming, pair.b)}`
         : "changed";
     }));
     if (signatures.size > 1) {
@@ -598,6 +611,30 @@ function detectSharedModuleDivergence(
       });
     }
   }
+}
+
+// A property that is not controlled by a module parameter is rewritten inside the shared module itself,
+// so every `use` of that module sees the new value. Say so, and point at the parameter alternative.
+function warnSubmoduleRewrites(changes: SynchronizationChange[], existingNodes: ComparableNode[]): SynchronizationWarning[] {
+  const seen = new Set<string>();
+  const warnings: SynchronizationWarning[] = [];
+  for (const change of changes) {
+    const ref = change.existing;
+    if (change.kind !== "updated" || !change.propertyChanges || !ref?.usePath?.length) continue;
+    const key = `${ref.documentPath}\0${ref.moduleId}\0${ref.instanceId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const uses = existingNodes.filter((node) =>
+      node.node.source?.path === ref.documentPath && node.provenance?.moduleId === ref.moduleId && node.provenance?.instanceIds.at(-1) === ref.instanceId).length;
+    const properties = Object.entries(change.propertyChanges)
+      .map(([name, value]) => `${name}: ${JSON.stringify(value.before)} -> ${JSON.stringify(value.after)}`).join(", ");
+    warnings.push({
+      kind: "submodule-rewrite",
+      reason: `Rewrote ${properties} on ${ref.instanceId} inside module ${ref.moduleId} in place. The change applies to all ${uses} expansion(s) of this module. To give each use its own value, turn the property into a module parameter (@name).`,
+      impacts: [{ documentPath: ref.documentPath, moduleId: ref.moduleId, instanceId: ref.instanceId, usePath: ref.usePath }],
+    });
+  }
+  return warnings;
 }
 
 function formatImpactDetail(impact: SynchronizationImpact): string {
@@ -742,6 +779,7 @@ function buildSourceEdits(
   pairs: MatchedNodePair[],
   changes: SynchronizationChange[],
   placements: AddedPlacement[],
+  paramWritebacks: ParamArgumentWriteback[],
 ): SynchronizationPlan["sourceEdits"] {
   const editsByDocument = new Map<string, SwNetTextEdit[]>();
   const documents = new Map(existing.documents.map((document) => [document.documentId, document] as const));
@@ -768,7 +806,8 @@ function buildSourceEdits(
       const pair = pairs.find((item) => item.a.node.id === oldRef.nodeId);
       const incomingStatement = pair ? incomingStatementById.get(pair.b.node.id) : undefined;
       if (incomingStatement) {
-        edits.push({ ...source.spanOf(statement), newText: serializeSwNetStatement(projectStatement(incomingStatement, oldRef.instanceId, netMap)) });
+        const projected = keepParamReferences(statement, projectStatement(incomingStatement, oldRef.instanceId, netMap));
+        edits.push({ ...source.spanOf(statement), newText: serializeSwNetStatement(projected) });
       }
     }
     editsByDocument.set(document.documentId, edits);
@@ -787,10 +826,57 @@ function buildSourceEdits(
     editsByDocument.set(document.documentId, edits);
   }
 
+  for (const edit of buildParamWritebackEdits(documents, paramWritebacks)) {
+    const edits = editsByDocument.get(edit.documentPath) ?? [];
+    edits.push(edit.edit);
+    editsByDocument.set(edit.documentPath, edits);
+  }
+
   void incomingGraph;
   void pairByIncomingId;
   void placementByIncomingId;
   return [...editsByDocument].map(([documentPath, edits]) => ({ documentPath, edits }));
+}
+
+// A gate that reads `@param` keeps the reference when its other properties are rewritten from the XML;
+// the parameter's new value reaches the source through the `use` argument instead.
+function keepParamReferences(existing: SwNetStatement, projected: SwNetStatement): SwNetStatement {
+  if (existing.kind !== "inst" || projected.kind !== "inst") return projected;
+  const references = new Map(existing.attributes.filter((item) => item.value.kind === "paramRef").map((item) => [item.key, item] as const));
+  if (references.size === 0) return projected;
+  const attributes = projected.attributes.map((item) => references.get(item.key) ?? item);
+  for (const reference of references.values()) {
+    if (!attributes.some((item) => item.key === reference.key)) attributes.push(reference);
+  }
+  return { ...projected, attributes };
+}
+
+// Set (or add) each controlling `name=value` argument on its `use` statement, one edit per statement.
+function buildParamWritebackEdits(
+  documents: Map<string, StormworksSourceDocument>,
+  writebacks: ParamArgumentWriteback[],
+): Array<{ documentPath: string; edit: SwNetTextEdit }> {
+  const byUse = new Map<string, ParamArgumentWriteback[]>();
+  for (const writeback of writebacks) {
+    const key = `${writeback.documentPath}\0${writeback.moduleId}\0${writeback.useInstanceId}`;
+    byUse.set(key, [...(byUse.get(key) ?? []), writeback]);
+  }
+  return [...byUse.entries()].map(([key, items]) => {
+    const first = items[0]!;
+    const document = documents.get(first.documentPath);
+    const statement = document?.swNet.modules.find((item) => item.id === first.moduleId)?.statements.find((item) => item.instanceId === first.useInstanceId);
+    const source = document?.swNetSource;
+    if (!document || !source || statement?.kind !== "use") throw new Error(`Cannot write parameter back to ${key}.`);
+    const args = statement.args.map((arg) => items.find((item) => item.argName === arg.key) ? { key: arg.key, value: items.find((item) => item.argName === arg.key)!.value } : arg);
+    for (const item of items) {
+      if (!args.some((arg) => arg.key === item.argName)) args.push({ key: item.argName, value: item.value });
+    }
+    return { documentPath: document.documentId, edit: { ...source.spanOf(statement), newText: serializeSwNetStatement({ ...statement, args }) } };
+  });
+}
+
+function withoutKeys<T>(record: Record<string, T>, keys: ReadonlySet<string> | undefined): Record<string, T> {
+  return keys ? Object.fromEntries(Object.entries(record).filter(([key]) => !keys.has(key))) : record;
 }
 
 function buildIncomingNetMap(

@@ -132,6 +132,32 @@ module main
 end
 ```
 
+**Module parameters:**
+
+A module can declare parameters, so that each `use` sets gate properties from outside. Declare them in the module header with a default value (required; a number, string, boolean, or `null`), read them with `@name` in a gate property, and override them in the `use`.
+
+```
+module edgy(edge="rise")
+  port in "t" : boolean
+  port out "p" : boolean
+  inst PULSE pulse (mode=@edge) : a="t" -> out="p"
+end
+
+module main
+  inst CONST_BOOL flag : -> out=flagnet
+  use edgy e1 : t=flagnet -> p=pa                    # edge="rise" (the default)
+  use edgy e2 (edge="fall") : t=flagnet -> p=pb      # overridden
+end
+```
+
+- `@name` can only be used as a gate property value or as a `use` argument. It cannot appear in wiring, and it is not a net.
+- A `use` can pass its own parameter on: `use leaf l (x=@start)`.
+- Parameters are expanded on export, because Stormworks XML has no modules. Each `use` becomes gates with concrete values.
+- An undeclared `@name`, an unknown argument, or an argument whose type differs from the default is an error. A `null` default accepts any type.
+- When `xml2dsl --sync-with` finds that a parameter-controlled property changed in the XML, it writes the new value back to the `use` argument, as long as every gate sharing that argument agrees. Otherwise it reports a "module parameter" conflict.
+- If a property that is not a parameter changes inside a submodule, sync rewrites it in the module itself, which affects every `use`, and prints a warning. Make the property a parameter if each `use` needs its own value.
+- `split-module` refuses to move a gate that reads `@name`.
+
 ### Main definition IDs
 
 | Category | Example IDs |

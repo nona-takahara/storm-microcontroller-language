@@ -26,6 +26,23 @@ describe("buildSplitModulePlan", () => {
     expect(result.value).toBeUndefined();
   });
 
+  it("refuses to move a gate that reads a module parameter", () => {
+    const source = parseSwNetSourceDocument("module main(lo=0)\n  inst CLAMP a (min=@lo) : value=1 -> out=r\nend\n");
+    const result = buildSplitModulePlan({
+      definitions,
+      source,
+      moduleId: "main",
+      gateInstanceIds: ["a"],
+      newModuleId: "extracted",
+      newInstanceId: "extracted_1",
+      newImportAlias: "extracted_module",
+    });
+
+    expect(hasErrorDiagnostics(result.diagnostics)).toBe(true);
+    expect(result.diagnostics.map((item) => item.code)).toContain("SPLIT_PARAM_REFERENCE");
+    expect(result.value).toBeUndefined();
+  });
+
   it("reports an error for an empty gate selection", () => {
     const source = parseSwNetSourceDocument("module main\n  inst ABS a : a=1 -> out=r\nend\n");
     const result = buildSplitModulePlan({

@@ -17,6 +17,8 @@ export interface SwNetImport {
 
 export interface SwNetModule {
   id: string;
+  /** Module parameters declared as `module id(name=default, ...)`. Defaults are always scalar literals. */
+  params: SwNetAssignment[];
   ports: SwNetPort[];
   statements: SwNetStatement[];
 }
@@ -42,6 +44,8 @@ export interface SwNetUseStatement {
   kind: "use";
   moduleRef: SwNetModuleRef;
   instanceId: string;
+  /** Parameter arguments passed with `use module id(name=value, ...)`; values may be literals or `@param` references. */
+  args: SwNetAssignment[];
   inputs: SwNetAssignment[];
   outputs: SwNetAssignment[];
 }
@@ -70,7 +74,8 @@ export type SwNetExpression =
   | SwNetNumberExpression
   | SwNetBooleanExpression
   | SwNetNullExpression
-  | SwNetListExpression;
+  | SwNetListExpression
+  | SwNetParamRefExpression;
 
 export interface SwNetIdentifierExpression {
   kind: "identifier";
@@ -105,6 +110,14 @@ export interface SwNetListExpression {
   entries: SwNetAssignment[];
 }
 
+// A `@name` reference to a module parameter. Deliberately has no `value` field so that any exhaustive
+// switch over SwNetExpression fails to compile until it handles this kind explicitly. References are only
+// valid in inst attribute values and use arguments, and are substituted away before XML export.
+export interface SwNetParamRefExpression {
+  kind: "paramRef";
+  name: string;
+}
+
 /** Error type for syntax and namespace problems found while parsing sw-net source text. */
 export class SwNetParseError extends Error {
   constructor(
@@ -128,6 +141,7 @@ export type SwNetTokenKind =
   | "colon"
   | "comma"
   | "dot"
+  | "at"
   | "equal"
   | "lparen"
   | "rparen"
@@ -251,6 +265,7 @@ class SwNetParser {
     const start = this.peek().start;
     this.expectIdentifier("module");
     const id = this.expect("identifier").text;
+    const params = this.isToken("lparen") ? this.parseAttributeAssignments() : [];
     const ports: SwNetPort[] = [];
     const statements: SwNetStatement[] = [];
 
@@ -281,6 +296,7 @@ class SwNetParser {
 
     const module: SwNetModule = {
       id,
+      params,
       ports,
       statements,
     };
@@ -343,12 +359,14 @@ class SwNetParser {
     this.expectIdentifier("use");
     const moduleRef = this.parseModuleRef();
     const instanceId = this.expect("identifier").text;
+    const args = this.isToken("lparen") ? this.parseAttributeAssignments() : [];
     const { inputs, outputs } = this.parsePinAssignments();
 
     const statement: SwNetUseStatement = {
       kind: "use",
       moduleRef,
       instanceId,
+      args,
       inputs,
       outputs,
     };
@@ -476,6 +494,14 @@ class SwNetParser {
 
     if (this.isToken("lbracket")) {
       return this.parseListExpression();
+    }
+
+    if (this.isToken("at")) {
+      this.expect("at");
+      return {
+        kind: "paramRef",
+        name: this.expect("identifier").text,
+      };
     }
 
     const identifierToken = this.expect("identifier");
@@ -622,6 +648,11 @@ class SwNetLexer {
     if (char === ".") {
       this.advance();
       return this.tokenAt("dot", ".", startLine, startColumn, this.index - 1);
+    }
+
+    if (char === "@") {
+      this.advance();
+      return this.tokenAt("at", "@", startLine, startColumn, this.index - 1);
     }
 
     if (char === "=") {

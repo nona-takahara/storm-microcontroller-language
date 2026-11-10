@@ -116,7 +116,8 @@ function propertyValue(
 ): string | number | boolean | null | undefined {
   const attribute = attributes.find((candidate) => candidate.key === key);
 
-  if (!attribute) {
+  // `@param` values are only known after a `use` expands the module, so shape the gate by its default.
+  if (!attribute || attribute.value.kind === "paramRef") {
     return defaults?.[key];
   }
 

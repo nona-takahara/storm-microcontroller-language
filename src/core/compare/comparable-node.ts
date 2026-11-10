@@ -77,5 +77,10 @@ function literalInputRecord(assignments: readonly SwNetAssignment[]): Record<str
 }
 
 function expressionToScalar(expression: SwNetExpression): IrScalarValue {
-  return expression.kind === "list" ? encodeSwNetItemListEntries(expression.entries) : expression.value;
+  if (expression.kind === "list") {
+    return encodeSwNetItemListEntries(expression.entries);
+  }
+
+  // Parameter references are substituted away by the project flattener before comparison.
+  return expression.kind === "paramRef" ? null : expression.value;
 }

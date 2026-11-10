@@ -604,13 +604,13 @@ function createXmlFlattenVisitor(
         messageArgs: { context: contextLabel, portName: JSON.stringify(portName) },
       });
     },
-    onInstance: ({ scope, moduleKey, statement, flattenedId, inputs, outputs }) => {
+    onInstance: ({ scope, moduleKey, statement, flattenedId, attributes, inputs, outputs }) => {
       out.push({
         statement: {
           kind: "inst",
           typeId: statement.typeId,
           instanceId: flattenedId,
-          attributes: statement.attributes,
+          attributes,
           inputs,
           outputs,
         },

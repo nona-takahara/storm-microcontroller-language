@@ -44,6 +44,12 @@ export const enMessages = {
   "project.componentDefinitionMissing": "Component type {typeId} is not defined in definitions.",
   "project.scriptMissing": "Script {scriptRef} was not found in document {documentId}.",
   "project.duplicateUseInstance": "Instance id {instanceId} is used more than once in module {moduleId}.",
+  "project.paramDuplicate": "Parameter {paramName} is declared more than once in module {moduleId}.",
+  "project.paramDefaultInvalid": "Parameter {paramName} of module {moduleId} needs a scalar default value (number, string, boolean, null, or bare word).",
+  "project.paramUndeclared": "{instanceId} in module {moduleId} references @{paramName}, which module {moduleId} does not declare.",
+  "project.paramRefNotAllowed": "@{paramName} on {instanceId} in module {moduleId} is not allowed here; parameters can only be used as property values and use arguments.",
+  "project.useArgUnknown": "Module {moduleId} has no parameter {argName} (passed by {instanceId}).",
+  "project.useArgTypeMismatch": "Argument {argName} on {instanceId} is {actual}, but parameter {argName} of module {moduleId} defaults to {expected}.",
   "project.unboundUseInput": "Input port {portName} of module {moduleId} is not bound by {instanceId}.",
   "project.portAssignedMultiple": "Port {portName} is assigned more than once on {instanceId}.",
   "project.modulePortMissing": "Module {moduleId} has no port {portName} (referenced by {instanceId}).",
@@ -135,8 +141,10 @@ export const enMessages = {
   "sync.kind.rewired": "rewired",
   "sync.warning.layout-overwrite": "layout overwrite",
   "sync.warning.layout-projection": "layout not applied",
+  "sync.warning.submodule-rewrite": "submodule property rewritten",
   "sync.conflict.module-boundary": "module boundary",
   "sync.conflict.shared-module-divergence": "shared module divergence",
+  "sync.conflict.module-parameter": "module parameter",
   "sync.conflict.ambiguous-correspondence": "ambiguous correspondence",
   "sync.conflict.ambiguous-placement": "ambiguous placement",
   "sync.conflict.layout-projection": "layout projection",
@@ -150,6 +158,7 @@ export const enMessages = {
   "split.emptySelection": "No gate instance ids were provided to split.",
   "split.gateNotFound": "Instance {instanceId} was not found in module {moduleId}.",
   "split.instanceIdConflict": "Instance id {instanceId} is already used in module {moduleId}.",
+  "split.paramReference": "Instance {instanceId} reads a module parameter (@name) of {moduleId}, so it cannot be moved into a new module.",
   "split.result.written": "Split applied. Files were written.",
   "split.result.dryRun": "Dry run completed. No files were written.",
   "split.summary": "Moved {count, plural, one {# instance} other {# instances}} into module {moduleId} ({path}).",
@@ -204,6 +213,12 @@ export interface MessageArgsById {
   "project.componentDefinitionMissing": { typeId: string };
   "project.scriptMissing": { scriptRef: string; documentId: string };
   "project.duplicateUseInstance": { instanceId: string; moduleId: string };
+  "project.paramDuplicate": { paramName: string; moduleId: string };
+  "project.paramDefaultInvalid": { paramName: string; moduleId: string };
+  "project.paramUndeclared": { paramName: string; moduleId: string; instanceId: string };
+  "project.paramRefNotAllowed": { paramName: string; moduleId: string; instanceId: string };
+  "project.useArgUnknown": { argName: string; moduleId: string; instanceId: string };
+  "project.useArgTypeMismatch": { argName: string; moduleId: string; instanceId: string; expected: string; actual: string };
   "project.unboundUseInput": { portName: string; moduleId: string; instanceId: string };
   "project.portAssignedMultiple": { portName: string; instanceId: string };
   "project.modulePortMissing": { moduleId: string; portName: string; instanceId: string };
@@ -297,8 +312,10 @@ export interface MessageArgsById {
   "sync.kind.rewired": NoMessageArguments;
   "sync.warning.layout-overwrite": NoMessageArguments;
   "sync.warning.layout-projection": NoMessageArguments;
+  "sync.warning.submodule-rewrite": NoMessageArguments;
   "sync.conflict.module-boundary": NoMessageArguments;
   "sync.conflict.shared-module-divergence": NoMessageArguments;
+  "sync.conflict.module-parameter": NoMessageArguments;
   "sync.conflict.ambiguous-correspondence": NoMessageArguments;
   "sync.conflict.ambiguous-placement": NoMessageArguments;
   "sync.conflict.layout-projection": NoMessageArguments;
@@ -312,6 +329,7 @@ export interface MessageArgsById {
   "split.emptySelection": NoMessageArguments;
   "split.gateNotFound": { instanceId: string; moduleId: string };
   "split.instanceIdConflict": { instanceId: string; moduleId: string };
+  "split.paramReference": { instanceId: string; moduleId: string };
   "split.result.written": NoMessageArguments;
   "split.result.dryRun": NoMessageArguments;
   "split.summary": { count: number; moduleId: string; path: string };
@@ -361,6 +379,12 @@ export const jaMessages: Record<MessageId, string> = {
   "project.componentDefinitionMissing": "コンポーネントtype {typeId} はdefinitionsに定義されていません。",
   "project.scriptMissing": "スクリプト {scriptRef} がドキュメント {documentId} にありません。",
   "project.duplicateUseInstance": "instance id {instanceId} はモジュール {moduleId} 内で複数回使われています。",
+  "project.paramDuplicate": "パラメータ {paramName} がモジュール {moduleId} で複数回宣言されています。",
+  "project.paramDefaultInvalid": "モジュール {moduleId} のパラメータ {paramName} には、スカラーの既定値（数値、文字列、真偽値、null、裸の単語）が必要です。",
+  "project.paramUndeclared": "モジュール {moduleId} 内の {instanceId} が @{paramName} を参照していますが、モジュール {moduleId} はそのパラメータを宣言していません。",
+  "project.paramRefNotAllowed": "モジュール {moduleId} 内の {instanceId} にある @{paramName} はここでは使えません。パラメータはプロパティの値と use の引数にだけ書けます。",
+  "project.useArgUnknown": "モジュール {moduleId} にパラメータ {argName} がありません（{instanceId}が渡しています）。",
+  "project.useArgTypeMismatch": "{instanceId} の引数 {argName} は {actual} ですが、モジュール {moduleId} のパラメータ {argName} の既定値は {expected} です。",
   "project.unboundUseInput": "モジュール {moduleId} の入力ポート {portName} が {instanceId} によって接続されていません。",
   "project.portAssignedMultiple": "ポート {portName} が {instanceId} で複数回割り当てられています。",
   "project.modulePortMissing": "モジュール {moduleId} にポート {portName} がありません（{instanceId}から参照）。",
@@ -452,8 +476,10 @@ export const jaMessages: Record<MessageId, string> = {
   "sync.kind.rewired": "配線変更",
   "sync.warning.layout-overwrite": "レイアウト上書き",
   "sync.warning.layout-projection": "レイアウト未反映",
+  "sync.warning.submodule-rewrite": "submodule内のプロパティを書き換え",
   "sync.conflict.module-boundary": "module境界",
   "sync.conflict.shared-module-divergence": "共有moduleの利用箇所間差異",
+  "sync.conflict.module-parameter": "moduleパラメータ",
   "sync.conflict.ambiguous-correspondence": "対応の曖昧性",
   "sync.conflict.ambiguous-placement": "配置先の曖昧性",
   "sync.conflict.layout-projection": "レイアウト投影",
@@ -467,6 +493,7 @@ export const jaMessages: Record<MessageId, string> = {
   "split.emptySelection": "分割対象のinstance idが指定されていません。",
   "split.gateNotFound": "instance {instanceId} はモジュール {moduleId} に見つかりません。",
   "split.instanceIdConflict": "instance id {instanceId} はモジュール {moduleId} で既に使われています。",
+  "split.paramReference": "instance {instanceId} は {moduleId} のモジュールパラメータ（@名前）を参照しているため、新しいモジュールへ移せません。",
   "split.result.written": "分割を適用し、ファイルを書き込みました。",
   "split.result.dryRun": "dry-runが完了しました。ファイルは変更していません。",
   "split.summary": "{count}個のインスタンスをモジュール {moduleId}（{path}）へ移動しました。",

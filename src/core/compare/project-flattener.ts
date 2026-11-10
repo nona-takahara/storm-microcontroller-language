@@ -5,7 +5,8 @@ import {
   type StormworksLibraryResult,
 } from "../diagnostics.js";
 import { walkFlattenedModule } from "../flatten/walk.js";
-import { type SwNetAssignment, type SwNetModule, type SwNetStatement } from "../parsers/sw-net.js";
+import { type ParamOrigin } from "../module-params.js";
+import { type SwNetModule, type SwNetStatement } from "../parsers/sw-net.js";
 import { type SwNetResolutionResult, type SwNetResolvedModule } from "../resolvers/sw-net.js";
 import { type ProvenancePath } from "./types.js";
 
@@ -17,6 +18,8 @@ export interface FlattenedSwNetProject {
   module: SwNetModule;
   provenanceByInstanceId: Record<string, ProvenancePath>;
   documentPathByInstanceId: Record<string, string>;
+  /** Per flattened instance, which attributes were written as `@param` and where each one is controlled. `undefined` marks a reference that cannot be written back (inside a list literal). */
+  paramOriginsByInstanceId: Record<string, Record<string, ParamOrigin | undefined>>;
 }
 
 /**
@@ -37,6 +40,7 @@ export function flattenSwNetProject(
   const statements: SwNetStatement[] = [];
   const provenanceByInstanceId: Record<string, ProvenancePath> = {};
   const documentPathByInstanceId: Record<string, string> = {};
+  const paramOriginsByInstanceId: Record<string, Record<string, ParamOrigin | undefined>> = {};
 
   try {
     walkFlattenedModule<void>(resolution.modules, entry.key, {
@@ -58,16 +62,19 @@ export function flattenSwNetProject(
           ),
         );
       },
-      onInstance: ({ moduleKey, statement, instancePath, flattenedId, inputs, outputs }) => {
+      onInstance: ({ moduleKey, statement, instancePath, flattenedId, attributes, paramOrigins, inputs, outputs }) => {
         statements.push({
           ...statement,
           instanceId: flattenedId,
-          attributes: cloneAssignments(statement.attributes),
+          attributes,
           inputs,
           outputs,
         });
         provenanceByInstanceId[flattenedId] = { moduleId: moduleKey.moduleId, instanceIds: instancePath };
         documentPathByInstanceId[flattenedId] = moduleKey.documentPath;
+        if (Object.keys(paramOrigins).length > 0) {
+          paramOriginsByInstanceId[flattenedId] = paramOrigins;
+        }
       },
     });
   } catch (error) {
@@ -89,11 +96,13 @@ export function flattenSwNetProject(
     value: {
       module: {
         id: entry.module.id,
+        params: entry.module.params,
         ports: entry.module.ports,
         statements,
       },
       provenanceByInstanceId,
       documentPathByInstanceId,
+      paramOriginsByInstanceId,
     },
     diagnostics,
   };
@@ -146,10 +155,6 @@ function selectEntryModule(
   }
 
   return candidates[0];
-}
-
-function cloneAssignments(assignments: SwNetAssignment[]): SwNetAssignment[] {
-  return assignments.map((assignment) => ({ key: assignment.key, value: { ...assignment.value } }));
 }
 
 function formatInstanceId(path: string[]): string {

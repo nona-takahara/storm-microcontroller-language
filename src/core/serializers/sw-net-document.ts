@@ -44,7 +44,8 @@ export function serializeSwNetDocument(
 function serializeSwNetModule(module: SwNetModule): string[] {
   const lines: string[] = [];
 
-  lines.push(`module ${module.id}`);
+  const paramsText = module.params.length > 0 ? `(${serializeAssignments(module.params)})` : "";
+  lines.push(`module ${module.id}${paramsText}`);
 
   for (const port of module.ports) {
     lines.push(`  port ${port.direction} ${formatPortName(port.name)} : ${port.signal}`);
@@ -80,7 +81,9 @@ export function serializeSwNetStatement(statement: SwNetStatement): string {
       ? statement.moduleRef.moduleId
       : `${statement.moduleRef.alias}.${statement.moduleRef.moduleId}`;
 
-  return `use ${moduleRef} ${statement.instanceId} ${serializePinAssignments(
+  const argsText = statement.args.length > 0 ? ` (${serializeAssignments(statement.args)})` : "";
+
+  return `use ${moduleRef} ${statement.instanceId}${argsText} ${serializePinAssignments(
     statement.inputs,
     statement.outputs,
   )}`;
@@ -123,6 +126,8 @@ function serializeExpression(expression: SwNetExpression): string {
       return "null";
     case "list":
       return `[${serializeAssignments(expression.entries)}]`;
+    case "paramRef":
+      return `@${expression.name}`;
   }
 }
 

@@ -4,6 +4,14 @@
 // expression rewriting reaches both (issue #60). Callers differ only in how they name flattened
 // instances/nets (FlattenNaming) and in what they do with each flattened `inst` (FlattenVisitor).
 import {
+  buildChildParamEnv,
+  buildEntryParamEnv,
+  type ModuleParamEnv,
+  type ParamOrigin,
+  resolveAttributeParamOrigins,
+  substituteAttributeParams,
+} from "../module-params.js";
+import {
   type SwNetAssignment,
   type SwNetExpression,
   type SwNetInstStatement,
@@ -27,6 +35,10 @@ export interface FlattenInstanceEvent<TScope> {
   /** Instance path including the statement's own id. */
   instancePath: string[];
   flattenedId: string;
+  /** The statement's attributes with every `@param` replaced by its value (issue #109). Prefer this over `statement.attributes`. */
+  attributes: SwNetAssignment[];
+  /** Attributes written as `@param`, mapped to the place that controls them; `undefined` marks one nested in a list literal. */
+  paramOrigins: Record<string, ParamOrigin | undefined>;
   /** Inputs/outputs with identifiers namespaced and port references substituted; unresolvable ones are dropped. */
   inputs: SwNetAssignment[];
   outputs: SwNetAssignment[];
@@ -70,13 +82,18 @@ export function walkFlattenedModule<TScope>(
   visitor: FlattenVisitor<TScope>,
 ): void {
   const moduleByKey = new Map(modules.map((module) => [formatResolvedModuleKey(module.key), module] as const));
-  walkModule(entryKey, [], new Map(), visitor.rootScope, moduleByKey, visitor);
+  const entryModule = moduleByKey.get(formatResolvedModuleKey(entryKey));
+  const entryParamEnv = entryModule
+    ? buildEntryParamEnv(entryModule.module, entryKey.documentPath)
+    : new Map();
+  walkModule(entryKey, [], new Map(), entryParamEnv, visitor.rootScope, moduleByKey, visitor);
 }
 
 function walkModule<TScope>(
   moduleKey: SwNetResolvedModuleKey,
   instancePath: string[],
   portBindings: Map<string, SwNetExpression>,
+  paramEnv: ModuleParamEnv,
   scope: TScope,
   moduleByKey: Map<string, SwNetResolvedModule>,
   visitor: FlattenVisitor<TScope>,
@@ -169,6 +186,8 @@ function walkModule<TScope>(
         statement,
         instancePath: statementPath,
         flattenedId,
+        attributes: substituteAttributeParams(statement.attributes, paramEnv),
+        paramOrigins: resolveAttributeParamOrigins(statement.attributes, paramEnv),
         inputs,
         outputs,
       });
@@ -215,7 +234,12 @@ function walkModule<TScope>(
       instancePath: statementPath,
       flattenedId,
     });
-    walkModule(useEdge.target, statementPath, childPortBindings, childScope, moduleByKey, visitor);
+    const childParamEnv = buildChildParamEnv(targetModule.module, statement.args, paramEnv, {
+      documentPath: moduleKey.documentPath,
+      moduleId: moduleKey.moduleId,
+      instanceId: statement.instanceId,
+    });
+    walkModule(useEdge.target, statementPath, childPortBindings, childParamEnv, childScope, moduleByKey, visitor);
   }
 }
 

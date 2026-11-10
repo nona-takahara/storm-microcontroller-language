@@ -67,5 +67,5 @@ export function encodeSwNetItemListEntries(entries: readonly SwNetAssignment[]):
 // Reduce one list-entry's value expression to a raw scalar before string coercion; a nested list
 // isn't a meaningful item value and falls back to null (via preserveNull) rather than being rejected.
 function extractItemListEntryRawValue(expression: SwNetExpression): IrScalarValue | undefined {
-  return expression.kind === "list" ? undefined : expression.value;
+  return expression.kind === "list" || expression.kind === "paramRef" ? undefined : expression.value;
 }
